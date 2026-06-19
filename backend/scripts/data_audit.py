@@ -90,9 +90,9 @@ try:
     print(f"[fund] fundamentals but NO price ({len(fund_no_px)} — the failed fetches):")
     print("       " + ", ".join(t[0] for t in fund_no_px))
     print(f"[fund] priced but NO fundamentals: {px_no_fund}")
-    # per-field NaN rate
-    cols = [c[0] for c in con.execute("PRAGMA table_info('fundamentals')").fetchall()
-            if c[0] not in ('ticker', 'snapshot_date', 'reporting_date', 'sector')]
+    # per-field NaN rate (PRAGMA table_info: c[0]=cid int, c[1]=name — use the name)
+    cols = [c[1] for c in con.execute("PRAGMA table_info('fundamentals')").fetchall()
+            if c[1] not in ('ticker', 'snapshot_date', 'reporting_date', 'sector')]
     tot = one("SELECT COUNT(*) FROM fundamentals")[0] or 1
     print("[fund] per-field NULL %:")
     for c in cols:
