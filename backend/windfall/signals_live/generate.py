@@ -118,7 +118,7 @@ def _regime_state(rs: ResolvedStrategy, cfg: StrategyConfig, i: int) -> dict | N
 def signals_to_csv(run: dict) -> str:
     """Serialize a signal run's list to CSV text (the exportable order list)."""
     cols = ["ticker", "action", "rank_value", "weight", "last_close", "entry_zone",
-            "stop", "target", "ext_above_50dma", "rsi14", "note"]
+            "stop", "target", "ext_above_50dma", "rsi14", "surveillance", "note"]
     out = io.StringIO()
     writer = csv.DictWriter(out, fieldnames=cols, extrasaction="ignore")
     writer.writeheader()
