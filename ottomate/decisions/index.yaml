@@ -108,3 +108,12 @@ decisions:
       - curated
       - cat:security
     body_path: docs/decisions/adr-012-windfall-surveillance-guardrail.md
+  - id: adr-013-windfall-screener-fundamentals
+    project_slug: windfall-labs
+    title: Historical fundamentals via screener.in, triangulation-validated
+    status: accepted
+    date: 2026-06-19T00:00:00.000Z
+    tags:
+      - curated
+      - cat:reliability
+    body_path: docs/decisions/adr-013-windfall-screener-fundamentals.md

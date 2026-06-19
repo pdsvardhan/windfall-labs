@@ -24,3 +24,24 @@
 3. Then user's sequence: detailed data verification → replicate 1-2 Trendlyne backtests in-engine & compare.
 
 **Known pre-existing:** anti-gaslight "unclaimed-done" on cockpit-dashboard (+1) — original Stage-3 features marked done before ledger writes existed; not from this session.
+
+## Session 2026-06-19 (cont.) — iter-26: screener.in historical fundamentals
+
+**Stage:** Stage 4 (iterate) — historical-fundamentals sourcing, validation & ingestion
+**What changed (ADR-013, verifier-APPROVED report #202, feature-claim #70 reconciled):**
+- **Validated screener.in** as the historical-fundamentals source via a three-way triangulation (screener × yfinance × Trendlyne) over 21 stocks: raw lines 97–99% vs Trendlyne gold, computed ROE 97%, ~6 bounded failure classes that **converged** (+9 diverse stocks added zero new classes). Decision: **GO**.
+- **Built `backend/windfall/data/screener_fundamentals.py`** — standalone `data/screener_fundamentals.duckdb`, six handling rules: (1) symbol→slug direct-first with screener search-API fallback + NSE-symbol verify; (2) financials excluded (sector + schema); (3) Net Profit → owner-attributable via yfinance overlap; (4) split-adjusted per-share; (5) period-end-date keying; (6) ratios computed from raw lines. Self-check (Layer-1 identity + soft yfinance cross-vote) → high/low/quarantined/excluded.
+- **Ran the full nifty500: 402 tickers, 4,159 rows, 2005–2026** (368 high · 32 low/review · 2 quarantined; 92 financials excluded; 1 failed). Batch-1 deep verify vs yfinance = 40/40 clean (assets 100%, rev 99%, cfo 98%); across all 402, assets agreed ~99.5%.
+- **Key finding:** yfinance is **unreliable for Indian revenue** (INFY ≈ ₹1,928 Cr vs screener's correct ₹162,990 Cr, ~85× off) — so the yfinance cross-vote was demoted to a **soft review flag**; screener is the more reliable source. Hard quarantine now only from the NSE-symbol mapping guard + Layer-1 identity.
+
+**Decisions:** ADR-013 (screener.in historical fundamentals, triangulation-validated, cat:reliability). Financials excluded from the fundamental-DVM (user decision).
+
+**Open bugs/items:** VAML ZeroDivisionError (1 stock); IDEA (Vodafone Idea) screener slug unresolved (search resolves to IdeaForge → MAP-MISMATCH-quarantined); ABB short consolidated history (4p).
+
+**Next session pick-up:**
+1. Fix the 3 open items (VAML divide-by-zero, IDEA slug, ABB short history).
+2. Run the wider **trendlyne universe (1,138)** — needs a ONE-DOOR-safe symbol export (not via opening windfall.duckdb).
+3. **Wire `fundamentals_history` into the engine** (point-in-time, ~3mo fiscal lag) → own Durability/Valuation over history.
+4. Then the user's sequence: detailed data verification → replicate 1–2 Trendlyne backtests in-engine & compare.
+
+**Commits:** 318a18c (ingester + ADR-013), f0174da (direct-first + 3 batch fixes), a9f9693 (soft yfinance cross-vote).
