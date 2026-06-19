@@ -175,7 +175,12 @@ def ingest_range(start: dt.date, end: dt.date, delay: float = 0.6) -> dict:
 
 def status(con=None) -> dict:
     own = con is None
-    con = con or connect()
+    if con is None:
+        try:  # read-only so a coverage check doesn't fight a running backfill for the write lock
+            con = duckdb.connect(DB, read_only=True)
+        except (duckdb.IOException, duckdb.Error):
+            return {"status": "busy — bhavcopy.duckdb is locked (a backfill is running); "
+                              "watch its log instead"}
     row = con.execute("SELECT COUNT(*), COUNT(DISTINCT ticker), COUNT(DISTINCT date), "
                       "MIN(date), MAX(date) FROM bhavcopy_prices").fetchone()
     out = {"rows": row[0], "tickers": row[1], "trading_days": row[2],
