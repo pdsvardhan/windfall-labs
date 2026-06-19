@@ -54,9 +54,12 @@ MOMENTUM_W = {"roc63": 0.20, "roc126": 0.25, "roc252": 0.25, "rsi14": 0.15, "rel
 # cross-source noise vs Trendlyne's own-data target, so they are NOT in the live-match blend.)
 DURABILITY_W = {"piotroski": 0.45, "pledge": 0.18, "eps_growth": 0.15, "roa": 0.12, "opm": 0.05, "np_qtr_yoy": 0.05}
 # PEG leads the valuation blend: it is the strongest single predictor of Trendlyne's valuation score
-# (Spearman ~0.67 on the 2026-06-18 snapshot, vs ~0.46 PE / ~0.40 PE-to-sector / ~0.30 PB), because
-# Trendlyne valuation is growth-adjusted. PB is the weakest, so it is downweighted.
-VALUATION_W = {"peg": 0.40, "pe_to_sector": 0.25, "pe": 0.20, "pb": 0.15}
+# (Spearman ~0.67 on the 2026-06-18 snapshot, vs ~0.46 PE / ~0.41 PB / ~0.40 PE-to-sector). PE-to-sector
+# was DROPPED (v1.1): a held-out least-squares fit gave it a NEGATIVE weight (redundant/noisy vs raw PE),
+# and dropping it lifted the blend from ~0.41 to ~0.44 — the data ceiling. (Trendlyne valuation also uses
+# forward-PE / EV-EBITDA / dividend-yield / self-history, none of which we have, so ~0.44 is the cap
+# until those are sourced; the stock's own-history percentile was tested and does NOT help cross-sectionally.)
+VALUATION_W = {"peg": 0.45, "pe": 0.30, "pb": 0.25}
 
 
 def momentum_own(roc63, roc126, roc252, rsi14, rel_strength126) -> pd.DataFrame | None:
@@ -91,13 +94,13 @@ def valuation_own(pe, pb, pe_to_sector, peg=None) -> pd.DataFrame | None:
     loss-makers as attractive and dragged it below its own components.)
 
     `peg` (P/E ÷ EPS-growth%) is the growth-adjusted cheapness Trendlyne leans on most; pass None to
-    omit it. The remaining Trendlyne ingredient — current multiple vs the stock's own 5–10yr history —
-    is a follow-up, unlocked once the screener-history overlap is wide enough to compute it."""
+    omit it. `pe_to_sector` is accepted for backward-compatibility but NOT used (v1.1: a held-out fit
+    gave it a negative weight — redundant with raw PE — and dropping it raised the match to the ~0.44
+    data ceiling). Reaching higher needs inputs we don't have (forward-PE / EV-EBITDA / dividend yield)."""
     def neg_pos(x):
         return (-x.where(x > 0)) if x is not None else None
     return _blend_pct([
         (neg_pos(peg), VALUATION_W["peg"]),
-        (neg_pos(pe_to_sector), VALUATION_W["pe_to_sector"]),
         (neg_pos(pe), VALUATION_W["pe"]),
         (neg_pos(pb), VALUATION_W["pb"]),
     ])
