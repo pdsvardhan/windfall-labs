@@ -99,3 +99,12 @@ decisions:
       - curated
       - cat:reliability
     body_path: docs/decisions/adr-011-windfall-bhavcopy-survivorship.md
+  - id: adr-012-windfall-surveillance-guardrail
+    project_slug: windfall-labs
+    title: ASM/GSM surveillance flag as a pre-deploy guardrail
+    status: accepted
+    date: 2026-06-19T00:00:00.000Z
+    tags:
+      - curated
+      - cat:security
+    body_path: docs/decisions/adr-012-windfall-surveillance-guardrail.md
