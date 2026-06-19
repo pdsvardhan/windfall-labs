@@ -66,6 +66,16 @@ class WalkForwardIn(SweepIn):
     oos_years: float = 1.0
 
 
+class CostSensitivityIn(BaseModel):
+    config: dict
+    multipliers: list[float] = [0.0, 1.0, 2.0]
+
+
+class CompareIn(BaseModel):
+    config_a: dict
+    config_b: dict
+
+
 class SignalsIn(BaseModel):
     config: dict
     strategy_id: str | None = None
@@ -211,6 +221,44 @@ def backtests_get(bid: str):
     return clean(d)
 
 
+# Summary metrics where the modelled costs + turnover actually show up (Build-Spec rail #1).
+_COST_METRICS = ("cagr", "total_return", "sharpe", "sortino", "max_drawdown",
+                 "annual_turnover", "n_trades", "exposure", "active_return")
+
+
+@app.post("/api/backtests/cost-sensitivity")
+def backtests_cost_sensitivity(body: CostSensitivityIn):
+    """Run one strategy at several cost multipliers (default 0x/1x/2x) so realism-vs-optimism is
+    explicit: how much net CAGR / Sharpe / return the modelled costs + turnover give back."""
+    base = StrategyConfig(**body.config)  # validate + resolve cost defaults
+    c = base.costs_bps
+    runs = []
+    for m in body.multipliers:
+        scaled = {"brokerage": c.brokerage * m, "stt": c.stt * m, "slippage": c.slippage * m}
+        try:
+            res = run_backtest({**body.config, "costs_bps": scaled})
+        except Exception as exc:  # noqa: BLE001
+            raise HTTPException(400, f"cost-sensitivity run (x{m}) failed: {exc}")
+        s = res.summary.model_dump()
+        runs.append({"cost_multiplier": m, "costs_bps": scaled,
+                     "summary": {k: s.get(k) for k in _COST_METRICS}})
+    return clean({"name": base.name, "base_costs_bps": c.model_dump(),
+                  "multipliers": body.multipliers, "runs": runs})
+
+
+@app.post("/api/backtests/compare")
+def backtests_compare(body: CompareIn):
+    """A/B two strategy configs over their windows: side-by-side summary metrics + equity curves."""
+    def one(cfg: dict) -> dict:
+        d = run_backtest(cfg).model_dump()
+        return {k: d[k] for k in ("name", "period", "summary", "equity_curve",
+                                  "benchmark_curve", "warnings")}
+    try:
+        return clean({"a": one(body.config_a), "b": one(body.config_b)})
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(400, f"compare failed: {exc}")
+
+
 # ── sweep / walk-forward ─────────────────────────────────────────────────────
 @app.post("/api/sweep")
 def sweep_run(body: SweepIn):
@@ -235,7 +283,9 @@ def signals_run(body: SignalsIn):
 
 @app.post("/api/signals/export")
 def signals_export(body: SignalsIn):
-    out = generate_signals(body.config)
+    # Annotate with ASM/GSM surveillance flags first (same as /api/signals) so the exported
+    # order-prep CSV carries the flag — a buy into a surveilled name must be visible on the sheet.
+    out = surveillance.annotate_signals(generate_signals(body.config))
     csv_text = signals_to_csv(out)
     return PlainTextResponse(
         csv_text, media_type="text/csv",
