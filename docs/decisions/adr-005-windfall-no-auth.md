@@ -18,3 +18,14 @@ does not want a login in v1. Every page is `anonymous` in the spec.
 - **If** the app is ever exposed publicly, or multi-user is added, this ADR must be superseded and
   a real auth strategy added before that change ships (the 3→deploy gate requires auth if any page
   becomes non-anonymous).
+
+## Amendment 2026-06-19 — exposed at the edge behind Authentik SSO
+The cockpit is now reachable at **https://windfall-labs.vault7a.xyz** via the vault7a Cloudflare
+tunnel, routed through **Authentik SSO** (embedded proxy outpost → upstream `http://192.168.1.10:8500`),
+matching the owner's other personal apps (ottomate, cointrail, leaploop). The app still has **no
+in-app login** — access control is enforced at the edge by Authentik (an unauthenticated request
+redirects to the Authentik login flow). This is consistent with the original "tunnel-gated, never
+unauthenticated-public" intent: it is *not* public-anonymous; it is SSO-gated. The frontend was
+reworked to **single-origin** (browser calls `/api/*` on the cockpit host; Next.js proxies to the API
+container) so it works through the tunnel with no hardcoded LAN address and no cross-origin. Do not
+remove the Authentik gate or route the hostname directly to `:8500`.

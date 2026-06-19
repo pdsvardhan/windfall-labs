@@ -20,8 +20,8 @@ services:
     ports:
       - "8500:8500"
     environment:
-      # Browser talks to the API on the host's published port; server components use the internal name.
-      - NEXT_PUBLIC_API_BASE=http://192.168.1.10:8505
+      # Single-origin: browser calls /api/* on this host; Next rewrites to the api container
+      # (see frontend/next.config.mjs). Works on LAN and through the tunnel; no hardcoded LAN IP.
       - API_INTERNAL_BASE=http://api:8503
     depends_on:
       - api

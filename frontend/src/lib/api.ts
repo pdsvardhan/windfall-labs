@@ -3,8 +3,10 @@ import type {
   ScoreRow, SignalRun, Strategy, WalkForwardReport,
 } from "./types";
 
-export const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE || "http://192.168.1.10:8505";
+// Same-origin by default: calls go to /api/* on whatever host serves the cockpit, and Next.js
+// rewrites them to the API container (see next.config.mjs). Set NEXT_PUBLIC_API_BASE only for
+// pointing a local dev frontend at a remote API.
+export const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "";
 
 async function http<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {

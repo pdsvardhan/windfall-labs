@@ -8,8 +8,9 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
-# NEXT_PUBLIC_* is inlined at build time — bake the API base the browser will use.
-ARG NEXT_PUBLIC_API_BASE=http://192.168.1.10:8505
+# Same-origin by default (empty base): the browser calls /api/* and Next proxies to the API
+# container, so it works on the LAN and through the tunnel. Override only for split deploys.
+ARG NEXT_PUBLIC_API_BASE=
 ENV NEXT_PUBLIC_API_BASE=${NEXT_PUBLIC_API_BASE}
 RUN npm run build
 
