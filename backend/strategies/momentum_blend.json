@@ -1,0 +1,38 @@
+{
+  "name": "momentum_blend",
+  "_note": "Showcases the multi-factor percentile-blend ranker on PRICE-ONLY factors, so it is fully backtestable over the entire price history (no fundamental filter, no fundamental blend factor -> data-readiness verdict: fully-backtestable). Quarterly rebalance (Trendlyne's strongest cadence), regime overlay for drawdown control, ATR stop + R-multiple target, ADTV cap, and a 15% max-weight-per-stock cap. Ranks by a 7-slot blend: relative strength 25, abs-momentum 15, vol-adj momentum 15, ADX 10, volume confirmation 10, entry-timing(RSI) 15, short-momentum 10. This is the price-only analogue of the DVM blend used to validate the engine over long history while fundamental history accrues.",
+  "universe": {
+    "index": "nifty500",
+    "filters": ["close > sma50", "close > sma200", "adtv_cr >= 10"],
+    "exclude_sectors": ["bank", "financial", "finance"]
+  },
+  "entry_filters": ["rsi14 > 50"],
+  "rank_by": "roc125",
+  "rank_blend": [
+    {"factor": "rel_strength63", "weight": 0.25, "order": "desc"},
+    {"factor": "roc125", "weight": 0.15, "order": "desc"},
+    {"factor": "roc125 / (atr14 / close)", "weight": 0.15, "order": "desc"},
+    {"factor": "adx14", "weight": 0.10, "order": "desc"},
+    {"factor": "volume / vol_avg21", "weight": 0.10, "order": "desc"},
+    {"factor": "rsi14", "weight": 0.15, "order": "desc"},
+    {"factor": "roc21", "weight": 0.10, "order": "desc"}
+  ],
+  "rank_order": "desc",
+  "n_holdings": 15,
+  "weighting": "equal",
+  "invest_fully": true,
+  "max_weight_per_stock": 0.15,
+  "rebalance": "quarterly",
+  "entry_fill": "next_open",
+  "sector_cap": 3,
+  "max_position_adtv_pct": 0.1,
+  "stop_loss": { "type": "atr", "mult": 2.5, "atr_period": 14 },
+  "take_profit": { "type": "none" },
+  "max_hold_days": null,
+  "regime_filter": { "enabled": true, "benchmark": "NIFTY500", "ma_period": 200, "mode": "scale", "below_exposure": 0.5 },
+  "costs_bps": { "brokerage": 3, "stt": 10, "slippage": 15 },
+  "capital": 1000000,
+  "start": "2015-01-01",
+  "end": null,
+  "benchmark": "NIFTY500"
+}

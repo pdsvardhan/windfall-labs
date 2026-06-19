@@ -1,6 +1,6 @@
 {
   "name": "dvm_monthly",
-  "_note": "The methodology v2.2 DVM/momentum screen, now expressible thanks to the Trendlyne fundamentals snapshot. Screens on Durability>50, mcap 500-50000cr, P/E <= 2.5x sector, promoter pledge < 20%, trend (>50 & >200 DMA), liquidity (ADTV>=10cr), excludes Banking & Finance; ranks by 12-week price momentum (roc125). Fundamentals are snapshot-only, so this is a LIVE-SIGNALS strategy (run it on /signals) - a historical backtest is gated to NaN before the snapshot by design. The full percentile-blend scoring isn't replicated in a single rank expression.",
+  "_note": "The methodology v2.2 DVM/momentum screen. Screens on Durability>50, mcap 500-50000cr, P/E <= 2.5x sector, promoter pledge < 20%, trend (>50 & >200 DMA), liquidity (ADTV>=10cr), excludes Banking & Finance. NOW ranks by the true 7-factor percentile blend (rank_blend) rather than single roc125: RS 25, abs-momentum 15, vol-adj momentum 15, ADX 10, volume 10, entry-timing(RSI) 15, quality(Piotroski) 10. Because the universe FILTER uses a fundamental (durability) this stays a LIVE-SIGNALS strategy (run on /signals) - a historical backtest is gated to NaN before the snapshot by design (data-readiness verdict: live-only). RS and quality blend factors are also fundamental and blank-tolerant in the blend.",
   "universe": {
     "index": "trendlyne",
     "filters": ["mcap_cr >= 500", "mcap_cr <= 50000", "durability > 50", "adtv_cr >= 10",
@@ -9,6 +9,15 @@
   },
   "entry_filters": ["rsi14 > 50"],
   "rank_by": "roc125",
+  "rank_blend": [
+    {"factor": "(rs_nifty_1m + rs_nifty_3m + rs_sector_1m + rs_sector_3m) / 4", "weight": 0.25, "order": "desc"},
+    {"factor": "roc125", "weight": 0.15, "order": "desc"},
+    {"factor": "roc125 / (atr14 / close)", "weight": 0.15, "order": "desc"},
+    {"factor": "adx14", "weight": 0.10, "order": "desc"},
+    {"factor": "volume / vol_avg21", "weight": 0.10, "order": "desc"},
+    {"factor": "rsi14", "weight": 0.15, "order": "desc"},
+    {"factor": "piotroski", "weight": 0.10, "order": "desc"}
+  ],
   "rank_order": "desc",
   "n_holdings": 10,
   "weighting": "equal",

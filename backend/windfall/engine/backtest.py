@@ -45,11 +45,34 @@ class _Sim:
 def _rebalance_dates(idx: pd.DatetimeIndex, freq: str) -> set:
     if freq == "daily":
         return set(idx)
-    period = {"weekly": "W", "fortnightly": "W", "monthly": "M"}[freq]
+    period = {"weekly": "W", "fortnightly": "W", "monthly": "M", "quarterly": "Q"}[freq]
     firsts = pd.Series(idx, index=idx).groupby(idx.to_period(period)).first().tolist()
     if freq == "fortnightly":
         firsts = firsts[::2]
     return set(firsts)
+
+
+def _apply_max_weight(weights: dict[int, float], cap: float) -> dict[int, float]:
+    """Cap any single name's weight at `cap`, redistributing the excess to uncapped names.
+
+    Iterates because redistributing can push another name over the cap. If every name is at the
+    cap (cap * n < total), weights simply sum to cap * n < 1 (the residual stays in cash).
+    """
+    w = dict(weights)
+    for _ in range(len(w) + 1):
+        over = {j: x for j, x in w.items() if x > cap + 1e-12}
+        if not over:
+            break
+        excess = sum(x - cap for x in over.values())
+        for j in over:
+            w[j] = cap
+        under = [j for j in w if w[j] < cap - 1e-12]
+        if not under:
+            break
+        add = excess / len(under)
+        for j in under:
+            w[j] += add
+    return w
 
 
 def _stop_target(cfg: StrategyConfig, entry: float, atr_v: float | None):
@@ -192,6 +215,10 @@ def run_backtest(config) -> BacktestResult:
         else:
             base = (1.0 / len(chosen)) if cfg.invest_fully else (1.0 / cfg.n_holdings)
             weights = {j: base for j in chosen}
+
+        # Per-stock weight cap (Trendlyne "Max Weightage Per Stock"): cap + redistribute.
+        if cfg.max_weight_per_stock and cfg.max_weight_per_stock > 0:
+            weights = _apply_max_weight(weights, cfg.max_weight_per_stock)
 
         # Regime overlay: binary -> go fully to cash; scale -> shrink target exposure.
         mult = regime_mult(i)
