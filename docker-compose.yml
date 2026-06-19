@@ -1,0 +1,27 @@
+services:
+  api:
+    build: ./backend
+    container_name: windfall-api
+    restart: unless-stopped
+    ports:
+      - "8505:8503"   # host 8505 (8503 is taken by another project) -> container 8503
+    volumes:
+      - ./backend/data:/app/data
+      - ./backend/strategies:/app/strategies
+    environment:
+      - WINDFALL_DATA_DIR=/app/data
+      - WINDFALL_DB=/app/data/windfall.duckdb
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8503
+
+  web:
+    build: ./frontend
+    container_name: windfall-web
+    restart: unless-stopped
+    ports:
+      - "8500:8500"
+    environment:
+      # Browser talks to the API on the host's published port; server components use the internal name.
+      - NEXT_PUBLIC_API_BASE=http://192.168.1.10:8505
+      - API_INTERNAL_BASE=http://api:8503
+    depends_on:
+      - api

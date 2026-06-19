@@ -1,0 +1,22 @@
+{
+  "name": "momentum_v22",
+  "_note": "Approximation of the live v2.2 momentum/DVM swing model in the declarative schema. The original blends percentile-ranked factors (rel-strength 25%, abs-momentum 15%, vol-adj-momentum 15%, trend 10%, volume 10%, entry-timing 15%, quality 10%); here we approximate the momentum lean with a trend+momentum filter, ATR stops and a 2:1 target. Sector cap = 2 per the methodology.",
+  "universe": { "index": "nifty500", "point_in_time": false, "filters": ["adtv_cr >= 10"] },
+  "entry_filters": ["close > sma50", "close > sma200", "rsi14 > 50", "roc125 > 0"],
+  "rank_by": "roc125",
+  "rank_order": "desc",
+  "n_holdings": 10,
+  "weighting": "equal",
+  "rebalance": "fortnightly",
+  "entry_fill": "next_open",
+  "sector_cap": 2,
+  "max_position_adtv_pct": 0.1,
+  "stop_loss": { "type": "atr", "mult": 2.0, "atr_period": 14 },
+  "take_profit": { "type": "r_multiple", "r": 2.0 },
+  "max_hold_days": 60,
+  "costs_bps": { "brokerage": 3, "stt": 10, "slippage": 15 },
+  "capital": 1000000,
+  "start": "2018-01-01",
+  "end": "2026-06-12",
+  "benchmark": "NIFTY500"
+}

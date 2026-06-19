@@ -1,0 +1,10 @@
+# Core runtime — must install cleanly.
+fastapi>=0.111
+uvicorn[standard]>=0.30
+pydantic>=2.6
+pandas>=2.1
+numpy>=1.26
+duckdb>=1.0
+yfinance>=0.2.40
+requests>=2.31
+python-dateutil>=2.9

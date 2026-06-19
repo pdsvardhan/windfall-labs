@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# Data & generated artifacts
+backend/data/*.duckdb
+backend/data/*.duckdb.wal
+backend/data/cache/
+backend/data/results/
+*.parquet
+
+# Node / Next
+node_modules/
+frontend/.next/
+frontend/out/
+frontend/.env.local
+
+# Env & secrets
+.env
+*.local
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,54 @@
+[fetch] 25/504 tickers processed (25 ok, 0 failed)
+[fetch] 50/504 tickers processed (50 ok, 0 failed)
+[fetch] 75/504 tickers processed (75 ok, 0 failed)
+[fetch] 100/504 tickers processed (100 ok, 0 failed)
+[fetch] 125/504 tickers processed (125 ok, 0 failed)
+[fetch] 150/504 tickers processed (150 ok, 0 failed)
+[fetch] 175/504 tickers processed (175 ok, 0 failed)
+[fetch] 200/504 tickers processed (200 ok, 0 failed)
+[fetch] 225/504 tickers processed (225 ok, 0 failed)
+[fetch] 250/504 tickers processed (250 ok, 0 failed)
+[fetch] 275/504 tickers processed (275 ok, 0 failed)
+[fetch] 300/504 tickers processed (300 ok, 0 failed)
+[fetch] 325/504 tickers processed (325 ok, 0 failed)
+[fetch] 350/504 tickers processed (350 ok, 0 failed)
+[fetch] 375/504 tickers processed (375 ok, 0 failed)
+[fetch] 400/504 tickers processed (400 ok, 0 failed)
+[fetch] 425/504 tickers processed (425 ok, 0 failed)
+[fetch] 450/504 tickers processed (450 ok, 0 failed)
+[fetch] 475/504 tickers processed (475 ok, 0 failed)
+[fetch] 500/504 tickers processed (500 ok, 0 failed)
+[fetch] 504/504 tickers processed (504 ok, 0 failed)
+{
+  "index": "nifty500",
+  "years": 12,
+  "start": "2014-06-14",
+  "requested": 504,
+  "ok": 504,
+  "failed": 0,
+  "coverage": 1.0,
+  "rows_written": 1153146,
+  "failed_sample": [],
+  "benchmarks": {
+    "NIFTY50": {
+      "ticker": "^NSEI",
+      "rows": 2951
+    },
+    "NIFTY500": {
+      "ticker": "^CRSLDX",
+      "rows": 2950
+    },
+    "NIFTY100": {
+      "ticker": "^CNX100",
+      "rows": 2950
+    },
+    "NIFTY200": {
+      "ticker": "^CNX200",
+      "rows": 2955
+    },
+    "NIFTYMIDCAP": {
+      "ticker": "^NSEMDCP50",
+      "rows": 2923
+    }
+  }
+}

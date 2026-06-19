@@ -1,0 +1,3 @@
+# Optional — used for an independent metrics cross-check in the validation harness.
+# Allowed to fail to install (heavy numba/numpy constraints); the engine does not depend on it.
+vectorbt>=0.26

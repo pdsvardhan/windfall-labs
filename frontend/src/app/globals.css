@@ -1,0 +1,50 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  @apply bg-bg text-fg font-sans antialiased;
+}
+
+.card {
+  @apply bg-card border border-border rounded-lg;
+}
+
+.mono {
+  @apply font-mono;
+}
+
+table.data {
+  @apply w-full text-sm font-mono;
+}
+table.data th {
+  @apply text-left text-muted font-normal px-3 py-2 border-b border-border sticky top-0 bg-card;
+}
+table.data td {
+  @apply px-3 py-1.5 border-b border-border/50 whitespace-nowrap;
+}
+table.data tr:hover td {
+  @apply bg-white/5;
+}
+
+.btn {
+  @apply px-3 py-1.5 rounded-md text-sm font-medium border border-border bg-white/5
+    hover:bg-white/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed;
+}
+.btn-accent {
+  @apply bg-accent/20 border-accent/50 text-fg hover:bg-accent/30;
+}
+
+.chip {
+  @apply inline-flex items-center px-2 py-0.5 rounded text-xs font-mono border;
+}
+
+/* thin scrollbars for data tables */
+.scroll-y {
+  @apply overflow-auto;
+  scrollbar-width: thin;
+}

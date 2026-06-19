@@ -1,0 +1,19 @@
+{
+  "name": "breakout_validation",
+  "universe": { "index": "nifty500", "point_in_time": false, "filters": ["adtv_cr >= 10"] },
+  "entry_filters": ["close > sma50", "close > sma200", "roc21 > 10", "rsi14 > 60"],
+  "rank_by": "roc21",
+  "rank_order": "desc",
+  "n_holdings": 10,
+  "weighting": "equal",
+  "rebalance": "weekly",
+  "entry_fill": "next_open",
+  "stop_loss": { "type": "none" },
+  "take_profit": { "type": "none" },
+  "max_hold_days": null,
+  "costs_bps": { "brokerage": 3, "stt": 10, "slippage": 15 },
+  "capital": 1000000,
+  "start": "2015-01-01",
+  "end": "2026-06-12",
+  "benchmark": "NIFTY500"
+}

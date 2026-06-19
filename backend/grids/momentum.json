@@ -1,0 +1,5 @@
+{
+  "n_holdings": [8, 10, 15],
+  "stop_loss.mult": [1.5, 2.0, 3.0],
+  "rebalance": ["weekly", "fortnightly"]
+}

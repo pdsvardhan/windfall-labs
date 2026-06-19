@@ -1,0 +1,14 @@
+[project]
+name = "windfall"
+version = "0.1.0"
+description = "Windfall Labs quant research & execution engine"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+filterwarnings = ["ignore::DeprecationWarning", "ignore::FutureWarning"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
