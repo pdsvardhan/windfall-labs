@@ -90,3 +90,12 @@ decisions:
       - curated
       - cat:system
     body_path: docs/decisions/adr-010-windfall-own-dvm.md
+  - id: adr-011-windfall-bhavcopy-survivorship
+    project_slug: windfall-labs
+    title: Survivorship-free prices via NSE Bhavcopy in a standalone store
+    status: accepted
+    date: 2026-06-19T00:00:00.000Z
+    tags:
+      - curated
+      - cat:reliability
+    body_path: docs/decisions/adr-011-windfall-bhavcopy-survivorship.md
