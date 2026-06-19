@@ -28,9 +28,10 @@ _FUND = set(fund.NUMERIC_FIELDS) | {"pe_to_sector"}
 # Our own reproducible scores (scores/own_dvm.py). momentum_own is price-only (full history);
 # durability_own / valuation_own derive from fundamentals (snapshot-gated).
 _OWN = {"momentum_own", "durability_own", "valuation_own"}
-# Fundamentals that now gain real history from the screener store (durability inputs + durability_own).
-# These are 120d-lagged point-in-time over ~2006->present, not snapshot-gated.
-_HIST_FUND = set(fund.SCREENER_HISTORY_FIELDS) | {"durability_own"}
+# Fundamentals that now gain real history from the screener store: durability inputs + computed
+# valuation pe/pb (in SCREENER_HISTORY_FIELDS), plus the own-scores built on them. 120d-lagged
+# point-in-time over ~2006->present, not snapshot-gated.
+_HIST_FUND = set(fund.SCREENER_HISTORY_FIELDS) | {"durability_own", "valuation_own"}
 
 
 @dataclass
@@ -153,6 +154,26 @@ def resolve(cfg: StrategyConfig) -> ResolvedStrategy:
                                     feat("opm"), feat("np_qtr_yoy"), feat("promoter_pledge"))
         elif name == "valuation_own":
             df = own.valuation_own(feat("pe"), feat("pb"), feat("pe_to_sector"))
+        elif name == "pe":
+            # Historical PE = price / EPS (loss-makers eps<=0 -> NaN). Today's price x the most-recent
+            # KNOWN (120d-lagged) annual EPS, so no look-ahead. Snapshot governs the present.
+            snap = fund.fundamental_panel("pe", close.index, tickers)
+            eps_h = fund.screener_history_panel("eps", close.index, tickers)
+            if eps_h is None:
+                df = snap
+            else:
+                df = snap.combine_first(close / eps_h.where(eps_h > 0))
+        elif name == "pb":
+            # Historical PB via the identity PB = PE * ROE (shares = NP_owner/EPS), both 120d-lagged;
+            # guard PB>0 to drop negative-net-worth cases. Snapshot governs the present.
+            snap = fund.fundamental_panel("pb", close.index, tickers)
+            eps_h = fund.screener_history_panel("eps", close.index, tickers)
+            roe_h = fund.screener_history_panel("roe", close.index, tickers)
+            if eps_h is None or roe_h is None:
+                df = snap
+            else:
+                pb_h = (close / eps_h.where(eps_h > 0)) * roe_h / 100.0
+                df = snap.combine_first(pb_h.where(pb_h > 0))
         elif name in fund.NUMERIC_FIELDS:
             snap = fund.fundamental_panel(name, close.index, tickers)
             # durability inputs (roe/roa/opm/np_qtr_yoy) gain real history from the screener store.
@@ -243,9 +264,9 @@ def resolve(cfg: StrategyConfig) -> ResolvedStrategy:
         snap_used = sorted(t for t in used_fund if t not in _HIST_FUND)
         if hist_used and sccov.get("available"):
             warnings.append(
-                f"durability fundamentals {hist_used} are screener-history-backed "
+                f"fundamentals {hist_used} are screener-history-backed "
                 f"({sccov['tickers']} names from {sccov['history_from']}, {fund.PIT_LAG_DAYS}d-lagged); "
-                f"the live snapshot governs the present, and piotroski/pledge remain snapshot-only.")
+                f"the live snapshot governs the present, and piotroski/pledge/sector-PE remain snapshot-only.")
         snaps = fund.snapshots()
         if snap_used and snaps:
             warnings.append(

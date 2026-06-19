@@ -25,9 +25,10 @@ _PARAM = re.compile(r"^(sma|ema|roc|rsi|atr|adx|adtv|vol_avg|dist_high|rel_stren
 _BASE = {"close", "open", "high", "low", "volume", "adj_close", "price"}
 _SPECIAL = {"adtv_cr", "macd", "macd_signal", "macd_hist", "momentum_own"}  # momentum_own is price-only
 _FUND = set(fund.NUMERIC_FIELDS) | {"pe_to_sector", "durability_own", "valuation_own"}  # fundamental-derived
-# Fundamentals now backed by real screener history (durability inputs + durability_own): 120d-lagged
-# point-in-time over ~2006->present, NOT snapshot-gated — a strategy using only these IS backtestable.
-_HIST_FUND = set(fund.SCREENER_HISTORY_FIELDS) | {"durability_own"}
+# Fundamentals now backed by real screener history: durability inputs + computed valuation pe/pb (in
+# SCREENER_HISTORY_FIELDS) + the own-scores (durability_own / valuation_own). 120d-lagged point-in-time
+# over ~2006->present, NOT snapshot-gated — a strategy using only these IS backtestable.
+_HIST_FUND = set(fund.SCREENER_HISTORY_FIELDS) | {"durability_own", "valuation_own"}
 
 
 def _features(exprs: list[str]) -> set[str]:
