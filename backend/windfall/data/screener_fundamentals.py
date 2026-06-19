@@ -37,6 +37,7 @@ UA = "Mozilla/5.0 (Windfall personal research; contact pdsvardhan7@gmail.com)"
 DB_PATH = DATA_DIR / "screener_fundamentals.duckdb"
 CACHE = DATA_DIR / "cache" / "screener"
 FETCH_SLEEP = 1.2
+SPARSE_CONSOLIDATED = 6  # consolidated period count below which we check standalone for richer history
 
 MONTHS = {"Jan": 1, "Feb": 2, "Mar": 3, "Apr": 4, "May": 5, "Jun": 6,
           "Jul": 7, "Aug": 8, "Sep": 9, "Oct": 10, "Nov": 11, "Dec": 12}
@@ -236,7 +237,13 @@ def build_records(ticker: str, parsed: dict, basis: str, yf_ni: dict | None = No
         opm = (op / rev * 100) if (op is not None and rev) else None
         npm = (owner / rev * 100) if (owner is not None and rev) else None
         roe = (owner / equity * 100) if (owner is not None and equity) else None
-        roce = (ebit / (equity + (borrow or 0)) * 100) if (ebit is not None and equity) else None
+        # ROCE = EBIT / capital employed (equity + debt). Capital employed can be 0 even when
+        # equity != 0 — a negative-net-worth name where borrowings offset equity (VAML Mar-2025:
+        # equity=-0.04, borrow=+0.04 -> 0.0, a crash) — or negative (VAML Mar-2026: -0.01, which
+        # yields an absurd ~300% ROCE). ROCE is undefined for non-positive capital employed, so
+        # require cap_employed > 0: None (honest) over a crash or a fabricated number.
+        cap_employed = (equity or 0) + (borrow or 0)
+        roce = (ebit / cap_employed * 100) if (ebit is not None and cap_employed > 0) else None
         de = (borrow / equity) if (borrow is not None and equity) else None
         np_yoy = ((owner - prev_owner) / abs(prev_owner) * 100) \
             if (owner is not None and prev_owner not in (None, 0)) else None
@@ -343,6 +350,14 @@ def _load(slug: str, basis: str, ticker: str, yf_ni):
     return parsed, build_records(ticker, parsed, basis, yf_ni=yf_ni), basis, code
 
 
+def _prefer_standalone(n_consolidated: int, n_standalone: int,
+                       threshold: int = SPARSE_CONSOLIDATED) -> bool:
+    """Sparse-consolidated rule. ADR-013 keeps consolidated as the default basis, but switch to
+    standalone when consolidated is short AND standalone carries strictly more periods. Young IPOs
+    and healthy 10-12p names stay on consolidated (equal counts -> no switch)."""
+    return n_consolidated < threshold and n_standalone > n_consolidated
+
+
 def ingest_symbol(con, symbol: str, name: str | None, basis: str, cross_check: bool,
                   sector: str | None = None) -> dict:
     ticker = f"{symbol}.NS"
@@ -352,24 +367,37 @@ def ingest_symbol(con, symbol: str, name: str | None, basis: str, cross_check: b
         return {"symbol": symbol, "status": "excluded", "confidence": "excluded-financial",
                 "periods": 0, "flags": ["SECTOR-FINANCIAL"], "slug": symbol}
 
-    # Direct page first: slug == NSE symbol for ~all stocks, so the rate-limited search API
-    # is only needed when the direct symbol 404s (renamed/demerged tickers, e.g. TATAMOTORS->TMCV).
-    row = con.execute("SELECT slug FROM slug_map WHERE symbol = ?", [symbol]).fetchone()
-    slug = row[0] if row else symbol
     yf = yf_overlap(ticker) if cross_check else None
     yf_ni = (yf or {}).get("ni")
 
+    # Direct-symbol-first: the screener slug == NSE symbol for ~all stocks, so try the direct page
+    # BEFORE any cached/searched slug. This stops a stale slug_map row (e.g. a poisoned
+    # IDEA->IDEAFORGE left over from the old search-first era) from shadowing the correct page.
+    slug = symbol
     parsed, recs, basis, code = _load(slug, "consolidated", ticker, yf_ni)
-    if code != 200:
-        slug2 = resolve_slug(symbol, name, con)  # polite search-API fallback
-        if slug2 and slug2 != slug:
-            slug = slug2
-            parsed, recs, basis, code = _load(slug, "consolidated", ticker, yf_ni)
+    nse = (parsed or {}).get("_nse")
+    direct_ok = code == 200 and (nse is None or nse.upper() == symbol.upper())
+
+    if not direct_ok:
+        # Direct symbol page 404d or resolved to a different company (renamed/demerged tickers,
+        # e.g. TATAMOTORS->TMCV): fall back to a cached slug, then the polite search API.
+        row = con.execute("SELECT slug FROM slug_map WHERE symbol = ?", [symbol]).fetchone()
+        alt = row[0] if (row and row[0] != symbol) else resolve_slug(symbol, name, con)
+        if alt and alt != slug:
+            p2, r2, b2, c2 = _load(alt, "consolidated", ticker, yf_ni)
+            if c2 == 200:
+                slug, parsed, recs, basis, code = alt, p2, r2, b2, c2
     if code != 200:
         return {"symbol": symbol, "status": "failed", "reason": f"http-{code}", "slug": slug}
-    # consolidated page exists but is empty (standalone-only MNCs, e.g. ABBOTINDIA/ABB) -> standalone
-    if not recs and basis == "consolidated":
-        parsed, recs, basis, _ = _load(slug, "standalone", ticker, yf_ni)
+
+    # Consolidated is the default basis, but some companies have a sparse or empty consolidated
+    # statement while standalone carries the full history (ABB: 4 consolidated periods vs 12
+    # standalone; ABBOTINDIA: empty consolidated). Only when consolidated looks sparse do we fetch
+    # standalone and switch if it is strictly richer -- healthy 10-12p names skip the 2nd fetch.
+    if basis == "consolidated" and len(recs) < SPARSE_CONSOLIDATED:
+        p2, r2, _, c2 = _load(slug, "standalone", ticker, yf_ni)
+        if c2 == 200 and _prefer_standalone(len(recs), len(r2)):
+            parsed, recs, basis = p2, r2, "standalone"
     if not recs:
         return {"symbol": symbol, "status": "failed", "reason": "empty-parse", "slug": slug}
 
@@ -385,7 +413,9 @@ def ingest_symbol(con, symbol: str, name: str | None, basis: str, cross_check: b
     fnow = dt.datetime.now(dt.timezone.utc)
     fl = ",".join(flags) or None
 
-    con.execute("DELETE FROM fundamentals_history WHERE ticker = ? AND basis = ?", [ticker, basis])
+    # Replace ALL rows for this ticker (any basis): a basis switch between runs (e.g.
+    # consolidated -> standalone for ABB) must not leave stale rows of the previous basis behind.
+    con.execute("DELETE FROM fundamentals_history WHERE ticker = ?", [ticker])
     cols = ["ticker", "period_end", "basis", "source", "is_financial", "revenue", "op_profit",
             "interest", "depreciation", "pbt", "tax", "net_profit", "net_profit_owner", "eps",
             "total_assets", "equity", "borrowings", "cfo", "opm", "npm", "roe", "roce", "de",
