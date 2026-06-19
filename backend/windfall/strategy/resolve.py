@@ -28,6 +28,9 @@ _FUND = set(fund.NUMERIC_FIELDS) | {"pe_to_sector"}
 # Our own reproducible scores (scores/own_dvm.py). momentum_own is price-only (full history);
 # durability_own / valuation_own derive from fundamentals (snapshot-gated).
 _OWN = {"momentum_own", "durability_own", "valuation_own"}
+# Fundamentals that now gain real history from the screener store (durability inputs + durability_own).
+# These are 120d-lagged point-in-time over ~2006->present, not snapshot-gated.
+_HIST_FUND = set(fund.SCREENER_HISTORY_FIELDS) | {"durability_own"}
 
 
 @dataclass
@@ -151,7 +154,13 @@ def resolve(cfg: StrategyConfig) -> ResolvedStrategy:
         elif name == "valuation_own":
             df = own.valuation_own(feat("pe"), feat("pb"), feat("pe_to_sector"))
         elif name in fund.NUMERIC_FIELDS:
-            df = fund.fundamental_panel(name, close.index, tickers)
+            snap = fund.fundamental_panel(name, close.index, tickers)
+            # durability inputs (roe/roa/opm/np_qtr_yoy) gain real history from the screener store.
+            # combine_first keeps the snapshot where it has a value (from its date forward) and uses
+            # the 120d-lagged screener history for the past — present from snapshot, history from
+            # screener, with no look-ahead. Other fundamentals (None) stay snapshot-only.
+            hist = fund.screener_history_panel(name, close.index, tickers)
+            df = snap if hist is None else snap.combine_first(hist)
         else:
             m = _PARAM.match(name)
             if not m:
@@ -221,19 +230,31 @@ def resolve(cfg: StrategyConfig) -> ResolvedStrategy:
             mask[drop] = False
             warnings.append(f"excluded {len(drop)} names in sectors {cfg.universe.exclude_sectors}")
 
-    # Honesty: fundamentals are snapshot-only until the owner accumulates a history of snapshots.
+    # Honesty: which fundamentals are screener-history-backed (120d-lagged, real history) vs
+    # snapshot-only (NaN before the single Trendlyne snapshot).
     blend_exprs = [rf.factor for rf in cfg.rank_blend]
     all_exprs = (list(cfg.universe.filters) + list(cfg.entry_filters) + blend_exprs
                  + ([cfg.rank_by] if not cfg.rank_blend else []))
-    if any(t in _FUND for e in all_exprs for t in feature_names(e)):
-        snaps = fund.snapshots()
-        if snaps:
+    used_fund = {t for e in all_exprs for t in feature_names(e)
+                 if t in _FUND or t in ("durability_own", "valuation_own")}
+    if used_fund:
+        sccov = fund.screener_coverage()
+        hist_used = sorted(t for t in used_fund if t in _HIST_FUND)
+        snap_used = sorted(t for t in used_fund if t not in _HIST_FUND)
+        if hist_used and sccov.get("available"):
             warnings.append(
-                f"uses fundamental features — these come from Trendlyne snapshots {snaps} and are "
-                f"NaN before the first snapshot, so they apply to live signals / dates on-or-after "
-                f"the snapshot, not historical backtests.")
-        else:
-            warnings.append("uses fundamental features but no fundamentals snapshot is loaded.")
+                f"durability fundamentals {hist_used} are screener-history-backed "
+                f"({sccov['tickers']} names from {sccov['history_from']}, {fund.PIT_LAG_DAYS}d-lagged); "
+                f"the live snapshot governs the present, and piotroski/pledge remain snapshot-only.")
+        snaps = fund.snapshots()
+        if snap_used and snaps:
+            warnings.append(
+                f"snapshot-only fundamentals {snap_used} come from Trendlyne snapshots {snaps} and are "
+                f"NaN before the first snapshot, so they apply to live signals / dates on-or-after the "
+                f"snapshot, not historical backtests.")
+        elif snap_used:
+            warnings.append(
+                f"snapshot-only fundamentals {snap_used} but no fundamentals snapshot is loaded.")
 
     # Rank score — a single expression, or a multi-factor cross-sectional percentile blend.
     if cfg.rank_blend:

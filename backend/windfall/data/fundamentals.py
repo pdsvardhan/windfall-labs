@@ -10,8 +10,10 @@ from __future__ import annotations
 
 import datetime as dt
 
+import duckdb
 import pandas as pd
 
+from ..config import DATA_DIR
 from .store import connect, coverage_summary
 
 FUND_SCHEMA = """
@@ -198,3 +200,94 @@ def coverage() -> dict:
         "stale": bool(age_days is not None and age_days > SNAPSHOT_STALE_AFTER_DAYS),
         "stale_after_days": SNAPSHOT_STALE_AFTER_DAYS,
     }
+
+
+# ── screener historical fundamentals (point-in-time, lagged) ──────────────────
+# The screener.in ingester (windfall.data.screener_fundamentals) writes a STANDALONE DB of annual
+# historical fundamentals (~2006->present). Unlike the single Trendlyne snapshot, this gives a real
+# point-in-time history, so own-Durability can be backtested over history, not just live-forward.
+#
+# Anti-look-ahead: an annual fiscal period (period_end) is only public ~3 months after it ends, so a
+# value is applied only from period_end + PIT_LAG_DAYS onward (NaN before). 120d is the locked lag
+# (covers the SEBI LODR filing window + the long tail of late filers). ONE DOOR: opened READ-ONLY; if
+# a scrape holds the writer lock we return None and the caller falls back to the snapshot — a backtest
+# never crashes on a locked or missing store.
+PIT_LAG_DAYS = 120
+SCREENER_DB_PATH = DATA_DIR / "screener_fundamentals.duckdb"
+
+# engine fundamental field -> SQL expression over screener fundamentals_history. Only durability
+# inputs are covered; valuation (PE/PB) needs price and is a separate iteration.
+_SCREENER_SQL = {
+    "roe": "roe",
+    "opm": "opm",
+    "roa": "(net_profit_owner / NULLIF(total_assets, 0) * 100)",
+    # the snapshot's np_qtr_yoy is quarterly; screener history carries only annual growth, so use
+    # np_yoy as the historical profit-growth proxy for the same durability input.
+    "np_qtr_yoy": "np_yoy",
+}
+# Raw fundamental fields that gain real history from the screener store (others stay snapshot-only).
+SCREENER_HISTORY_FIELDS = frozenset(_SCREENER_SQL)
+
+
+def _screener_connect():
+    """Read-only connection to the standalone screener DB, or None if missing/locked (scrape running)."""
+    try:
+        return duckdb.connect(str(SCREENER_DB_PATH), read_only=True)
+    except Exception:  # noqa: BLE001 — locked by a running scrape, or not yet created
+        return None
+
+
+def screener_history_panel(field: str, dates: pd.DatetimeIndex, tickers: list[str],
+                           lag_days: int = PIT_LAG_DAYS) -> pd.DataFrame | None:
+    """Point-in-time historical panel for a durability input from the screener store, or None when
+    the field isn't covered / there's no data / the DB is unavailable (caller falls back to snapshot).
+
+    The value for fiscal period_end becomes known at period_end + lag_days and is applied from then
+    onward (never before) — so there is no look-ahead. Within `dates` the latest known value is
+    forward-filled; cells before the first known date stay NaN."""
+    expr = _SCREENER_SQL.get(field)
+    if expr is None:
+        return None
+    con = _screener_connect()
+    if con is None:
+        return None
+    try:
+        df = con.execute(
+            f"SELECT ticker, period_end, {expr} AS val FROM fundamentals_history "
+            f"WHERE confidence IN ('high', 'low') AND ({expr}) IS NOT NULL").fetchdf()
+    except Exception:  # noqa: BLE001
+        return None
+    finally:
+        con.close()
+    if df.empty:
+        return None
+    # known-from date = fiscal period end + publication lag (the anti-look-ahead control)
+    df["known"] = pd.to_datetime(df["period_end"]) + pd.Timedelta(days=lag_days)
+    wide = df.pivot_table(index="known", columns="ticker", values="val", aggfunc="last")
+    wide = wide.reindex(columns=tickers)
+    idx = pd.DatetimeIndex(dates)
+    full = wide.reindex(wide.index.union(idx)).sort_index().ffill()
+    return full.reindex(idx)
+
+
+def screener_coverage(lag_days: int = PIT_LAG_DAYS) -> dict:
+    """Coverage of the screener historical store: how many names, and from when (lagged) durability
+    history is available. `history_from` is the earliest date any lagged annual becomes known."""
+    empty = {"available": False, "tickers": 0, "history_from": None,
+             "fields": sorted(SCREENER_HISTORY_FIELDS)}
+    con = _screener_connect()
+    if con is None:
+        return empty
+    try:
+        row = con.execute(
+            "SELECT COUNT(DISTINCT ticker), MIN(period_end) FROM fundamentals_history "
+            "WHERE confidence IN ('high', 'low')").fetchone()
+    except Exception:  # noqa: BLE001
+        return empty
+    finally:
+        con.close()
+    if not row or not row[0] or row[1] is None:
+        return empty
+    history_from = (pd.to_datetime(row[1]) + pd.Timedelta(days=lag_days)).date()
+    return {"available": True, "tickers": int(row[0]), "history_from": str(history_from),
+            "fields": sorted(SCREENER_HISTORY_FIELDS)}

@@ -25,6 +25,9 @@ _PARAM = re.compile(r"^(sma|ema|roc|rsi|atr|adx|adtv|vol_avg|dist_high|rel_stren
 _BASE = {"close", "open", "high", "low", "volume", "adj_close", "price"}
 _SPECIAL = {"adtv_cr", "macd", "macd_signal", "macd_hist", "momentum_own"}  # momentum_own is price-only
 _FUND = set(fund.NUMERIC_FIELDS) | {"pe_to_sector", "durability_own", "valuation_own"}  # fundamental-derived
+# Fundamentals now backed by real screener history (durability inputs + durability_own): 120d-lagged
+# point-in-time over ~2006->present, NOT snapshot-gated — a strategy using only these IS backtestable.
+_HIST_FUND = set(fund.SCREENER_HISTORY_FIELDS) | {"durability_own"}
 
 
 def _features(exprs: list[str]) -> set[str]:
@@ -54,37 +57,69 @@ def data_readiness(cfg) -> dict:
     price_from, price_to = cov.get("date_min"), cov.get("date_max")
     snaps = fund.snapshots()
     fund_from = snaps[0] if snaps else None
+    sccov = fund.screener_coverage()
+    hist_from = sccov["history_from"] if sccov.get("available") else None
+    lag_txt = f"{fund.PIT_LAG_DAYS}d-lagged"
+
+    def _hist_backed(f: str) -> bool:
+        return f in _HIST_FUND and hist_from is not None
+
+    # A fundamental's coverage starts at the screener history (if history-backed) else the snapshot.
+    def _fund_cov(f: str):
+        return hist_from if _hist_backed(f) else fund_from
 
     fund_in_filter = sorted(f for f in filter_feats if _classify(f) == "fundamental")
     fund_in_rank = sorted(f for f in rank_feats if _classify(f) == "fundamental")
     unknown = sorted(f for f in all_feats if _classify(f) == "unknown")
+    # snapshot-only fundamental filters still gate the run to live; history-backed ones are backtestable.
+    snap_only_filter = [f for f in fund_in_filter if not _hist_backed(f)]
+    hist_filter = [f for f in fund_in_filter if _hist_backed(f)]
 
     features = []
     for f in sorted(all_feats):
         kind = _classify(f)
         used_in = [u for u, s in (("filter", filter_feats), ("rank", rank_feats)) if f in s]
-        coverage_from = price_from if kind == "price" else (fund_from if kind == "fundamental" else None)
-        features.append({"name": f, "kind": kind, "used_in": used_in, "coverage_from": coverage_from})
+        coverage_from = (price_from if kind == "price"
+                         else (_fund_cov(f) if kind == "fundamental" else None))
+        features.append({"name": f, "kind": kind, "used_in": used_in,
+                         "coverage_from": coverage_from,
+                         "source": ("screener-history" if _hist_backed(f) else "snapshot")
+                         if kind == "fundamental" else None})
 
-    if fund_in_filter and fund_from:
+    if snap_only_filter and fund_from:
         verdict = "live-only"
         backtestable_from = fund_from
-        summary = (f"Live-only: fundamental filter(s) {fund_in_filter} are NaN before the "
-                   f"{fund_from} snapshot, so a historical backtest holds nothing — run it on "
-                   f"/signals. Backtest history accrues as monthly snapshots accumulate.")
-    elif fund_in_filter and not fund_from:
+        tail = (f" (history-backed filter(s) {hist_filter} do have screener history from {hist_from})"
+                if hist_filter else "")
+        summary = (f"Live-only: snapshot-only fundamental filter(s) {snap_only_filter} are NaN before "
+                   f"the {fund_from} snapshot, so a historical backtest holds nothing — run it on "
+                   f"/signals.{tail}")
+    elif snap_only_filter and not fund_from:
         verdict = "blocked"
         backtestable_from = None
-        summary = (f"Blocked: fundamental filter(s) {fund_in_filter} need a snapshot, but none is "
-                   f"loaded. Ingest a Trendlyne snapshot to run it live.")
+        summary = (f"Blocked: fundamental filter(s) {snap_only_filter} need a snapshot, but none is "
+                   f"loaded. Ingest a Trendlyne snapshot to run them live.")
+    elif hist_filter:
+        verdict = "backtestable"
+        backtestable_from = hist_from
+        summary = (f"Backtestable from {hist_from}: fundamental filter(s) {hist_filter} are backed by "
+                   f"screener historical fundamentals ({sccov['tickers']} names, {lag_txt}). Before "
+                   f"{hist_from} the screener history has no lagged value, so those names drop out.")
     elif fund_in_rank:
         verdict = "price-backtestable"
         backtestable_from = price_from
-        tail = (f"; the fundamental rank factor(s) {fund_in_rank} are blank-tolerant and activate "
-                f"from the {fund_from} snapshot onward" if fund_from else
-                f"; the fundamental rank factor(s) {fund_in_rank} have no snapshot yet, so the "
-                f"blend uses price factors only")
-        summary = f"Backtestable over full price history{tail}."
+        hist_rank = [f for f in fund_in_rank if _hist_backed(f)]
+        snap_rank = [f for f in fund_in_rank if not _hist_backed(f)]
+        bits = []
+        if hist_rank:
+            bits.append(f"history-backed rank factor(s) {hist_rank} activate from {hist_from} "
+                        f"(screener history, {lag_txt})")
+        if snap_rank:
+            bits.append(f"snapshot-only rank factor(s) {snap_rank} activate from the {fund_from} "
+                        f"snapshot onward" if fund_from else
+                        f"snapshot-only rank factor(s) {snap_rank} have no snapshot yet, so the blend "
+                        f"uses price factors only")
+        summary = "Backtestable over full price history; " + "; ".join(bits) + "."
     else:
         verdict = "fully-backtestable"
         backtestable_from = price_from
@@ -98,6 +133,7 @@ def data_readiness(cfg) -> dict:
         "backtestable_from": backtestable_from,
         "price_coverage": {"from": price_from, "to": price_to},
         "fundamentals_snapshot": fund_from,
+        "screener_history": sccov,
         "fundamentals_in_filter": fund_in_filter,
         "fundamentals_in_rank": fund_in_rank,
         "unknown_features": unknown,
