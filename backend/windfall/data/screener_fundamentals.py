@@ -272,8 +272,11 @@ def self_check(parsed: dict, recs: list[dict], yf=None) -> tuple[str, list[str]]
     if identity_rate < 0.8:
         flags.append(f"identity-{idok}/{idn}")
 
-    # yfinance cross-vote on Revenue + Total Assets (the lines that must match)
-    yf_bad = False
+    # yfinance cross-vote on Revenue + Total Assets — a SOFT corroboration only.
+    # yfinance's India data is itself unreliable (e.g. INFY revenue comes back ~85x wrong), and
+    # revenue definitions legitimately differ (gross-vs-net of levies). So a yf disagreement marks
+    # the stock 'low' for review — never a hard quarantine. Wrong-COMPANY mappings are caught
+    # deterministically by the NSE-symbol guard in ingest_symbol, not here.
     if yf is not None:
         rev_by_yr = {r["period_end"].year: r["revenue"] for r in recs if r["revenue"]}
         as_by_yr = {r["period_end"].year: r["total_assets"] for r in recs if r["total_assets"]}
@@ -285,10 +288,9 @@ def self_check(parsed: dict, recs: list[dict], yf=None) -> tuple[str, list[str]]
                     n += 1
                     ok += abs(v - ext[y]) / abs(ext[y]) <= 0.05
             if n and ok < n - 1:
-                yf_bad = True
                 flags.append(f"yf-{label}-{ok}/{n}")
 
-    if yf_bad or identity_rate < 0.5:
+    if identity_rate < 0.5:  # the only hard self-check signal (a genuinely broken parse)
         return "quarantined", flags
     if identity_rate < 0.8 or flags:
         return "low", flags
