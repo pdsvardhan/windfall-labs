@@ -45,3 +45,26 @@
 4. Then the user's sequence: detailed data verification → replicate 1–2 Trendlyne backtests in-engine & compare.
 
 **Commits:** 318a18c (ingester + ADR-013), f0174da (direct-first + 3 batch fixes), a9f9693 (soft yfinance cross-vote).
+
+## Session 2026-06-19 (cont.) — iters 6/7/8/C: bug fixes, wider scrape, D/V/M history
+
+**Stage:** Stage 4 (iterate) — 4 verifier-APPROVED iterations + the wider-universe scrape
+**What changed:**
+- **iter-6 (#20, merge 26ca933, APPROVE 3/3):** fixed 3 screener-ingester bug classes — ROCE crash on zero/negative capital employed (VAML); poisoned slug_map IDEA->IDEAFORGE + 7 corrupt rows (direct-symbol-first resolution + cleanup); sparse consolidated kept over richer standalone (ABB) + DELETE-all-bases on re-ingest. `tests/test_screener_fundamentals.py`.
+- **#21a wider scrape:** ran niftytotalmarket (754) WITH cross-check -> 552 high / 80 low / 1 quarantined / 121 financials excluded / **0 failed** (the iter-6 fixes held). Store 403 -> **633 tickers, 6,648 rows, 2006-2026**.
+- **iter-7 (#19 + #16, merge 16dd4a2, APPROVE 3/3):** signals/export CSV now carries the ASM/GSM flag; new `/api/backtests/cost-sensitivity` (0x/1x/2x) + `/api/backtests/compare` (A/B). `tests/test_insight_endpoints.py`. (#16 cockpit UI views deferred.)
+- **iter-8 (#21b, merge bcb9b69, APPROVE 2/2, NO look-ahead):** wired screener `fundamentals_history` into the engine for Durability — `fund.screener_history_panel` (read-only cross-DB, conf in {high,low}, roe/opm/roa/np_qtr_yoy, **keyed on period_end+120d**); `resolve.feat()` `snapshot.combine_first(history)`; readiness honesty (durability no longer live-only). `tests/test_durability_history.py`.
+- **iter-C (#23, merge 83d02e2, APPROVE, NO look-ahead):** wired historical PE/PB into `valuation_own` — PE = close/eps_lagged, PB = PE*ROE/100 (guards); `pe_to_sector` stays snapshot-only. `tests/test_valuation_history.py`.
+
+**Result: the D/V/M-history trio is COMPLETE** — Momentum (price), Durability (iter-8), Valuation (iter-C) all backtest over real history (2006-2026, 633 names) with verifier-confirmed no-look-ahead. Tests 60 -> 83.
+
+**Decisions:** no new ADRs (bug fixes + additive features + documented modeling choices: 120d publication lag; PB = PE*ROE identity).
+
+**To-dos:** #20/#21/#22/#23 done; #16 retitled (backend done, UI remains). Open: #16(UI)/#14/#13/#17/#12/#18.
+
+**Next session pick-up:**
+1. **Run a Trendlyne-parity DVM backtest end-to-end** (now possible — all 3 factors history-backed) + detailed data verification, then replicate 1-2 Trendlyne results in-engine & compare. (User's stated phase goal — now unblocked.)
+2. #16 cockpit UI views (cost-sensitivity + A/B panels -> the new endpoints).
+3. Ops: #14 nightly auto-refresh cron, #13 monthly snapshot auto-save.
+
+**Commits:** d92d53f/26ca933 (iter-6), 27dc074/16dd4a2 (iter-7), b97ed6a/bcb9b69 (iter-8), 826d3f5/83d02e2 (iter-C).
