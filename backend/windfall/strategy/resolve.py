@@ -22,7 +22,7 @@ from .schema import StrategyConfig
 
 _PARAM = re.compile(r"^(sma|ema|roc|rsi|atr|adx|adtv|vol_avg|dist_high|rel_strength)(\d+)$")
 _BASE = {"close", "open", "high", "low", "volume", "adj_close", "price"}
-_SPECIAL = {"adtv_cr", "macd", "macd_signal", "macd_hist"}
+_SPECIAL = {"adtv_cr", "macd", "macd_signal", "macd_hist", "peg"}
 # Fundamental features from the Trendlyne snapshot (point-in-time; NaN before the snapshot date).
 _FUND = set(fund.NUMERIC_FIELDS) | {"pe_to_sector"}
 # Our own reproducible scores (scores/own_dvm.py). momentum_own is price-only (full history);
@@ -146,6 +146,12 @@ def resolve(cfg: StrategyConfig) -> ResolvedStrategy:
             df = ind.macd(close)[2]
         elif name == "pe_to_sector":
             df = feat("pe") / feat("sector_pe").replace(0.0, np.nan)
+        elif name == "peg":
+            # P/E ÷ EPS-growth% — growth-adjusted cheapness, guarded to profitable & growing names.
+            # eps_growth is snapshot-only, so PEG contributes to valuation only from the snapshot
+            # forward (NaN before — same gating as the other snapshot-only fundamentals).
+            pe_, g = feat("pe"), feat("eps_growth")
+            df = pe_.where(pe_ > 0) / g.where(g > 0)
         elif name == "momentum_own":
             df = own.momentum_own(feat("roc63"), feat("roc126"), feat("roc252"),
                                   feat("rsi14"), feat("rel_strength126"))
@@ -153,7 +159,7 @@ def resolve(cfg: StrategyConfig) -> ResolvedStrategy:
             df = own.durability_own(feat("roe"), feat("roa"), feat("piotroski"),
                                     feat("opm"), feat("np_qtr_yoy"), feat("promoter_pledge"))
         elif name == "valuation_own":
-            df = own.valuation_own(feat("pe"), feat("pb"), feat("pe_to_sector"))
+            df = own.valuation_own(feat("pe"), feat("pb"), feat("pe_to_sector"), feat("peg"))
         elif name == "pe":
             # Historical PE = price / EPS (loss-makers eps<=0 -> NaN). Today's price x the most-recent
             # KNOWN (120d-lagged) annual EPS, so no look-ahead. Snapshot governs the present.
@@ -266,7 +272,8 @@ def resolve(cfg: StrategyConfig) -> ResolvedStrategy:
             warnings.append(
                 f"fundamentals {hist_used} are screener-history-backed "
                 f"({sccov['tickers']} names from {sccov['history_from']}, {fund.PIT_LAG_DAYS}d-lagged); "
-                f"the live snapshot governs the present, and piotroski/pledge/sector-PE remain snapshot-only.")
+                f"the live snapshot governs the present, and piotroski/pledge/sector-PE and "
+                f"eps_growth (so valuation_own's PEG component) remain snapshot-only.")
         snaps = fund.snapshots()
         if snap_used and snaps:
             warnings.append(

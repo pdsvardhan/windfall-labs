@@ -48,7 +48,10 @@ def _blend_pct(items: list[tuple[pd.DataFrame, float]]) -> pd.DataFrame | None:
 # Default weights (tunable against validation correlations).
 MOMENTUM_W = {"roc63": 0.20, "roc126": 0.25, "roc252": 0.25, "rsi14": 0.15, "rel_strength126": 0.15}
 DURABILITY_W = {"roe": 0.25, "roa": 0.15, "piotroski": 0.20, "opm": 0.15, "np_qtr_yoy": 0.10, "pledge": 0.15}
-VALUATION_W = {"pe": 0.40, "pb": 0.30, "pe_to_sector": 0.30}
+# PEG leads the valuation blend: it is the strongest single predictor of Trendlyne's valuation score
+# (Spearman ~0.67 on the 2026-06-18 snapshot, vs ~0.46 PE / ~0.40 PE-to-sector / ~0.30 PB), because
+# Trendlyne valuation is growth-adjusted. PB is the weakest, so it is downweighted.
+VALUATION_W = {"peg": 0.40, "pe_to_sector": 0.25, "pe": 0.20, "pb": 0.15}
 
 
 def momentum_own(roc63, roc126, roc252, rsi14, rel_strength126) -> pd.DataFrame | None:
@@ -70,12 +73,21 @@ def durability_own(roe, roa, piotroski, opm, np_qtr_yoy, promoter_pledge) -> pd.
     ])
 
 
-def valuation_own(pe, pb, pe_to_sector) -> pd.DataFrame | None:
-    """Cheapness score. Cheaper (lower ratio) is better, so ratios enter negated; loss-makers
-    (P/E <= 0) are excluded from the P/E component rather than scored as 'cheap'."""
-    pe_pos = pe.where(pe > 0) if pe is not None else None
+def valuation_own(pe, pb, pe_to_sector, peg=None) -> pd.DataFrame | None:
+    """Cheapness score (cross-sectional). Every ratio enters NEGATED (cheaper = higher score) and is
+    guarded > 0: a non-positive PE/PB/PEG/PE-to-sector (loss-maker, negative net worth) is undefined
+    cheapness, so it drops from that component and the remaining weights renormalize — it is never
+    scored as 'cheap'. (Negating an un-guarded negative ratio was the bug that made the old blend rank
+    loss-makers as attractive and dragged it below its own components.)
+
+    `peg` (P/E ÷ EPS-growth%) is the growth-adjusted cheapness Trendlyne leans on most; pass None to
+    omit it. The remaining Trendlyne ingredient — current multiple vs the stock's own 5–10yr history —
+    is a follow-up, unlocked once the screener-history overlap is wide enough to compute it."""
+    def neg_pos(x):
+        return (-x.where(x > 0)) if x is not None else None
     return _blend_pct([
-        ((-pe_pos) if pe_pos is not None else None, VALUATION_W["pe"]),
-        ((-pb) if pb is not None else None, VALUATION_W["pb"]),
-        ((-pe_to_sector) if pe_to_sector is not None else None, VALUATION_W["pe_to_sector"]),
+        (neg_pos(peg), VALUATION_W["peg"]),
+        (neg_pos(pe_to_sector), VALUATION_W["pe_to_sector"]),
+        (neg_pos(pe), VALUATION_W["pe"]),
+        (neg_pos(pb), VALUATION_W["pb"]),
     ])

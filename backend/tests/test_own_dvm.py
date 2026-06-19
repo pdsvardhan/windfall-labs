@@ -36,6 +36,25 @@ def test_valuation_excludes_loss_makers_and_prefers_cheap():
     assert s.iloc[0]["A"] > s.iloc[0]["D"]          # cheaper P/E -> higher valuation score
 
 
+def test_valuation_peg_rewards_cheaper_growth():
+    # PE/PB/PE-to-sector all equal -> only PEG differentiates; lower PEG (cheaper per unit of
+    # growth) must score higher. Guards the new growth-adjusted component.
+    eq = _panel([[20.0, 20.0, 20.0, 20.0]])
+    peg = _panel([[0.5, 1.0, 2.0, 4.0]])            # A cheapest per growth, D dearest
+    s = own.valuation_own(eq, _panel([[3.0, 3.0, 3.0, 3.0]]), _panel([[1.0, 1.0, 1.0, 1.0]]), peg)
+    assert s.iloc[0]["A"] > s.iloc[0]["D"]
+
+
+def test_valuation_negative_book_not_scored_cheap():
+    # The fixed bug: a negative ratio entered un-guarded, so negating it made it look 'cheapest'.
+    # C has negative book value (PB<0) -> its PB component must DROP, not out-rank a genuinely cheap PB.
+    pe = _panel([[20.0, 20.0, 20.0, 20.0]])         # equal
+    pts = _panel([[1.0, 1.0, 1.0, 1.0]])            # equal
+    pb = _panel([[2.0, 5.0, -10.0, 8.0]])           # A cheap; C negative net worth
+    s = own.valuation_own(pe, pb, pts)
+    assert s.iloc[0]["A"] >= s.iloc[0]["C"]         # negative book never beats a real cheap PB
+
+
 def test_durability_handles_all_missing_gracefully():
     nan = _panel([[np.nan] * 4])
     s = own.durability_own(nan, nan, nan, nan, nan, nan)
