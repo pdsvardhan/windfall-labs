@@ -224,9 +224,12 @@ _SCREENER_SQL = {
     # the snapshot's np_qtr_yoy is quarterly; screener history carries only annual growth, so use
     # np_yoy as the historical profit-growth proxy for the same durability input.
     "np_qtr_yoy": "np_yoy",
+    "eps": "eps",  # split-adjusted annual EPS — for computed historical PE = price / eps (resolve.py)
 }
-# Raw fundamental fields that gain real history from the screener store (others stay snapshot-only).
-SCREENER_HISTORY_FIELDS = frozenset(_SCREENER_SQL)
+# Engine fundamental tokens now backed by real screener history: durability inputs produced directly
+# by screener_history_panel, plus valuation pe/pb computed in resolve.py from price x lagged eps/roe.
+# (pe_to_sector stays snapshot-only — there is no historical sector PE.)
+SCREENER_HISTORY_FIELDS = frozenset({"roe", "roa", "opm", "np_qtr_yoy", "pe", "pb"})
 
 
 def _screener_connect():
