@@ -21,6 +21,7 @@ from windfall.paper import commit_signal, list_positions, mark_to_market, scoreb
 from windfall.scripts_validation import run_validation
 from windfall.signals_live import generate_signals
 from windfall.signals_live.generate import signals_to_csv
+from windfall.strategy.readiness import data_readiness
 from windfall.strategy.schema import StrategyConfig
 from windfall.walkforward import sweep, walk_forward
 
@@ -140,6 +141,12 @@ def strategies_create(body: StrategyIn):
     return store_meta.get_strategy(sid)
 
 
+@app.post("/api/strategies/readiness")
+def strategies_readiness(body: BacktestIn):
+    """Tell the owner whether a strategy can be backtested (and from when) before they run it."""
+    return data_readiness(body.config)
+
+
 @app.get("/api/strategies/{sid}")
 def strategies_get(sid: str):
     s = store_meta.get_strategy(sid)
@@ -162,6 +169,7 @@ def backtests_run(body: BacktestIn):
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(400, f"backtest failed: {exc}")
     d = clean(res.model_dump())
+    d["readiness"] = data_readiness(body.config)  # so the UI can flag live-only / partial runs
     if body.save:
         d["backtest_id"] = store_meta.save_backtest(d, body.strategy_id)
     return d

@@ -48,6 +48,40 @@ def _trading_dates(close: pd.DataFrame) -> pd.DatetimeIndex:
     return close.index
 
 
+def _percentile_blend(factors, mask, eval_expr, idx, cols, warnings) -> pd.DataFrame | None:
+    """Cross-sectional percentile blend over the eligible set, per rebalance date.
+
+    For each factor: evaluate -> restrict to eligible cells (mask) -> percentile-rank across
+    tickers within each date (inverting for 'asc' factors) -> multiply by weight. Sum the
+    (pct * weight) contributions and divide by the per-cell sum of weights that actually had a
+    value, so a factor that is NaN for a name (e.g. a fundamental before its snapshot) drops out
+    and the remaining weights renormalize. Returns a date x ticker score panel (higher = better),
+    NaN where ineligible or where no factor had data.
+    """
+    blended: pd.DataFrame | None = None   # running sum of pct*weight over available factors
+    wsum: pd.DataFrame | None = None      # running sum of weights over available factors (per cell)
+    for rf in factors:
+        panel = eval_expr(rf.factor)
+        if panel is None:
+            warnings.append(f"rank_blend factor '{rf.factor}' unresolved — dropped from blend")
+            continue
+        vals = panel.reindex(index=idx, columns=cols).where(mask)   # NaN where not eligible
+        if rf.order == "asc":
+            vals = -vals
+        pct = vals.rank(axis=1, pct=True)                           # percentile within eligible non-NaN
+        contrib = (pct * rf.weight).fillna(0.0)
+        present = pct.notna().astype(float) * rf.weight
+        blended = contrib if blended is None else blended.add(contrib)
+        wsum = present if wsum is None else wsum.add(present)
+        if float(pct.notna().to_numpy().mean()) == 0.0:
+            warnings.append(
+                f"rank_blend factor '{rf.factor}' has no data in this window — excluded from the "
+                f"blend here (e.g. a fundamental before its first snapshot).")
+    if blended is None or wsum is None:
+        return None
+    return blended.divide(wsum.replace(0.0, np.nan)).where(mask)    # weighted-mean percentile
+
+
 def resolve(cfg: StrategyConfig) -> ResolvedStrategy:
     index = cfg.universe.index
     members = store.universe_tickers(index)
@@ -173,7 +207,9 @@ def resolve(cfg: StrategyConfig) -> ResolvedStrategy:
             warnings.append(f"excluded {len(drop)} names in sectors {cfg.universe.exclude_sectors}")
 
     # Honesty: fundamentals are snapshot-only until the owner accumulates a history of snapshots.
-    all_exprs = list(cfg.universe.filters) + list(cfg.entry_filters) + [cfg.rank_by]
+    blend_exprs = [rf.factor for rf in cfg.rank_blend]
+    all_exprs = (list(cfg.universe.filters) + list(cfg.entry_filters) + blend_exprs
+                 + ([cfg.rank_by] if not cfg.rank_blend else []))
     if any(t in _FUND for e in all_exprs for t in feature_names(e)):
         snaps = fund.snapshots()
         if snaps:
@@ -184,12 +220,19 @@ def resolve(cfg: StrategyConfig) -> ResolvedStrategy:
         else:
             warnings.append("uses fundamental features but no fundamentals snapshot is loaded.")
 
-    # Rank score.
-    rank = eval_expr(cfg.rank_by)
-    if rank is None:
-        warnings.append(f"rank_by '{cfg.rank_by}' unresolved — defaulting to roc21")
-        rank = feat("roc21")
-    rank = rank.reindex(index=close.index, columns=close.columns)
+    # Rank score — a single expression, or a multi-factor cross-sectional percentile blend.
+    if cfg.rank_blend:
+        rank = _percentile_blend(cfg.rank_blend, mask, eval_expr,
+                                 close.index, close.columns, warnings)
+        if rank is None:
+            warnings.append("rank_blend produced no usable factors — defaulting to roc21")
+            rank = feat("roc21").reindex(index=close.index, columns=close.columns)
+    else:
+        rank = eval_expr(cfg.rank_by)
+        if rank is None:
+            warnings.append(f"rank_by '{cfg.rank_by}' unresolved — defaulting to roc21")
+            rank = feat("roc21")
+        rank = rank.reindex(index=close.index, columns=close.columns)
 
     atr_stop = None
     if cfg.stop_loss.type in ("atr", "trailing"):

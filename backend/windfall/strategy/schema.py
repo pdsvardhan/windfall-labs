@@ -37,6 +37,21 @@ class Costs(BaseModel):
     slippage: float = 15.0   # basis points per side
 
 
+class RankFactor(BaseModel):
+    """One ingredient in a multi-factor percentile-blend ranking.
+
+    `factor` is any rank expression (e.g. "roc125", "rs_nifty_3m", "roc125 / (atr14 / close)").
+    At each rebalance the engine percentile-ranks the factor across that day's eligible names,
+    then weight-blends all factors (higher blended score = better). `order` flips the sense so a
+    "lower is better" factor (e.g. a valuation ratio) contributes its inverted percentile.
+    Blank-tolerant: when a factor is NaN for a name (e.g. a fundamental before its snapshot) it is
+    dropped for that name and the remaining factor weights renormalize.
+    """
+    factor: str
+    weight: float = 1.0
+    order: Literal["desc", "asc"] = "desc"  # desc = higher value is better (prefer high)
+
+
 class RegimeFilter(BaseModel):
     """Index-trend overlay: scale down / go to cash when the index is below its moving average.
 
@@ -54,12 +69,14 @@ class StrategyConfig(BaseModel):
     name: str = "unnamed_strategy"
     universe: Universe = Field(default_factory=Universe)
     entry_filters: list[str] = Field(default_factory=list)
-    rank_by: str = "roc21"
+    rank_by: str = "roc21"                     # single-factor rank (used when rank_blend is empty)
+    rank_blend: list[RankFactor] = Field(default_factory=list)  # multi-factor percentile blend; overrides rank_by
     rank_order: Literal["desc", "asc"] = "desc"
     n_holdings: int = 10
     weighting: Literal["equal", "inverse_vol"] = "equal"
     invest_fully: bool = False                 # True: weight = 1/(qualifying names), no idle-cash drag
-    rebalance: Literal["daily", "weekly", "fortnightly", "monthly"] = "weekly"
+    max_weight_per_stock: float | None = None  # cap any single name's book weight (e.g. 0.20); excess redistributes
+    rebalance: Literal["daily", "weekly", "fortnightly", "monthly", "quarterly"] = "weekly"
     entry_fill: Literal["next_open", "close"] = "next_open"
     stop_loss: StopLoss = Field(default_factory=StopLoss)
     take_profit: TakeProfit = Field(default_factory=TakeProfit)
