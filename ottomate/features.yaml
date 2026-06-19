@@ -1,0 +1,255 @@
+features:
+  - id: data-pipeline
+    title: Data pipeline (yfinance to DuckDB, Nifty 500)
+    short_description: Fetch, clean and store adjusted+raw daily OHLCV, corporate
+      actions, point-in-time universe membership and ADTV for the Nifty 500
+      universe in DuckDB.
+    type: backend
+    status: done
+    priority: P0
+    size: L
+    test_status: not-tested
+    acceptance_criteria:
+      - content: Downloads adjusted + raw daily OHLCV for the Nifty 500 universe and
+          stores them in DuckDB.
+        test_status: not-tested
+        linked_test: null
+      - content: Computes ADTV (average daily traded value) per ticker over a rolling
+          window.
+        test_status: not-tested
+        linked_test: null
+      - content: Incremental daily update fetches only missing bars and never re-fetches
+          cached history.
+        test_status: not-tested
+        linked_test: null
+    dependencies: []
+  - id: indicator-library
+    title: Vectorized indicator/signal library
+    short_description: SMA/EMA, RSI, ROC, ATR, ADX, MACD, rolling N-day high/low,
+      relative strength vs index, volume averages, ADTV.
+    type: backend
+    status: done
+    priority: P0
+    size: M
+    test_status: not-tested
+    acceptance_criteria:
+      - content: Each indicator matches a known reference value within tolerance
+          (unit-tested).
+        test_status: not-tested
+        linked_test: null
+      - content: Indicators are computed vectorized over the full price panel.
+        test_status: not-tested
+        linked_test: null
+    dependencies: []
+  - id: strategy-config
+    title: Declarative strategy config schema
+    short_description: "Stable JSON schema: universe+filters, signals, entry rules,
+      ranking, n_holdings, weighting, rebalance, fills, stops, targets, costs,
+      dates, benchmark."
+    type: backend
+    status: done
+    priority: P0
+    size: S
+    test_status: not-tested
+    acceptance_criteria:
+      - content: A strategy config validates against the published schema and
+          round-trips losslessly.
+        test_status: not-tested
+        linked_test: null
+      - content: The example breakout config from the Build-Spec loads and resolves to
+          concrete signals.
+        test_status: not-tested
+        linked_test: null
+    dependencies: []
+  - id: backtest-engine
+    title: Backtesting engine (vectorbt)
+    short_description: "Vectorbt simulation: costs+slippage,
+      stops/targets/trailing/time-exit, ADTV-capped sizing, next-open fills,
+      full metrics + trade log to results.json."
+    type: backend
+    status: done
+    priority: P0
+    size: L
+    test_status: not-tested
+    acceptance_criteria:
+      - content: At each rebalance, signals use only data up to that date (no
+          look-ahead) and fills occur at the next bar's open.
+        test_status: not-tested
+        linked_test: null
+      - content: Costs and slippage are deducted on every entry and exit, and annual
+          turnover is reported.
+        test_status: not-tested
+        linked_test: null
+      - content: Stops, targets, trailing and time-exits are checked daily and exit
+          intra-period when hit, logged with an exit_reason.
+        test_status: not-tested
+        linked_test: null
+      - content: Output conforms to the results.json schema (summary, equity/drawdown
+          curves, monthly returns, trades) and is deterministic per config hash.
+        test_status: not-tested
+        linked_test: null
+    dependencies: []
+  - id: validation-harness
+    title: Validation harness (reproduce known result)
+    short_description: Reproduce a known Trendlyne breakout result, indicator unit
+      tests, and buy-and-hold-equals-stock sanity check.
+    type: backend
+    status: done
+    priority: P0
+    size: M
+    test_status: not-tested
+    acceptance_criteria:
+      - content: The breakout screen config (costs off) reproduces the Trendlyne
+          reference (CAGR/maxDD/avg-hold) within tolerance, or the deviation is
+          reported with a diagnosis.
+        test_status: not-tested
+        linked_test: null
+      - content: Buy-and-hold of a single stock matches its actual total return over the
+          period.
+        test_status: not-tested
+        linked_test: null
+    dependencies: []
+  - id: walk-forward
+    title: Walk-forward + parameter optimization
+    short_description: Parameter sweep across a grid in one batch (rank by metric)
+      and rolling walk-forward optimize-then-test across history, reporting IS
+      vs OOS degradation.
+    type: backend
+    status: done
+    priority: P0
+    size: L
+    test_status: not-tested
+    acceptance_criteria:
+      - content: A parameter grid runs in one batch and ranks variants by a chosen
+          metric.
+        test_status: not-tested
+        linked_test: null
+      - content: Walk-forward optimizes on in-sample windows, tests on the next
+          out-of-sample window, rolls across history, and reports in-sample vs
+          out-of-sample degradation.
+        test_status: not-tested
+        linked_test: null
+    dependencies: []
+  - id: live-signals
+    title: Live signal generation
+    short_description: Run a saved strategy on the latest data to produce today's
+      buy/hold/sell list with entry zone, stop, targets, weight and rank;
+      exportable.
+    type: backend
+    status: done
+    priority: P0
+    size: M
+    test_status: not-tested
+    acceptance_criteria:
+      - content: Running a saved strategy on the latest data emits a per-stock action
+          (buy/hold/sell) with entry zone, stop, targets, weight and rank.
+        test_status: not-tested
+        linked_test: null
+      - content: The signal list is exportable as both CSV and JSON.
+        test_status: not-tested
+        linked_test: null
+    dependencies: []
+  - id: paper-trade-log
+    title: Paper-trade log
+    short_description: Persist each live signal as a simulated position,
+      mark-to-market daily, and track per-strategy P&L, win rate and drawdown.
+    type: hybrid
+    status: done
+    priority: P0
+    size: M
+    test_status: not-tested
+    acceptance_criteria:
+      - content: Each live signal can be persisted as a simulated open position with
+          entry, stop and target.
+        test_status: not-tested
+        linked_test: null
+      - content: Positions are marked-to-market daily and the log tracks per-strategy
+          P&L, win rate and drawdown.
+        test_status: not-tested
+        linked_test: null
+    dependencies: []
+  - id: backtest-runner-api
+    title: FastAPI engine API
+    short_description: FastAPI endpoints to run backtest/walk-forward/signals and
+      fetch saved strategies, results, signals and paper-trade state.
+    type: backend
+    status: done
+    priority: P0
+    size: M
+    test_status: not-tested
+    acceptance_criteria:
+      - content: Posting a strategy config returns a standardized results payload (or a
+          job id that resolves to one).
+        test_status: not-tested
+        linked_test: null
+      - content: GET endpoints return saved strategies, results, signals and paper-trade
+          state.
+        test_status: not-tested
+        linked_test: null
+    dependencies: []
+  - id: cockpit-dashboard
+    title: Next.js cockpit dashboard
+    short_description: "Next.js TypeScript cockpit: strategy list, backtest results
+      (equity/drawdown curves, metrics, trade log), walk-forward report, live
+      signals, paper-trade scoreboard."
+    type: ui
+    status: done
+    priority: P0
+    size: L
+    test_status: not-tested
+    acceptance_criteria:
+      - content: The dashboard lists saved strategies and renders a backtest's equity
+          curve, drawdown curve, metrics and trade log.
+        test_status: not-tested
+        linked_test: null
+      - content: Live signals and the paper-trade scoreboard are viewable in the UI.
+        test_status: not-tested
+        linked_test: null
+    dependencies: []
+  - id: strategy-editor
+    title: Strategy editor (UI)
+    short_description: Create, edit and save strategy configs from the UI and launch
+      a backtest on them.
+    type: ui
+    status: done
+    priority: P1
+    size: M
+    test_status: not-tested
+    acceptance_criteria:
+      - content: A user can create, edit and save a strategy config from the UI and run
+          a backtest on it.
+        test_status: not-tested
+        linked_test: null
+    dependencies: []
+  - id: scheduler-jobs
+    title: Scheduled data + signal jobs
+    short_description: "Nightly job: update daily prices and rebuild live signals
+      for saved strategies."
+    type: automated
+    status: building
+    priority: P1
+    size: S
+    test_status: not-tested
+    acceptance_criteria:
+      - content: A scheduled job updates daily prices and rebuilds live signals for
+          saved strategies, recording its run status.
+        test_status: not-tested
+        linked_test: null
+    dependencies: []
+  - id: alerts
+    title: Alerts (scaffolded, delivery deferred)
+    short_description: Alert-rule engine for new signals, stop/target hits and
+      drawdown breaches; logs to DB/console, external Telegram/email delivery
+      deferred per owner.
+    type: backend
+    status: planned
+    priority: P2
+    size: S
+    test_status: not-tested
+    acceptance_criteria:
+      - content: The alert rule interface exists and logs would-be alerts (new signal,
+          stop/target hit, drawdown breach) to the DB/console; external delivery
+          is deferred.
+        test_status: not-tested
+        linked_test: null
+    dependencies: []

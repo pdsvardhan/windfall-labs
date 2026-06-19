@@ -1,0 +1,17 @@
+risks: []
+policy:
+  project_slug: windfall-labs
+  exposure: intranet-only
+  access_control: anonymous-ok
+  data_sensitivity_tier: financial
+  encryption_at_rest: false
+  encryption_in_transit: true
+  key_management: env-vars
+  rate_limiting_enabled: false
+auth_config:
+  project_slug: windfall-labs
+  strategy: none
+  mfa_supported: false
+  auth_library: n-a
+third_party_services: []
+secrets: []

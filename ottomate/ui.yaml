@@ -1,0 +1,81 @@
+pages:
+  - id: page-windfall-home
+    title: Cockpit Home
+    route: /
+    purpose: "Overview: saved strategies, quick stats, recent backtests and data
+      status."
+    layout_type: dashboard
+    empty_state: No strategies yet - create your first strategy to run a backtest.
+    loading_state: skeleton
+    permissions: anonymous
+    mobile_handling: desktop-only
+    entry_points: []
+    components: []
+  - id: page-windfall-strategy-editor
+    title: Strategy Editor
+    route: /strategies/[id]
+    purpose: Create, edit and save a declarative strategy config and launch a backtest.
+    layout_type: form
+    empty_state: Start from a template or a blank config.
+    loading_state: spinner
+    permissions: anonymous
+    mobile_handling: desktop-only
+    entry_points: []
+    components: []
+  - id: page-windfall-backtest-results
+    title: Backtest Results
+    route: /backtests/[id]
+    purpose: Equity curve, drawdown curve, summary metrics, monthly returns and the
+      full trade log for a backtest.
+    layout_type: detail
+    empty_state: Run a backtest to see results here.
+    loading_state: skeleton
+    permissions: anonymous
+    mobile_handling: desktop-only
+    entry_points: []
+    components: []
+  - id: page-windfall-walk-forward
+    title: Walk-Forward Report
+    route: /walk-forward/[id]
+    purpose: In-sample vs out-of-sample degradation and parameter-sweep ranking.
+    layout_type: detail
+    empty_state: Launch a walk-forward to see the robustness report.
+    loading_state: skeleton
+    permissions: anonymous
+    mobile_handling: desktop-only
+    entry_points: []
+    components: []
+  - id: page-windfall-signals
+    title: Live Signals
+    route: /signals
+    purpose: Today's buy/hold/sell list with entry/stop/target/size, exportable.
+    layout_type: list
+    empty_state: No signals yet - run a saved strategy on the latest data.
+    loading_state: skeleton
+    permissions: anonymous
+    mobile_handling: desktop-only
+    entry_points: []
+    components: []
+  - id: page-windfall-paper
+    title: Paper Trades
+    route: /paper
+    purpose: Paper-trade scoreboard and open simulated positions per strategy.
+    layout_type: dashboard
+    empty_state: No paper trades yet - commit a live signal to start tracking.
+    loading_state: skeleton
+    permissions: anonymous
+    mobile_handling: desktop-only
+    entry_points: []
+    components: []
+  - id: page-windfall-data
+    title: Data Status
+    route: /data
+    purpose: Universe coverage, last update, ADTV summary and the Phase-0 data
+      feasibility matrix.
+    layout_type: dashboard
+    empty_state: No data loaded yet.
+    loading_state: skeleton
+    permissions: anonymous
+    mobile_handling: desktop-only
+    entry_points: []
+    components: []

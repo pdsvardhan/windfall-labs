@@ -1,0 +1,93 @@
+slug: windfall-labs
+display_name: Windfall Labs
+summary:
+  tagline: Backtest, validate & act on Indian equity strategies
+  short_description: "A private quant cockpit for Indian (NSE) equities: define a
+    strategy once, backtest it over long history with realistic costs, prove it
+    isn't curve-fit with walk-forward, generate today's exact orders, and
+    paper-trade it before risking capital."
+  core_idea: "Windfall Labs is a personal, web-hosted quant research & execution
+    platform for systematic Indian equity strategies. The loop: define a
+    declarative strategy config -> backtest over 10+ years with modelled costs,
+    slippage and explicit exits -> validate against a known result and prove
+    robustness with walk-forward (in-sample vs out-of-sample) -> generate
+    today's exact buy/hold/sell orders with entry/stop/target/size ->
+    paper-trade it to prove the edge live with zero risk before any real
+    capital. Built on hard-won principles: realism over optimism, exits are
+    first-class, no look-ahead, no survivorship, liquidity-aware, validate
+    everything, human in the loop. v1 is signals-only (no broker execution)."
+current_status: building
+lifecycle_phase: building
+scope_size: large
+target_devices: desktop
+hosting_target: vault7a-docker
+port: 8500
+public_url: http://192.168.1.10:8500
+repository_url: http://192.168.1.10:3300/pdsv/windfall-labs
+problem_statement: "Researching systematic equity strategies on screener tools
+  (Trendlyne) hits hard limits: rebalance caps, no realistic costs/slippage, no
+  explicit exit modelling, survivorship-biased universes, and look-ahead risk -
+  so backtests look great and lose money live. A weekly momentum screen showed
+  +17% gross but churned ~53%/week; the same selection made +17% with weekly
+  loss-cutting vs -17% held a month. There is no private, reproducible place to
+  backtest over long history with real costs and exits, prove a strategy isn't
+  curve-fit (walk-forward), turn it into today's exact orders, and paper-track
+  it before risking money. Windfall Labs is that cockpit."
+non_goals:
+  - No broker order execution in v1 - the platform generates signals; the human
+    places every order.
+  - No intraday or F&O/options data or strategies in v1 - daily equities only.
+  - No public internet exposure - private, single-user, behind the home-server
+    tunnel.
+  - No multi-user accounts, roles, or heavy auth in v1.
+  - No automated/algorithmic live trading - that is a guard-railed later phase,
+    paper-proven first.
+  - No fundamental/DVM-score strategies requiring point-in-time fundamentals
+    until that data is sourced.
+  - No mobile-native app - desktop web cockpit only.
+success_criteria:
+  - Reproduces a known Trendlyne backtest within tolerance - engine validated
+    before it is trusted.
+  - Backtests any price strategy over 10+ years in seconds, with costs, slippage
+    and stops applied.
+  - Produces a walk-forward report (in-sample vs out-of-sample degradation) for
+    any saved strategy.
+  - One command/click generates today's buy/hold/sell order list for any saved
+    strategy.
+  - "Paper-trade log runs for live strategies: marked-to-market daily, tracks
+    P&L, win rate, drawdown."
+  - Nifty 500 daily history (~12yr) loaded and cached in DuckDB, reused across
+    runs with no re-fetch.
+  - Results are deterministic and tagged by config hash; standardized JSON
+    contracts are honored.
+preferences:
+  likes:
+    - realism over optimism (costs + slippage + turnover always reported)
+    - deterministic, reproducible runs tagged by config hash
+    - clean stable JSON contracts between assistant and engine
+    - fast columnar data (DuckDB) - download once, reuse
+    - battle-tested vectorized backtest core (vectorbt)
+  dislikes:
+    - curve-fit strategies that only work in-sample
+    - look-ahead bias (same-bar close fills, unlagged fundamentals)
+    - survivorship bias (today-only universes)
+    - costless/frictionless backtests
+  must_haves:
+    - transaction costs + slippage modelled on every entry and exit
+    - "explicit exits: stop-loss (pct/ATR/trailing), take-profit, time-exit"
+    - "no look-ahead: next-open fills, point-in-time data, lagged fundamentals"
+    - walk-forward mandatory before any strategy is approved
+    - "liquidity realism: ADTV filter + ADTV-capped position sizing"
+    - "validation first: reproduce a known Trendlyne result before trusting the
+      engine"
+  avoid:
+    - broker order execution in v1 (signals-only)
+    - intraday / F&O data and strategies in v1
+    - public internet exposure
+    - heavy auth (private single-user tool)
+tags:
+  - personal
+  - quant
+  - finance
+  - trading
+  - nse

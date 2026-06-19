@@ -1,0 +1,135 @@
+flows:
+  - id: flow-windfall-run-backtest
+    title: Run a backtest
+    type: mixed
+    priority: critical
+    test_status: not-tested
+    trigger: User selects or authors a strategy and clicks Run Backtest.
+    expected_outcome: A standardized results payload is returned and the
+      equity/drawdown curves, metrics and trade log are rendered.
+    pre_conditions: []
+    steps:
+      - actor: user
+        action: Select an existing strategy or author a new config
+        result: Config is validated against the schema
+      - actor: user
+        action: Click Run Backtest
+        result: Engine loads point-in-time data and simulates with costs and exits
+      - actor: system
+        action: Run the vectorbt simulation over the date range
+        result: results.json is produced (summary + curves + trades), deterministic per
+          config hash
+      - actor: system
+        action: Render equity curve, drawdown curve, metrics and trade log
+        result: User can read CAGR, max DD, Sharpe, turnover and the trade-by-trade log
+    edge_cases: []
+    linked_features: []
+    linked_pages: []
+  - id: flow-windfall-validate-engine
+    title: Validate the engine against a known result
+    type: backend
+    priority: critical
+    test_status: not-tested
+    trigger: User runs the validation suite before trusting the engine.
+    expected_outcome: The engine reproduces the Trendlyne reference within tolerance
+      (or reports the deviation) and indicator/sanity tests pass.
+    pre_conditions: []
+    steps:
+      - actor: user
+        action: Run the validation suite
+        result: The breakout reproduce-Trendlyne config runs with costs off
+      - actor: system
+        action: Compare CAGR / max DD / avg-hold to the Trendlyne reference
+        result: Pass within tolerance or a diagnosed deviation is reported
+      - actor: system
+        action: Run indicator unit tests and a buy-and-hold sanity check
+        result: Indicator values and single-stock total return match references
+    edge_cases: []
+    linked_features: []
+    linked_pages: []
+  - id: flow-windfall-walk-forward
+    title: Walk-forward a strategy
+    type: backend
+    priority: critical
+    test_status: not-tested
+    trigger: User wants to prove a strategy is not curve-fit.
+    expected_outcome: An in-sample vs out-of-sample degradation report; strategies
+      that only work in-sample are flagged for rejection.
+    pre_conditions: []
+    steps:
+      - actor: user
+        action: Select a strategy and a parameter grid
+        result: The sweep runs and ranks variants by the chosen metric
+      - actor: user
+        action: Launch walk-forward
+        result: Parameters are optimized in-sample, tested out-of-sample, rolled forward
+          across history
+      - actor: system
+        action: Report IS vs OOS degradation
+        result: A strategy whose OOS performance collapses is flagged as rejected
+    edge_cases: []
+    linked_features: []
+    linked_pages: []
+  - id: flow-windfall-todays-orders
+    title: Generate today's orders
+    type: mixed
+    priority: critical
+    test_status: not-tested
+    trigger: User selects a saved strategy to get today's actions.
+    expected_outcome: A buy/hold/sell list with entry zone, stop, targets and size,
+      exportable for manual order placement.
+    pre_conditions: []
+    steps:
+      - actor: user
+        action: Select a saved (approved) strategy
+        result: The strategy runs on the latest available data
+      - actor: system
+        action: Emit the buy/hold/sell list with entry/stop/target/size
+        result: A ranked signal table is rendered
+      - actor: user
+        action: Export the order list (CSV/JSON) and place orders manually
+        result: The human places every order; the platform only prepares them
+    edge_cases: []
+    linked_features: []
+    linked_pages: []
+  - id: flow-windfall-paper-track
+    title: Paper-track a strategy
+    type: mixed
+    priority: important
+    test_status: not-tested
+    trigger: User commits a live signal to the paper book.
+    expected_outcome: A simulated position is opened, marked-to-market daily, and
+      visible on the paper scoreboard.
+    pre_conditions: []
+    steps:
+      - actor: user
+        action: Commit a live signal to the paper book
+        result: A simulated position is opened with stop and target
+      - actor: system
+        action: Mark-to-market daily and check stops/targets
+        result: P&L, R-multiple and status update each day
+      - actor: user
+        action: Review the paper scoreboard over time
+        result: Per-strategy P&L, win rate and drawdown are visible
+    edge_cases: []
+    linked_features: []
+    linked_pages: []
+  - id: flow-windfall-refresh-data
+    title: Refresh data + rebuild signals
+    type: automated
+    priority: important
+    test_status: not-tested
+    trigger: Nightly scheduled job (or manual trigger).
+    expected_outcome: Latest daily bars are upserted and live signals for saved
+      strategies are rebuilt.
+    pre_conditions: []
+    steps:
+      - actor: system
+        action: Fetch latest daily bars for the universe
+        result: Only missing bars are upserted into DuckDB
+      - actor: system
+        action: Recompute live signals for saved strategies
+        result: Dashboard signal tables reflect the latest data
+    edge_cases: []
+    linked_features: []
+    linked_pages: []

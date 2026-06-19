@@ -1,0 +1,56 @@
+decisions:
+  - id: adr-001-windfall-stack
+    project_slug: windfall-labs
+    title: "Stack: FastAPI + Next.js + DuckDB for a private quant cockpit"
+    status: accepted
+    date: 2026-06-19T00:00:00.000Z
+    tags:
+      - curated
+      - cat:system
+    body_path: docs/decisions/adr-001-windfall-stack.md
+  - id: adr-002-windfall-architecture
+    project_slug: windfall-labs
+    title: "Architecture: monorepo with an importable quant engine, CLI and HTTP API"
+    status: accepted
+    date: 2026-06-19T00:00:00.000Z
+    tags:
+      - curated
+      - cat:system
+    body_path: docs/decisions/adr-002-windfall-architecture.md
+  - id: adr-003-windfall-data-sourcing
+    project_slug: windfall-labs
+    title: "Data sourcing: yfinance first, Bhavcopy for survivorship-free history,
+      behind a Phase-0 gate"
+    status: accepted
+    date: 2026-06-19T00:00:00.000Z
+    tags:
+      - curated
+      - cat:reliability
+    body_path: docs/decisions/adr-003-windfall-data-sourcing.md
+  - id: adr-004-windfall-engine-core
+    project_slug: windfall-labs
+    title: "Backtest core: vectorbt over a hand-rolled simulator"
+    status: accepted
+    date: 2026-06-19T00:00:00.000Z
+    tags:
+      - curated
+      - cat:system
+    body_path: docs/decisions/adr-004-windfall-engine-core.md
+  - id: adr-005-windfall-no-auth
+    project_slug: windfall-labs
+    title: "No authentication in v1: private, single-user, tunnel-gated"
+    status: accepted
+    date: 2026-06-19T00:00:00.000Z
+    tags:
+      - curated
+      - cat:security
+    body_path: docs/decisions/adr-005-windfall-no-auth.md
+  - id: adr-006-windfall-build-plan
+    project_slug: windfall-labs
+    title: "Build plan: validate before trusting, walk-forward before approving"
+    status: accepted
+    date: 2026-06-19T00:00:00.000Z
+    tags:
+      - curated
+      - cat:product
+    body_path: docs/decisions/adr-006-windfall-build-plan.md
