@@ -85,3 +85,13 @@
 1. **Valuation v2:** historical-multiple percentile (current PE/PB vs the stock's own screener history) — Trendlyne's core valuation ingredient; now feasible across the wider overlap from the 674 scrape.
 2. **Durability gap:** Trendlyne durability uses **ROCE + D/E**; ours uses ROA/Piotroski/OPM. Add ROCE + D/E (screener history already computes both) to lift durability ρ above 0.55.
 3. Run a Trendlyne-parity DVM backtest end-to-end + replicate 1–2 Trendlyne results in-engine & compare (user's stated phase goal).
+
+### 2026-06-20 (cont.) — scrape complete, data validated, durability v2
+
+- **674-gap scrape complete:** 660 ingested / 9 quarantined / 3 financial / 2 failed. Screener store **633 → 1,305** names. **Trendlyne ∩ screener = 238 → 898** (~98% of eligible operating companies; remaining 240 = 130 ETFs/funds + 89 financials + 21 edge-cases). The fundamental-backtest universe is now effectively complete.
+- **Universe clarified:** NSE ~2,375 listed (EQUITY_L); we hold prices for 1,505 (liquid set). BSE out of scope (illiquid, NSE-keyed sources).
+- **Data correctness (independent):** screener-COMPUTED ROE vs Trendlyne-REPORTED ROE on the 898 overlap = **Spearman 0.90, 94% within ±5pp** (OPM 0.87, wider by the annual-vs-quarterly definition). The wild ROE outliers are unstable ratios (near-zero equity), not parse errors. Conclusion: **screener data is sound; remaining DVM gaps are formula, not data.** (Note: the earlier net-profit-vs-yfinance "match" is non-independent — the ingester adopts yfinance owner-NP on overlap; revenue is the independent yfinance check and agrees <2% on clean large-caps.)
+- **iter durability-dvm-v2 (commit 65d75aa, verifier-APPROVED):** a held-out least-squares fit showed Trendlyne durability is **Piotroski-DOMINATED** (Piotroski ~3× any other input; ceiling ~0.88). Reweighted `durability_own` to {piotroski .45, pledge .18, eps_growth .15, roa .12, opm .05, np_qtr_yoy .05}; ROE dropped from blend (collinear) but kept as a param. **Durability 0.546 → 0.875** (valuation/momentum unchanged). Measured finding: **ROCE/D-E HURT the snapshot match** (cross-source noise vs Trendlyne's own-data target) — kept out of the live blend; ROCE-for-history is an opt-in ~0.03-match-cost follow-up (user chose "max live-match").
+- **DVM scoreboard now:** momentum **0.835** · durability **0.875** · valuation **0.407**.
+
+**Pick-up:** valuation v2 (historical-multiple percentile — same measure-first lstsq-ceiling method); momentum tweak (add distance-from-200DMA / 52w-high); then the Trendlyne-parity backtest.
