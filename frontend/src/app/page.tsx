@@ -3,12 +3,14 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api";
-import type { BacktestRow, Coverage, Strategy } from "@/lib/types";
+import type { BacktestRow, Coverage, FundamentalsCoverage, Strategy } from "@/lib/types";
 import { pct } from "@/lib/format";
 import { StatCard } from "@/components/StatCard";
+import { SnapshotBanner } from "@/components/SnapshotBanner";
 
 export default function Home() {
   const [cov, setCov] = useState<Coverage | null>(null);
+  const [fund, setFund] = useState<FundamentalsCoverage | null>(null);
   const [strats, setStrats] = useState<Strategy[]>([]);
   const [backtests, setBacktests] = useState<BacktestRow[]>([]);
   const [err, setErr] = useState<string | null>(null);
@@ -19,6 +21,7 @@ export default function Home() {
     Promise.all([api.coverage(), api.listStrategies(), api.listBacktests()])
       .then(([c, s, b]) => { setCov(c); setStrats(s); setBacktests(b); })
       .catch((e) => setErr(e.message));
+    api.fundamentalsStatus().then((f) => setFund(f.coverage)).catch(() => {});
   }, []);
 
   async function runValidation() {
@@ -44,6 +47,7 @@ export default function Home() {
       </div>
 
       {err && <div className="card border-loss/50 px-4 py-3 text-loss text-sm">API error: {err} — is the backend API running on :8505?</div>}
+      <SnapshotBanner cov={fund} />
       {validation && <div className="card px-4 py-2 text-sm">Validation: <span className="mono">{validation}</span></div>}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">

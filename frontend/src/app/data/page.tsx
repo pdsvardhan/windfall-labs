@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import type { DataStatus } from "@/lib/types";
 import { StatCard } from "@/components/StatCard";
+import { SnapshotBanner } from "@/components/SnapshotBanner";
 
 const statusChip: Record<string, string> = {
   available: "border-gain/50 text-gain",
@@ -39,6 +40,7 @@ export default function DataPage() {
       </div>
 
       {err && <div className="card border-loss/50 px-4 py-2 text-loss text-sm">{err}</div>}
+      <SnapshotBanner cov={ds?.fundamentals} />
       {!ds ? <div className="text-muted">Loading…</div> : (
         <>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">

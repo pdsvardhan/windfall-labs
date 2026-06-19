@@ -1,5 +1,5 @@
 import type {
-  BacktestResult, BacktestRow, Coverage, DataStatus, PaperPosition,
+  BacktestResult, BacktestRow, Coverage, DataStatus, FundamentalsStatus, PaperPosition,
   ScoreRow, SignalRun, Strategy, WalkForwardReport,
 } from "./types";
 
@@ -30,6 +30,7 @@ export const api = {
   health: () => get<{ status: string }>("/health"),
   coverage: () => get<Coverage>("/api/coverage"),
   dataStatus: () => get<DataStatus>("/api/data/status"),
+  fundamentalsStatus: () => get<FundamentalsStatus>("/api/fundamentals/status"),
   refreshData: () => post<unknown>("/api/data/refresh", {}),
 
   listStrategies: () => get<Strategy[]>("/api/strategies"),

@@ -20,8 +20,9 @@ export function MetricsGrid({ s }: { s: Summary }) {
         sub={`avg win ${pct(s.avg_win)} / loss ${pct(s.avg_loss)}`} />
       <StatCard label="Annual Turnover" value={`${num(s.annual_turnover * 100, 0)}%`} tone="warn"
         sub={`avg hold ${num(s.avg_holding_days, 0)}d`} />
-      <StatCard label="Active Return" value={pct(s.active_return)} tone={tone(s.active_return)}
-        sub="vs benchmark" />
+      <StatCard label="Active Return" value={pct(s.active_return)}
+        tone={s.active_return == null ? "muted" : tone(s.active_return)}
+        sub={s.active_return == null ? (s.active_return_note || "not comparable") : "vs benchmark"} />
       <StatCard label="Exposure" value={pct(s.exposure)} tone="muted" />
     </div>
   );

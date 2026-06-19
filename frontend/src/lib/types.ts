@@ -17,7 +17,10 @@ export interface Summary {
   exposure: number;
   n_trades: number;
   benchmark_cagr: number;
-  active_return: number;
+  // null when the run had ~no exposure (0 trades / held cash): active return isn't
+  // comparable then. active_return_note carries the reason when it's suppressed.
+  active_return: number | null;
+  active_return_note?: string;
 }
 
 export interface Trade {
@@ -132,10 +135,25 @@ export interface FeasibilityRow {
   detail: string;
 }
 
+export interface FundamentalsCoverage {
+  tickers: number;
+  snapshots: number;
+  latest: string | null;
+  latest_age_days: number | null;
+  stale: boolean;
+  stale_after_days: number;
+}
+
+export interface FundamentalsStatus {
+  coverage: FundamentalsCoverage;
+  snapshots: string[];
+  fields: string[];
+}
+
 export interface DataStatus {
   coverage: Coverage;
   n_universe: number;
-  fundamentals?: { tickers: number; snapshots: number; latest: string | null };
+  fundamentals?: FundamentalsCoverage;
   feasibility: FeasibilityRow[];
 }
 

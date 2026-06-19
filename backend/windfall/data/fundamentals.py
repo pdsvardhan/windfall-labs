@@ -59,6 +59,10 @@ _MAP = {
 }
 NUMERIC_FIELDS = list(_MAP.keys())
 
+# A Trendlyne snapshot older than this is "stale" — the owner should export a fresh one.
+# Snapshots are taken roughly monthly; the buffer lets a few days pass before nagging.
+SNAPSHOT_STALE_AFTER_DAYS = 35
+
 
 def _to_float(v):
     if v is None:
@@ -184,4 +188,13 @@ def coverage() -> dict:
     row = con.execute(
         "SELECT COUNT(DISTINCT ticker), COUNT(DISTINCT snapshot_date), MAX(snapshot_date) "
         "FROM fundamentals").fetchone()
-    return {"tickers": row[0] or 0, "snapshots": row[1] or 0, "latest": str(row[2]) if row[2] else None}
+    latest = _to_date(row[2]) if row[2] else None
+    age_days = (dt.date.today() - latest).days if latest else None
+    return {
+        "tickers": row[0] or 0,
+        "snapshots": row[1] or 0,
+        "latest": str(latest) if latest else None,
+        "latest_age_days": age_days,
+        "stale": bool(age_days is not None and age_days > SNAPSHOT_STALE_AFTER_DAYS),
+        "stale_after_days": SNAPSHOT_STALE_AFTER_DAYS,
+    }
