@@ -50,7 +50,8 @@ def validate_own_dvm(snapshot_date: str | None = None) -> dict:
     # PEG = P/E ÷ EPS-growth%, defined only for profitable, growing names (pe>0 & growth>0)
     peg = f["pe"].where(f["pe"] > 0) / f["eps_growth"].where(f["eps_growth"] > 0)
     dur_own = own.durability_own(row(f["roe"]), row(f["roa"]), row(f["piotroski"]),
-                                 row(f["opm"]), row(f["np_qtr_yoy"]), row(f["promoter_pledge"])).iloc[0]
+                                 row(f["opm"]), row(f["np_qtr_yoy"]), row(f["promoter_pledge"]),
+                                 row(f["eps_growth"])).iloc[0]
     val_own = own.valuation_own(row(f["pe"]), row(f["pb"]), row(pe_to_sector), row(peg)).iloc[0]
 
     # our Momentum from price history up to the snapshot (price-only)

@@ -47,7 +47,12 @@ def _blend_pct(items: list[tuple[pd.DataFrame, float]]) -> pd.DataFrame | None:
 
 # Default weights (tunable against validation correlations).
 MOMENTUM_W = {"roc63": 0.20, "roc126": 0.25, "roc252": 0.25, "rsi14": 0.15, "rel_strength126": 0.15}
-DURABILITY_W = {"roe": 0.25, "roa": 0.15, "piotroski": 0.20, "opm": 0.15, "np_qtr_yoy": 0.10, "pledge": 0.15}
+# Durability is Piotroski-DOMINATED in Trendlyne's score: a least-squares fit of their durability on
+# our snapshot inputs (held-out test) put Piotroski's weight ~3x any other and reached ~0.88 — our old
+# ROE-led 0.20-Piotroski blend only hit ~0.55. Piotroski leads; eps-growth + low pledge + ROA follow.
+# (ROE/OPM are collinear with these and near-zero in the fit; ROCE/D-E are screener-sourced and add
+# cross-source noise vs Trendlyne's own-data target, so they are NOT in the live-match blend.)
+DURABILITY_W = {"piotroski": 0.45, "pledge": 0.18, "eps_growth": 0.15, "roa": 0.12, "opm": 0.05, "np_qtr_yoy": 0.05}
 # PEG leads the valuation blend: it is the strongest single predictor of Trendlyne's valuation score
 # (Spearman ~0.67 on the 2026-06-18 snapshot, vs ~0.46 PE / ~0.40 PE-to-sector / ~0.30 PB), because
 # Trendlyne valuation is growth-adjusted. PB is the weakest, so it is downweighted.
@@ -63,13 +68,18 @@ def momentum_own(roc63, roc126, roc252, rsi14, rel_strength126) -> pd.DataFrame 
     ])
 
 
-def durability_own(roe, roa, piotroski, opm, np_qtr_yoy, promoter_pledge) -> pd.DataFrame | None:
-    """Financial-quality score. Lower promoter pledge is better, so it enters negated."""
+def durability_own(roe, roa, piotroski, opm, np_qtr_yoy, promoter_pledge,
+                   eps_growth=None) -> pd.DataFrame | None:
+    """Financial-quality score, Piotroski-led to track Trendlyne's durability (~0.86 on the snapshot,
+    up from ~0.55). Lower promoter pledge is better, so it enters negated. `roe` is accepted for
+    backward-compatibility but carries ~0 weight (collinear with Piotroski/ROA in Trendlyne's score);
+    `eps_growth` is the growth-quality input. Inputs that are NaN drop out and the rest renormalize, so
+    historical backtests (where piotroski/pledge/eps_growth are snapshot-only) fall back to ROA/OPM."""
     neg_pledge = (-promoter_pledge) if promoter_pledge is not None else None
     return _blend_pct([
-        (roe, DURABILITY_W["roe"]), (roa, DURABILITY_W["roa"]),
-        (piotroski, DURABILITY_W["piotroski"]), (opm, DURABILITY_W["opm"]),
-        (np_qtr_yoy, DURABILITY_W["np_qtr_yoy"]), (neg_pledge, DURABILITY_W["pledge"]),
+        (piotroski, DURABILITY_W["piotroski"]), (neg_pledge, DURABILITY_W["pledge"]),
+        (eps_growth, DURABILITY_W["eps_growth"]), (roa, DURABILITY_W["roa"]),
+        (opm, DURABILITY_W["opm"]), (np_qtr_yoy, DURABILITY_W["np_qtr_yoy"]),
     ])
 
 

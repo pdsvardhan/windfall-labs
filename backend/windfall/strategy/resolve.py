@@ -157,7 +157,8 @@ def resolve(cfg: StrategyConfig) -> ResolvedStrategy:
                                   feat("rsi14"), feat("rel_strength126"))
         elif name == "durability_own":
             df = own.durability_own(feat("roe"), feat("roa"), feat("piotroski"),
-                                    feat("opm"), feat("np_qtr_yoy"), feat("promoter_pledge"))
+                                    feat("opm"), feat("np_qtr_yoy"), feat("promoter_pledge"),
+                                    feat("eps_growth"))
         elif name == "valuation_own":
             df = own.valuation_own(feat("pe"), feat("pb"), feat("pe_to_sector"), feat("peg"))
         elif name == "pe":

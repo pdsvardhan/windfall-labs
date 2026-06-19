@@ -61,6 +61,15 @@ def test_durability_handles_all_missing_gracefully():
     assert s is not None and s.iloc[0].isna().all()  # no inputs -> all-NaN, no crash
 
 
+def test_durability_is_piotroski_led():
+    # Piotroski dominates Trendlyne durability; with all else equal, higher Piotroski must win.
+    eq = _panel([[10.0, 10.0, 10.0, 10.0]])
+    piotroski = _panel([[9.0, 3.0, 6.0, 1.0]])      # A best, D worst
+    pledge = _panel([[0.0, 0.0, 0.0, 0.0]])
+    s = own.durability_own(eq, eq, piotroski, eq, eq, pledge)
+    assert s.iloc[0]["A"] > s.iloc[0]["D"]
+
+
 def test_momentum_own_resolves_as_a_feature_in_0_100():
     cfg = StrategyConfig(name="m", universe=Universe(index="nifty500", filters=["momentum_own > 0"]),
                          rank_by="momentum_own", start="2018-01-01")
