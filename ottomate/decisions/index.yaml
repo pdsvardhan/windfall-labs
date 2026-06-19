@@ -63,3 +63,21 @@ decisions:
       - curated
       - cat:product
     body_path: docs/decisions/adr-007-windfall-fundamentals.md
+  - id: adr-008-windfall-reporting-honesty
+    project_slug: windfall-labs
+    title: "Reporting honesty: suppress active-return when a strategy holds cash"
+    status: accepted
+    date: 2026-06-19T00:00:00.000Z
+    tags:
+      - curated
+      - cat:product
+    body_path: docs/decisions/adr-008-windfall-reporting-honesty.md
+  - id: adr-009-windfall-blend-rank-readiness
+    project_slug: windfall-labs
+    title: Multi-factor blend ranking + per-strategy data-readiness
+    status: accepted
+    date: 2026-06-19T00:00:00.000Z
+    tags:
+      - curated
+      - cat:system
+    body_path: docs/decisions/adr-009-windfall-blend-rank-readiness.md
