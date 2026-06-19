@@ -81,3 +81,12 @@ decisions:
       - curated
       - cat:system
     body_path: docs/decisions/adr-009-windfall-blend-rank-readiness.md
+  - id: adr-010-windfall-own-dvm
+    project_slug: windfall-labs
+    title: Build our own reproducible D/V/M, validated against Trendlyne
+    status: accepted
+    date: 2026-06-19T00:00:00.000Z
+    tags:
+      - curated
+      - cat:system
+    body_path: docs/decisions/adr-010-windfall-own-dvm.md
