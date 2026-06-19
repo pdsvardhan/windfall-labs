@@ -19,8 +19,10 @@ from . import own_dvm as own
 
 
 def _spearman(ours: pd.Series, theirs: pd.Series) -> dict:
+    # Spearman == Pearson correlation of the ranks. Computing it via .rank().corr() avoids the
+    # scipy dependency that pandas' method="spearman" pulls in (not in every environment).
     df = pd.DataFrame({"ours": ours, "theirs": theirs}).dropna()
-    rho = float(df["ours"].corr(df["theirs"], method="spearman")) if len(df) > 2 else None
+    rho = float(df["ours"].rank().corr(df["theirs"].rank())) if len(df) > 2 else None
     return {"spearman": round(rho, 4) if rho is not None else None, "n": int(len(df))}
 
 
