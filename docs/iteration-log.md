@@ -68,3 +68,20 @@
 3. Ops: #14 nightly auto-refresh cron, #13 monthly snapshot auto-save.
 
 **Commits:** d92d53f/26ca933 (iter-6), 27dc074/16dd4a2 (iter-7), b97ed6a/bcb9b69 (iter-8), 826d3f5/83d02e2 (iter-C).
+
+## Session 2026-06-20 — data audit + valuation DVM v1 + 674-name screener scrape
+
+**Stage:** Stage 4 (iterate) — data-quality audit (user-requested), one verifier-APPROVED code iteration, one data-source scrape.
+
+**Data audit (read-only, requested: "how much screener data, is it correct, are the DVM right?"):**
+- **Screener coverage reconciled.** The run targeted **niftytotalmarket (754)** — complete: 633 ingested (552 high / 80 low / 1 quarantined), 121 financials excluded by ADR-013, **0 failed**. The "1138 vs 633" is apples-to-oranges: Trendlyne(1138) ∩ niftytotalmarket = only **287**; **Trendlyne ∩ screener = 238** (the usable set for fundamental backtests). The 900 Trendlyne names without screener history = 89 financial + 137 fund/ETF/other + **674 genuine companies** (668 outside the run target, 6 inside). Exact list dumped to `backend/data/missing_screener.csv`.
+- **Data correctness.** Fresh yfinance cross-check on 8 large-caps: revenue agrees <2% on all clean names (RELIANCE 0.1%, TCS 0.0%, HINDUNILVR 1.1%, MARUTI 1.6%, SUNPHARMA 0.4%); TITAN 14% correctly flagged `low`; NESTLE filled where yfinance has no data. Caveat: net-profit agreement is partly circular (ingester adopts yfinance owner-NP on overlap) — revenue is the independent signal. Confidence tiering is the systematic guard.
+
+**iter (valuation-dvm-v1, commit 28dc401, verifier-APPROVED, no look-ahead):** Trendlyne valuation is growth-adjusted + benchmarked vs a stock's own 5–10yr multiple history (per Trendlyne's own methodology, user-supplied). v1: added **PEG** (P/E ÷ EPS-growth%, the strongest single predictor ρ≈0.67) as the leading valuation component; **fixed a latent blend bug** (PB / PE-to-sector were negated without a >0 guard, so negative ratios scored as "cheapest"); reweighted peg .40 / pe_to_sector .25 / pe .20 / pb .15; wired PEG into the live engine with snapshot-only gating. **Valuation Spearman 0.211 → 0.407** (durability 0.546 / momentum 0.835 unchanged). +2 regression tests; 83 → 85 pass. Deliberately did NOT crank weights to chase the snapshot number (curve-fit risk) — the remaining gap is the historical-multiple-percentile component (v2).
+
+**In flight:** detached screener scrape of the **674 genuine-company gap** (`data/genuine_674.csv`, cross-check on) → lifts the live-DVM ∩ history overlap from 238 toward ~900, unlocking valuation v2 + fundamental backtests on a wide universe.
+
+**Next session pick-up:**
+1. **Valuation v2:** historical-multiple percentile (current PE/PB vs the stock's own screener history) — Trendlyne's core valuation ingredient; now feasible across the wider overlap from the 674 scrape.
+2. **Durability gap:** Trendlyne durability uses **ROCE + D/E**; ours uses ROA/Piotroski/OPM. Add ROCE + D/E (screener history already computes both) to lift durability ρ above 0.55.
+3. Run a Trendlyne-parity DVM backtest end-to-end + replicate 1–2 Trendlyne results in-engine & compare (user's stated phase goal).

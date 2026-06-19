@@ -25,10 +25,12 @@ F&O/long-term are later phases. Built through Ottomate (project slug `windfall-l
   running api container. Pattern: `docker stop windfall-api` → run the job → `docker compose up -d --build`.
   pytest is safe anytime (uses a temp DB). Read-only host queries while api is up will error — read via the API.
 
-## Current data state (2026-06-19)
+## Current data state (2026-06-20)
 - **Prices:** 1,505 NSE tickers, daily adjusted OHLCV, 2014-06 → **2026-06-18** (last close). DuckDB at `backend/data/windfall.duckdb`.
-- **Fundamentals:** 1 Trendlyne snapshot dated **2026-06-18**, 1,138 stocks (DVM scores, PE/sector-PE, PB, EPS growth, ROE, Piotroski, promoter pledge/holding, qtr growth, relative strength).
-- **Universes:** `nifty500`, `niftytotalmarket` (~750), `trendlyne` (the 1138 fundamentals stocks), `allnse` (full EQUITY_L, load on demand).
+- **Fundamentals (Trendlyne snapshot):** 1 snapshot dated **2026-06-18**, 1,138 stocks (DVM scores, PE/sector-PE, PB, EPS growth, ROE, Piotroski, promoter pledge/holding, qtr growth, relative strength).
+- **Fundamentals (screener.in history):** point-in-time annual 2006→2026 in `backend/data/screener_fundamentals.duckdb`. **633 names** from the niftytotalmarket run (552 high / 80 low / 1 quarantined; 121 financials excluded; 0 failed). NOTE: niftytotalmarket and the Trendlyne-1138 universe overlap only on **287**, so the usable **Trendlyne ∩ screener = 238**. A scrape of the **674 genuine-company gap** (`data/genuine_674.csv`, classified in `data/missing_screener.csv`) ran 2026-06-20 to widen this toward ~900.
+- **Universes:** `nifty500` (504), `niftytotalmarket` (~754), `trendlyne` (the 1138 fundamentals stocks), `allnse` (full EQUITY_L, load on demand).
+- **DVM validation vs Trendlyne (snapshot 2026-06-18, Spearman):** momentum **0.835**, durability **0.546**, valuation **0.407** (v1: PEG + blend-bug fix, commit 28dc401). Valuation v2 (historical-multiple percentile) and a durability ROCE/D-E add are the next correlation lifts.
 - **Refresh cadence (agreed):** prices nightly after close; fundamentals monthly re-export (each export = a new point-in-time snapshot → builds backtest history forward). Corporate-action logs: skip (adjusted prices suffice). Point-in-time index membership: only as part of survivorship work.
 
 ## What's built (done)
