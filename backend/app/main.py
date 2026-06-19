@@ -14,6 +14,7 @@ from pydantic import BaseModel
 from windfall import store_meta
 from windfall.data import fundamentals as fund
 from windfall.data import store
+from windfall.data import surveillance
 from windfall.jsonsafe import clean
 from windfall.data.pipeline import incremental_update
 from windfall.engine.backtest import run_backtest
@@ -110,6 +111,21 @@ def scores_own_validate(snapshot_date: str | None = None):
 @app.post("/api/data/refresh")
 def data_refresh(index: str = "nifty500"):
     return incremental_update(index)
+
+
+@app.post("/api/surveillance/refresh")
+def surveillance_refresh():
+    """Fetch the current NSE ASM/GSM lists and store a dated snapshot (in-process — ONE DOOR safe)."""
+    try:
+        rows = surveillance.fetch_asm_gsm()
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(502, f"NSE surveillance fetch failed: {exc}")
+    return surveillance.ingest(rows)
+
+
+@app.get("/api/surveillance")
+def surveillance_list():
+    return surveillance.latest_flags()
 
 
 def _feasibility(cov: dict, fcov: dict | None = None) -> list[dict]:
@@ -210,7 +226,7 @@ def walkforward_run(body: WalkForwardIn):
 # ── signals ──────────────────────────────────────────────────────────────────
 @app.post("/api/signals")
 def signals_run(body: SignalsIn):
-    out = clean(generate_signals(body.config))
+    out = surveillance.annotate_signals(clean(generate_signals(body.config)))
     if body.save:
         out["signal_run_id"] = store_meta.save_signal_run(
             body.strategy_id, out.get("as_of"), out.get("signals", []))
