@@ -253,3 +253,28 @@ features:
         test_status: not-tested
         linked_test: null
     dependencies: []
+  - id: fundamentals-dvm
+    title: Fundamentals / DVM ingestion (Trendlyne)
+    short_description: Ingest Trendlyne snapshot exports into a point-in-time
+      fundamentals table; expose DVM/PE/ROE/pledge/etc as resolver features; DVM
+      live-signals strategy.
+    type: backend
+    status: done
+    priority: P0
+    size: L
+    test_status: not-tested
+    acceptance_criteria:
+      - content: Trendlyne exports parse + merge on NSE Code into a point-in-time
+          fundamentals table with snapshot + reporting dates.
+        test_status: not-tested
+        linked_test: null
+      - content: Fundamental features (durability, pe_to_sector, roe, piotroski,
+          promoter_pledge, mcap_cr, etc) resolve in strategies and are NaN
+          before their snapshot (no look-ahead).
+        test_status: not-tested
+        linked_test: null
+      - content: The DVM screen generates today live buy/hold/sell signals on the
+          fundamentals universe.
+        test_status: not-tested
+        linked_test: null
+    dependencies: []

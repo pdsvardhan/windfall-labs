@@ -54,3 +54,12 @@ decisions:
       - curated
       - cat:product
     body_path: docs/decisions/adr-006-windfall-build-plan.md
+  - id: adr-007-windfall-fundamentals
+    project_slug: windfall-labs
+    title: "Fundamentals via Trendlyne snapshots: point-in-time, snapshot-only"
+    status: accepted
+    date: 2026-06-19T00:00:00.000Z
+    tags:
+      - curated
+      - cat:product
+    body_path: docs/decisions/adr-007-windfall-fundamentals.md
