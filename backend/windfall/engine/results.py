@@ -21,7 +21,11 @@ class Summary(BaseModel):
     exposure: float = 0.0
     n_trades: int = 0
     benchmark_cagr: float = 0.0
-    active_return: float = 0.0
+    # None when the run took ~no exposure (0 trades / sat in cash): active return vs a
+    # benchmark is not comparable then, and reporting a number invites the "+8.71% on
+    # 0 trades" misread. `active_return_note` carries the reason when it is suppressed.
+    active_return: float | None = None
+    active_return_note: str = ""
 
 
 class Trade(BaseModel):

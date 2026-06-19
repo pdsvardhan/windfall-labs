@@ -21,6 +21,32 @@ def test_max_drawdown_is_exact():
     assert abs(dd.min() - (-0.5)) < 1e-9
 
 
+def test_active_return_suppressed_when_no_exposure():
+    # A do-nothing run (0 trades, 0 exposure) vs a FALLING benchmark must NOT report a
+    # positive active_return — that was the dvm_monthly "+8.71% on 0 trades" trap.
+    idx = pd.bdate_range("2020-01-01", periods=261)
+    nav = pd.Series(100.0, index=idx)                                # flat: held cash, ~0% CAGR
+    bench = pd.Series(np.linspace(100.0, 80.0, len(idx)), index=idx)  # index fell ~20%
+    s = compute_summary(nav, trades=[], benchmark=bench, years=1.0,
+                        annual_turnover=0.0, exposure=0.0)
+    assert s.n_trades == 0
+    assert s.benchmark_cagr < 0                            # benchmark really did fall
+    assert s.active_return is None                         # suppressed, not a fake positive
+    assert "no exposure" in s.active_return_note
+
+
+def test_active_return_reported_when_invested():
+    idx = pd.bdate_range("2020-01-01", periods=261)
+    nav = pd.Series(np.linspace(100.0, 130.0, len(idx)), index=idx)    # +30%
+    bench = pd.Series(np.linspace(100.0, 110.0, len(idx)), index=idx)  # +10%
+    trades = [{"return_pct": 0.30, "exit": 1, "holding_days": 30}]
+    s = compute_summary(nav, trades, benchmark=bench, years=1.0,
+                        annual_turnover=1.0, exposure=0.9)
+    assert s.active_return is not None
+    assert s.active_return > 0                             # genuinely beat the index
+    assert s.active_return_note == ""
+
+
 def test_win_rate_and_profit_factor_from_trades():
     trades = [
         {"return_pct": 0.10, "exit": 1, "holding_days": 5},

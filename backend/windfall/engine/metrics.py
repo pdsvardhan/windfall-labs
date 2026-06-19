@@ -7,6 +7,9 @@ import pandas as pd
 from .results import Summary
 
 TRADING_DAYS = 252
+# Below this exposure (fraction of book deployed) a run is treated as "sat in cash",
+# so active_return vs the benchmark is suppressed (not comparable).
+MIN_EXPOSURE_FOR_ACTIVE_RETURN = 0.01
 
 
 def _cagr(nav: pd.Series, years: float) -> float:
@@ -71,5 +74,13 @@ def compute_summary(
         b = benchmark.reindex(nav.index).ffill().dropna()
         if len(b) >= 2 and b.iloc[0] > 0:
             s.benchmark_cagr = round(_cagr(b, years), 6)
-            s.active_return = round(s.cagr - s.benchmark_cagr, 6)
+            # Only report active_return when the strategy actually took exposure. A run that
+            # made 0 trades (or sat ~entirely in cash) shows a spuriously positive active_return
+            # whenever the index fell — it didn't outperform, it just wasn't invested. Suppress
+            # it with a reason instead of reporting a misleading number.
+            if s.n_trades == 0 or s.exposure < MIN_EXPOSURE_FOR_ACTIVE_RETURN:
+                s.active_return = None
+                s.active_return_note = "no exposure (held cash) — not comparable to benchmark"
+            else:
+                s.active_return = round(s.cagr - s.benchmark_cagr, 6)
     return s
