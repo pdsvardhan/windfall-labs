@@ -62,7 +62,19 @@ export default function SignalsPage() {
       {run && (
         <>
           <div className="flex items-center justify-between">
-            <div className="text-sm text-muted mono">as of {run.as_of} · {run.signals.length} signals</div>
+            <div className="text-sm text-muted mono">
+              as of {run.as_of} · {run.signals.length} signals
+              {typeof run.data_age_days === "number" && (
+                <span className={run.data_age_days > 3 ? "text-warn ml-2" : "ml-2"}>
+                  · data {run.data_age_days}d old
+                </span>
+              )}
+              {run.regime?.enabled && (
+                <span className={`ml-2 ${run.regime.index_above_ma ? "text-gain" : "text-loss"}`}>
+                  · regime {run.regime.index_above_ma ? "RISK-ON" : `RISK-OFF (${(run.regime.exposure * 100).toFixed(0)}% exposure)`}
+                </span>
+              )}
+            </div>
             <button className="btn text-xs" onClick={downloadCsv}>⬇ Export CSV</button>
           </div>
           {run.warnings?.length > 0 && (

@@ -36,6 +36,19 @@ class Costs(BaseModel):
     slippage: float = 15.0   # basis points per side
 
 
+class RegimeFilter(BaseModel):
+    """Index-trend overlay: scale down / go to cash when the index is below its moving average.
+
+    The direct lever on drawdowns — a top-N momentum book run straight through 2018/2020/2022
+    with no regime gate is what produces the -69% drawdowns.
+    """
+    enabled: bool = False
+    benchmark: str | None = None             # defaults to the strategy benchmark when None
+    ma_period: int = 200
+    mode: Literal["binary", "scale"] = "binary"
+    below_exposure: float = 0.0              # target exposure while index < its MA (0 = full cash)
+
+
 class StrategyConfig(BaseModel):
     name: str = "unnamed_strategy"
     universe: Universe = Field(default_factory=Universe)
@@ -44,6 +57,7 @@ class StrategyConfig(BaseModel):
     rank_order: Literal["desc", "asc"] = "desc"
     n_holdings: int = 10
     weighting: Literal["equal", "inverse_vol"] = "equal"
+    invest_fully: bool = False                 # True: weight = 1/(qualifying names), no idle-cash drag
     rebalance: Literal["daily", "weekly", "fortnightly", "monthly"] = "weekly"
     entry_fill: Literal["next_open", "close"] = "next_open"
     stop_loss: StopLoss = Field(default_factory=StopLoss)
@@ -51,6 +65,7 @@ class StrategyConfig(BaseModel):
     max_hold_days: int | None = None
     sector_cap: int | None = None              # max holdings per sector (methodology v2.2 used 2)
     max_position_adtv_pct: float = 0.10        # cap a position's notional vs its ADTV
+    regime_filter: RegimeFilter = Field(default_factory=RegimeFilter)
     costs_bps: Costs = Field(default_factory=Costs)
     capital: float = 1_000_000.0
     start: str = "2015-01-01"

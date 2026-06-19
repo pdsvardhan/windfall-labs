@@ -31,9 +31,12 @@ def rsi(close: Frame, n: int = 14) -> Frame:
     loss = (-delta).clip(lower=0.0)
     avg_gain = gain.ewm(alpha=1.0 / n, adjust=False, min_periods=n).mean()
     avg_loss = loss.ewm(alpha=1.0 / n, adjust=False, min_periods=n).mean()
-    rs = avg_gain / avg_loss.replace(0.0, np.nan)
+    # avg_loss == 0 (all gains) -> rs = inf -> rsi = 100 (correct). The first n bars stay NaN
+    # (warm-up), so an `rsi > X` filter correctly does NOT pass on a newly-listed name's history.
+    with np.errstate(divide="ignore", invalid="ignore"):
+        rs = avg_gain / avg_loss
     out = 100.0 - (100.0 / (1.0 + rs))
-    return out.fillna(100.0).where(close.notna())
+    return out.where(close.notna())
 
 
 def _true_range(high: Frame, low: Frame, close: Frame) -> Frame:
@@ -75,11 +78,11 @@ def macd(close: Frame, fast: int = 12, slow: int = 26, signal: int = 9):
 
 
 def rolling_high(x: Frame, n: int) -> Frame:
-    return x.rolling(n, min_periods=1).max()
+    return x.rolling(n, min_periods=n).max()
 
 
 def rolling_low(x: Frame, n: int) -> Frame:
-    return x.rolling(n, min_periods=1).min()
+    return x.rolling(n, min_periods=n).min()
 
 
 def dist_from_high(close: Frame, n: int = 252) -> Frame:
@@ -88,12 +91,12 @@ def dist_from_high(close: Frame, n: int = 252) -> Frame:
 
 
 def volume_avg(volume: Frame, n: int = 20) -> Frame:
-    return volume.rolling(n, min_periods=1).mean()
+    return volume.rolling(n, min_periods=n).mean()
 
 
 def adtv(close: Frame, volume: Frame, n: int = 20) -> Frame:
     """Average daily traded value over n days = mean(close * volume)."""
-    return (close * volume).rolling(n, min_periods=1).mean()
+    return (close * volume).rolling(n, min_periods=n).mean()
 
 
 def relative_strength(close: pd.DataFrame, benchmark: pd.Series, n: int = 63) -> pd.DataFrame:

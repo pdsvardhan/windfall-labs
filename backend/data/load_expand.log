@@ -1,0 +1,54 @@
+HTTP Error 404: {"quoteSummary":{"result":null,"error":{"code":"Not Found","description":"Quote not found for symbol: DUMMYALCAR.NS"}}}
+$DUMMYALCAR.NS: possibly delisted; no timezone found
+
+1 Failed download:
+['DUMMYALCAR.NS']: possibly delisted; no timezone found
+[fetch] 25/251 tickers processed (25 ok, 0 failed)
+[fetch] 50/251 tickers processed (50 ok, 0 failed)
+[fetch] 75/251 tickers processed (74 ok, 1 failed)
+[fetch] 100/251 tickers processed (99 ok, 1 failed)
+[fetch] 125/251 tickers processed (124 ok, 1 failed)
+[fetch] 150/251 tickers processed (149 ok, 1 failed)
+[fetch] 175/251 tickers processed (174 ok, 1 failed)
+[fetch] 200/251 tickers processed (199 ok, 1 failed)
+[fetch] 225/251 tickers processed (224 ok, 1 failed)
+[fetch] 250/251 tickers processed (249 ok, 1 failed)
+[fetch] 251/251 tickers processed (250 ok, 1 failed)
+{
+  "index": "niftytotalmarket",
+  "years": 12,
+  "start": "2014-06-14",
+  "members": 755,
+  "skip_existing": true,
+  "fetched": 251,
+  "requested": 251,
+  "ok": 250,
+  "failed": 1,
+  "coverage": 0.996,
+  "rows_written": 495046,
+  "failed_sample": [
+    "DUMMYALCAR.NS"
+  ],
+  "benchmarks": {
+    "NIFTY50": {
+      "ticker": "^NSEI",
+      "rows": 2951
+    },
+    "NIFTY500": {
+      "ticker": "^CRSLDX",
+      "rows": 2950
+    },
+    "NIFTY100": {
+      "ticker": "^CNX100",
+      "rows": 2950
+    },
+    "NIFTY200": {
+      "ticker": "^CNX200",
+      "rows": 2955
+    },
+    "NIFTYMIDCAP": {
+      "ticker": "^NSEMDCP50",
+      "rows": 2923
+    }
+  }
+}

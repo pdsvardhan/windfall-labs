@@ -6,18 +6,20 @@ import { api } from "@/lib/api";
 
 const TEMPLATE = {
   name: "my_strategy",
-  universe: { index: "nifty500", point_in_time: false, filters: ["adtv_cr >= 10"] },
+  universe: { index: "niftytotalmarket", point_in_time: false, filters: ["adtv_cr >= 10"] },
   entry_filters: ["close > sma50", "close > sma200", "roc21 > 10", "rsi14 > 60"],
   rank_by: "roc21",
   rank_order: "desc",
   n_holdings: 10,
   weighting: "equal",
+  invest_fully: false,
   rebalance: "weekly",
   entry_fill: "next_open",
   sector_cap: 2,
   stop_loss: { type: "atr", mult: 2.0, atr_period: 14 },
   take_profit: { type: "r_multiple", r: 2.0 },
   max_hold_days: 60,
+  regime_filter: { enabled: false, ma_period: 200, mode: "binary", below_exposure: 0.0 },
   costs_bps: { brokerage: 3, stt: 10, slippage: 15 },
   capital: 1000000,
   start: "2018-01-01",
@@ -92,7 +94,12 @@ export default function StrategyEditor() {
         Declarative config. Filters reference indicators like <span className="mono">close</span>,{" "}
         <span className="mono">sma50</span>, <span className="mono">roc21</span>,{" "}
         <span className="mono">rsi14</span>, <span className="mono">adtv_cr</span>,{" "}
-        <span className="mono">rel_strength63</span>. Each filter is ANDed.
+        <span className="mono">rel_strength63</span>. Each filter is ANDed (use safe comparisons only).
+      </p>
+      <p className="text-muted text-xs">
+        Universe: <span className="mono">nifty500</span> or <span className="mono">niftytotalmarket</span> (~750).
+        {" "}<span className="mono">regime_filter</span> scales to cash when the index is below its MA
+        (kills deep drawdowns); <span className="mono">invest_fully</span> removes idle-cash drag.
       </p>
 
       <div className="flex items-center gap-3">

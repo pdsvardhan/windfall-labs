@@ -93,6 +93,20 @@ def run_backtest(config) -> BacktestResult:
     cr = sim.cost_rate
     rebal = _rebalance_dates(dates, cfg.rebalance)
 
+    # Regime overlay: index value vs its moving average, aligned to the trading calendar.
+    rf = cfg.regime_filter
+    bench_val = rs.benchmark.reindex(dates).ffill().values
+    bench_ma = rs.benchmark.reindex(dates).ffill().rolling(rf.ma_period,
+                                                            min_periods=rf.ma_period).mean().values
+
+    def regime_mult(i: int) -> float:
+        if not rf.enabled:
+            return 1.0
+        bv, bm = bench_val[i], bench_ma[i]
+        if math.isnan(bv) or math.isnan(bm):
+            return 1.0  # insufficient history to judge regime — stay invested
+        return 1.0 if bv >= bm else rf.below_exposure
+
     nav_dates, nav_vals, exposure_vals = [], [], []
     pending: dict | None = None
 
@@ -166,6 +180,8 @@ def run_backtest(config) -> BacktestResult:
             chosen.append(j)
             if len(chosen) >= cfg.n_holdings:
                 break
+        if not chosen:
+            return [], {}
         if cfg.weighting == "inverse_vol" and VOL is not None:
             inv = {}
             for j in chosen:
@@ -174,7 +190,15 @@ def run_backtest(config) -> BacktestResult:
             tot = sum(inv.values()) or 1.0
             weights = {j: (inv[j] / tot if tot > 0 else 1.0 / len(chosen)) for j in chosen}
         else:
-            weights = {j: 1.0 / cfg.n_holdings for j in chosen}
+            base = (1.0 / len(chosen)) if cfg.invest_fully else (1.0 / cfg.n_holdings)
+            weights = {j: base for j in chosen}
+
+        # Regime overlay: binary -> go fully to cash; scale -> shrink target exposure.
+        mult = regime_mult(i)
+        if mult <= 0.0 and rf.mode == "binary":
+            return [], {}
+        if mult != 1.0:
+            weights = {j: w * mult for j, w in weights.items()}
         return chosen, weights
 
     n = len(dates)

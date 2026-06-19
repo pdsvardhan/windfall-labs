@@ -15,9 +15,9 @@ import pandas as pd
 from .. import signals as ind
 from ..data import store
 from ..data.universe import benchmark_ticker
+from .safe_eval import SafeEvalError, feature_names, safe_eval
 from .schema import StrategyConfig
 
-_IDENT = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 _PARAM = re.compile(r"^(sma|ema|roc|rsi|atr|adx|adtv|vol_avg|dist_high|rel_strength)(\d+)$")
 _BASE = {"close", "open", "high", "low", "volume", "adj_close", "price"}
 _SPECIAL = {"adtv_cr", "macd", "macd_signal", "macd_hist"}
@@ -64,12 +64,17 @@ def resolve(cfg: StrategyConfig) -> ResolvedStrategy:
     raw_close = store.price_panel("close", tickers, cfg.start, cfg.end, adjusted=False)
     raw_vol = store.price_panel("volume", tickers, cfg.start, cfg.end, adjusted=False)
 
+    warnings: list[str] = []
     bt = benchmark_ticker(cfg.benchmark)
     bench_panel = store.price_panel("close", [bt], cfg.start, cfg.end, adjusted=True)
-    benchmark = bench_panel[bt] if (not bench_panel.empty and bt in bench_panel.columns) \
-        else close.mean(axis=1)
+    if not bench_panel.empty and bt in bench_panel.columns:
+        benchmark = bench_panel[bt]
+    else:
+        benchmark = close.mean(axis=1)
+        warnings.append(
+            f"benchmark '{cfg.benchmark}' ({bt}) not loaded — falling back to an equal-weight "
+            f"universe average; benchmark_cagr/active_return are NOT the real index.")
 
-    warnings: list[str] = []
     cache: dict[str, pd.DataFrame] = {}
 
     def feat(name: str) -> pd.DataFrame:
@@ -124,23 +129,18 @@ def resolve(cfg: StrategyConfig) -> ResolvedStrategy:
         cache[name] = df
         return df
 
-    def names_in(expr: str) -> list[str]:
-        out = []
-        for tok in _IDENT.findall(expr):
-            if tok in _BASE or tok in _SPECIAL or _PARAM.match(tok):
-                out.append(tok)
-        return out
-
     def eval_expr(expr: str) -> pd.DataFrame | None:
         ns: dict[str, pd.DataFrame] = {}
-        for tok in names_in(expr):
-            try:
-                ns[tok] = feat(tok)
-            except KeyError:
+        for tok in feature_names(expr):
+            if not (tok in _BASE or tok in _SPECIAL or _PARAM.match(tok)):
                 warnings.append(f"unknown feature '{tok}' in '{expr}' — filter skipped")
                 return None
+            ns[tok] = feat(tok)
         try:
-            return eval(expr, {"__builtins__": {}}, ns)  # noqa: S307 — trusted single-user config
+            return safe_eval(expr, ns)
+        except SafeEvalError as exc:
+            warnings.append(f"rejected expression '{expr}': {exc} — filter skipped")
+            return None
         except Exception as exc:  # noqa: BLE001
             warnings.append(f"could not evaluate '{expr}': {exc!r} — skipped")
             return None

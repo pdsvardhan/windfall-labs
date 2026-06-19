@@ -12,13 +12,24 @@ def _start_for_years(years: int) -> str:
     return (dt.date.today() - dt.timedelta(days=int(years * 365.25) + 5)).isoformat()
 
 
-def load_universe(index: str = "nifty500", years: int = 12, include_benchmarks: bool = True) -> dict:
-    """Full load: resolve constituents, fetch ~`years` of daily history, store, log coverage."""
+def load_universe(index: str = "nifty500", years: int = 12, include_benchmarks: bool = True,
+                  skip_existing: bool = False) -> dict:
+    """Full load: resolve constituents, fetch ~`years` of daily history, store, log coverage.
+
+    With skip_existing=True, only tickers not already in the prices table are fetched (so
+    expanding the universe doesn't re-download names already cached).
+    """
     store.init_db()
     members = get_universe(index)
     store.record_universe(index, members)
-    tickers = [m.ticker for m in members]
+    all_tickers = [m.ticker for m in members]
     start = _start_for_years(years)
+
+    if skip_existing:
+        have = set(store.available_tickers())
+        tickers = [t for t in all_tickers if t not in have]
+    else:
+        tickers = all_tickers
 
     frames, report = fetch_prices(tickers, start=start)
     n_rows = store.upsert_prices(frames)
@@ -33,7 +44,8 @@ def load_universe(index: str = "nifty500", years: int = 12, include_benchmarks: 
                 bench_summary[name] = {"ticker": sym, "rows": len(df)}
 
     return {
-        "index": index, "years": years, "start": start,
+        "index": index, "years": years, "start": start, "members": len(all_tickers),
+        "skip_existing": skip_existing, "fetched": len(tickers),
         "requested": report.requested, "ok": len(report.ok), "failed": len(report.failed),
         "coverage": round(report.coverage, 3), "rows_written": n_rows,
         "failed_sample": report.failed[:20], "benchmarks": bench_summary,

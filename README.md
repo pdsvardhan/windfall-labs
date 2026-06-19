@@ -38,7 +38,7 @@ python3 -m venv .venv && . .venv/bin/activate
 pip install -r requirements.txt
 python scripts/load_data.py --universe nifty500 --years 12     # load price history
 python -m windfall.cli backtest strategies/breakout_validation.json
-uvicorn app.main:app --host 0.0.0.0 --port 8503 --reload
+uvicorn app.main:app --host 0.0.0.0 --port 8503 --reload   # API listens on 8503
 
 # frontend
 cd frontend
@@ -49,7 +49,7 @@ npm run dev    # http://localhost:8500
 ## Docker (vault7a)
 
 ```bash
-docker compose up -d --build      # web on :8500, api on :8503
+docker compose up -d --build      # web on :8500, api on host :8505 (container :8503)
 ```
 
 ## Status

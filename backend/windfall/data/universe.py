@@ -19,7 +19,16 @@ NSE_INDEX_CSV = {
     "nifty100": "https://archives.nseindia.com/content/indices/ind_nifty100list.csv",
     "nifty200": "https://archives.nseindia.com/content/indices/ind_nifty200list.csv",
     "nifty500": "https://archives.nseindia.com/content/indices/ind_nifty500list.csv",
+    "niftymidcap150": "https://archives.nseindia.com/content/indices/ind_niftymidcap150list.csv",
+    "niftysmallcap250": "https://archives.nseindia.com/content/indices/ind_niftysmallcap250list.csv",
+    "niftymicrocap250": "https://archives.nseindia.com/content/indices/ind_niftymicrocap250_list.csv",
+    "niftytotalmarket": "https://archives.nseindia.com/content/indices/ind_niftytotalmarket_list.csv",
 }
+# Alias: "nifty750" == the Total Market index (~750 names: Nifty 500 + Midcap/Smallcap/Microcap).
+NSE_INDEX_CSV["nifty750"] = NSE_INDEX_CSV["niftytotalmarket"]
+
+# Full NSE mainboard equity list (~1800 EQ-series names) — the broadest investable universe.
+NSE_EQUITY_LIST_CSV = "https://archives.nseindia.com/content/equities/EQUITY_L.csv"
 
 # Yahoo Finance symbols for the index series themselves (benchmarks).
 BENCHMARK_YF = {
@@ -91,8 +100,33 @@ def _fetch_nse_csv(url: str) -> list[UniverseMember]:
     return members
 
 
+def _fetch_equity_list() -> list[UniverseMember]:
+    """Fetch the full NSE mainboard equity list (EQUITY_L.csv), keeping only EQ-series names."""
+    resp = requests.get(NSE_EQUITY_LIST_CSV, headers=_HEADERS, timeout=30)
+    resp.raise_for_status()
+    rows = list(csv.DictReader(io.StringIO(resp.text)))
+    members: list[UniverseMember] = []
+    for r in rows:
+        # EQUITY_L columns are space-padded; normalize keys.
+        rr = {k.strip(): (v.strip() if isinstance(v, str) else v) for k, v in r.items()}
+        series = (rr.get("SERIES") or rr.get(" SERIES") or "").strip()
+        sym = (rr.get("SYMBOL") or "").strip()
+        if not sym or (series and series != "EQ"):
+            continue
+        members.append(UniverseMember(
+            symbol=sym, ticker=to_ticker(sym),
+            name=(rr.get("NAME OF COMPANY") or "").strip() or None,
+            isin=(rr.get("ISIN NUMBER") or "").strip() or None,
+        ))
+    return members
+
+
 def get_universe(index: str = "nifty500", use_cache: bool = True) -> list[UniverseMember]:
-    """Resolve an index to its constituents. Caches the CSV under data/universe/."""
+    """Resolve an index to its constituents. Caches the CSV under data/universe/.
+
+    `index` may be any key in NSE_INDEX_CSV (e.g. nifty500, niftytotalmarket/nifty750) or
+    'allnse' for the full mainboard equity list.
+    """
     ensure_dirs()
     index = index.lower()
     cache_path = UNIVERSE_DIR / f"{index}.csv"
@@ -111,12 +145,13 @@ def get_universe(index: str = "nifty500", use_cache: bool = True) -> list[Univer
             ]
 
     members: list[UniverseMember] = []
-    url = NSE_INDEX_CSV.get(index)
-    if url:
-        try:
-            members = _fetch_nse_csv(url)
-        except Exception as exc:  # noqa: BLE001 — fall back, never hard-fail universe resolution
-            print(f"[universe] NSE fetch failed for {index}: {exc!r}; using fallback list.")
+    try:
+        if index in ("allnse", "nse", "equity"):
+            members = _fetch_equity_list()
+        elif index in NSE_INDEX_CSV:
+            members = _fetch_nse_csv(NSE_INDEX_CSV[index])
+    except Exception as exc:  # noqa: BLE001 — fall back, never hard-fail universe resolution
+        print(f"[universe] NSE fetch failed for {index}: {exc!r}; using fallback list.")
 
     if not members:
         members = [UniverseMember(symbol=s, ticker=to_ticker(s)) for s in FALLBACK_SYMBOLS]

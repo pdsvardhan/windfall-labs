@@ -4,6 +4,8 @@ Sync (`def`) handlers run in the threadpool so a long backtest never blocks the 
 """
 from __future__ import annotations
 
+import os
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse
@@ -22,8 +24,17 @@ from windfall.strategy.schema import StrategyConfig
 from windfall.walkforward import sweep, walk_forward
 
 app = FastAPI(title="Windfall Labs API", version="0.1.0")
+
+# Lock CORS to the cockpit origin(s) so an arbitrary browser tab can't POST to this API.
+# Override with WINDFALL_CORS_ORIGINS (comma-separated) if the cockpit moves.
+_DEFAULT_ORIGINS = "http://192.168.1.10:8500,http://localhost:8500,http://127.0.0.1:8500"
+_ALLOWED_ORIGINS = [o.strip() for o in
+                    os.environ.get("WINDFALL_CORS_ORIGINS", _DEFAULT_ORIGINS).split(",") if o.strip()]
 app.add_middleware(
-    CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"],
+    CORSMiddleware,
+    allow_origins=_ALLOWED_ORIGINS,
+    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type"],
 )
 
 

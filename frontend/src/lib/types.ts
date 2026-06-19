@@ -79,8 +79,10 @@ export interface Signal {
 
 export interface SignalRun {
   as_of: string | null;
+  data_age_days?: number;
   strategy?: string;
   n_holdings?: number;
+  regime?: { enabled: boolean; index_above_ma: boolean; ma_period: number; exposure: number } | null;
   signals: Signal[];
   warnings: string[];
   signal_run_id?: string;

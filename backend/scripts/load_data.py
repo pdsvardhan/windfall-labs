@@ -14,8 +14,10 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--universe", default="nifty500")
     ap.add_argument("--years", type=int, default=12)
+    ap.add_argument("--skip-existing", action="store_true",
+                    help="only fetch tickers not already in the store (fast universe expansion)")
     args = ap.parse_args()
-    summary = load_universe(index=args.universe, years=args.years)
+    summary = load_universe(index=args.universe, years=args.years, skip_existing=args.skip_existing)
     print(json.dumps(summary, indent=2, default=str))
 
 

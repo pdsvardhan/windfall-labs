@@ -16,7 +16,8 @@ be a huge product with lots of features later."
   trades — fast columnar reads, SQL, zero server to operate.
 - **Frontend:** **Next.js (App Router) + TypeScript + Tailwind** — a real, componentized cockpit
   that scales to many features, not a notebook UI.
-- **Deploy:** two Docker containers on vault7a — `web` (Next.js, :8500) and `api` (FastAPI, :8503).
+- **Deploy:** two Docker containers on vault7a — `web` (Next.js, :8500) and `api` (FastAPI,
+  host **:8505** → container :8503; host 8503 was already taken by another project).
 
 ## Consequences
 - Two languages/containers instead of one Streamlit process — more moving parts, but a clean

@@ -55,7 +55,15 @@ def walk_forward(
     is_avg = _avg([w["is_metric"] for w in windows])
     oos_avg = _avg([w["oos_metric"] for w in windows])
     degradation = (oos_avg - is_avg)
-    verdict = "robust" if (is_avg <= 0 or oos_avg / is_avg >= 0.5) else "likely-curve-fit"
+    # Ratio is only meaningful when the in-sample metric is positive.
+    if is_avg <= 0:
+        verdict = "inconclusive"        # in-sample optimization found no positive edge
+    elif oos_avg <= 0:
+        verdict = "likely-curve-fit"    # worked in-sample, broke out-of-sample
+    elif oos_avg / is_avg >= 0.5:
+        verdict = "robust"
+    else:
+        verdict = "likely-curve-fit"
     return {
         "metric": metric, "is_years": is_years, "oos_years": oos_years,
         "n_windows": len(windows), "windows": windows,

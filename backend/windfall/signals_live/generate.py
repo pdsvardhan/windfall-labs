@@ -6,6 +6,7 @@ Sell = dropped out of the top-N. Entry zone follows the methodology's anti-chase
 from __future__ import annotations
 
 import csv
+import datetime as dt
 import io
 import math
 
@@ -34,12 +35,14 @@ def _select(rs: ResolvedStrategy, i: int, cfg: StrategyConfig) -> dict[str, tupl
         chosen.append(j)
         if len(chosen) >= cfg.n_holdings:
             break
-    w = 1.0 / cfg.n_holdings
+    w = (1.0 / len(chosen)) if (cfg.invest_fully and chosen) else (1.0 / cfg.n_holdings)
     return {tickers[j]: (float(rrow[j]), w) for j in chosen}
 
 
 def generate_signals(config) -> dict:
     cfg = config if isinstance(config, StrategyConfig) else StrategyConfig(**config)
+    # Live signals always run on the latest available data, ignoring the strategy's backtest end.
+    cfg = cfg.model_copy(update={"end": None})
     rs = resolve(cfg)
     dates = rs.close_adj.index
     if len(dates) < 60:
@@ -80,8 +83,33 @@ def generate_signals(config) -> dict:
         sigs.append({"ticker": ticker, "action": "sell", "weight": 0.0,
                      "last_close": round(entry, 2) if not math.isnan(entry) else None,
                      "note": "dropped out of top-N at this rebalance"})
-    return {"as_of": str(dates[last_i].date()), "strategy": cfg.name,
-            "n_holdings": cfg.n_holdings, "signals": sigs, "warnings": rs.warnings}
+
+    as_of = dates[last_i].date()
+    days_stale = (dt.date.today() - as_of).days
+    warnings = list(rs.warnings)
+    if cfg.stop_loss.type == "none":
+        warnings.append("This strategy has no stop-loss — the signal list ships without stop "
+                        "levels. You would be entering with no exit plan.")
+    if days_stale > 3:
+        warnings.append(f"Latest data is {days_stale} days old (as of {as_of}). Refresh data "
+                        f"before trading these signals.")
+    return {"as_of": str(as_of), "data_age_days": days_stale, "strategy": cfg.name,
+            "regime": _regime_state(rs, cfg, last_i),
+            "n_holdings": cfg.n_holdings, "signals": sigs, "warnings": warnings}
+
+
+def _regime_state(rs: ResolvedStrategy, cfg: StrategyConfig, i: int) -> dict | None:
+    """Report whether the regime filter (if enabled) currently permits new exposure."""
+    rf = cfg.regime_filter
+    if not rf.enabled:
+        return None
+    # Align the benchmark to the strategy's trading calendar before positional indexing.
+    bench = rs.benchmark.reindex(rs.close_adj.index).ffill()
+    ma = bench.rolling(rf.ma_period, min_periods=rf.ma_period).mean()
+    bv, bm = float(bench.iloc[i]), float(ma.iloc[i])
+    on = (not math.isnan(bm)) and bv >= bm
+    return {"enabled": True, "index_above_ma": on, "ma_period": rf.ma_period,
+            "exposure": 1.0 if on else rf.below_exposure}
 
 
 def signals_to_csv(run: dict) -> str:
