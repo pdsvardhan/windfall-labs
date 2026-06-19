@@ -23,8 +23,8 @@ from .schema import StrategyConfig
 
 _PARAM = re.compile(r"^(sma|ema|roc|rsi|atr|adx|adtv|vol_avg|dist_high|rel_strength)\d+$")
 _BASE = {"close", "open", "high", "low", "volume", "adj_close", "price"}
-_SPECIAL = {"adtv_cr", "macd", "macd_signal", "macd_hist"}
-_FUND = set(fund.NUMERIC_FIELDS) | {"pe_to_sector"}
+_SPECIAL = {"adtv_cr", "macd", "macd_signal", "macd_hist", "momentum_own"}  # momentum_own is price-only
+_FUND = set(fund.NUMERIC_FIELDS) | {"pe_to_sector", "durability_own", "valuation_own"}  # fundamental-derived
 
 
 def _features(exprs: list[str]) -> set[str]:

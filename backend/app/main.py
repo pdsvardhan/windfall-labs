@@ -18,6 +18,7 @@ from windfall.jsonsafe import clean
 from windfall.data.pipeline import incremental_update
 from windfall.engine.backtest import run_backtest
 from windfall.paper import commit_signal, list_positions, mark_to_market, scoreboard
+from windfall.scores.validate import validate_own_dvm
 from windfall.scripts_validation import run_validation
 from windfall.signals_live import generate_signals
 from windfall.signals_live.generate import signals_to_csv
@@ -98,6 +99,12 @@ def data_status():
 @app.get("/api/fundamentals/status")
 def fundamentals_status():
     return {"coverage": fund.coverage(), "snapshots": fund.snapshots(), "fields": fund.NUMERIC_FIELDS}
+
+
+@app.get("/api/scores/own-validate")
+def scores_own_validate(snapshot_date: str | None = None):
+    """Rank-correlate our own D/V/M against Trendlyne's scores on the snapshot (verify/tune loop)."""
+    return validate_own_dvm(snapshot_date)
 
 
 @app.post("/api/data/refresh")

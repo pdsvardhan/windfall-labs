@@ -15,6 +15,7 @@ import pandas as pd
 from .. import signals as ind
 from ..data import fundamentals as fund
 from ..data import store
+from ..scores import own_dvm as own
 from ..data.universe import benchmark_ticker
 from .safe_eval import SafeEvalError, feature_names, safe_eval
 from .schema import StrategyConfig
@@ -24,6 +25,9 @@ _BASE = {"close", "open", "high", "low", "volume", "adj_close", "price"}
 _SPECIAL = {"adtv_cr", "macd", "macd_signal", "macd_hist"}
 # Fundamental features from the Trendlyne snapshot (point-in-time; NaN before the snapshot date).
 _FUND = set(fund.NUMERIC_FIELDS) | {"pe_to_sector"}
+# Our own reproducible scores (scores/own_dvm.py). momentum_own is price-only (full history);
+# durability_own / valuation_own derive from fundamentals (snapshot-gated).
+_OWN = {"momentum_own", "durability_own", "valuation_own"}
 
 
 @dataclass
@@ -138,6 +142,14 @@ def resolve(cfg: StrategyConfig) -> ResolvedStrategy:
             df = ind.macd(close)[2]
         elif name == "pe_to_sector":
             df = feat("pe") / feat("sector_pe").replace(0.0, np.nan)
+        elif name == "momentum_own":
+            df = own.momentum_own(feat("roc63"), feat("roc126"), feat("roc252"),
+                                  feat("rsi14"), feat("rel_strength126"))
+        elif name == "durability_own":
+            df = own.durability_own(feat("roe"), feat("roa"), feat("piotroski"),
+                                    feat("opm"), feat("np_qtr_yoy"), feat("promoter_pledge"))
+        elif name == "valuation_own":
+            df = own.valuation_own(feat("pe"), feat("pb"), feat("pe_to_sector"))
         elif name in fund.NUMERIC_FIELDS:
             df = fund.fundamental_panel(name, close.index, tickers)
         else:
@@ -167,13 +179,16 @@ def resolve(cfg: StrategyConfig) -> ResolvedStrategy:
                 df = ind.relative_strength(close, benchmark, n_s)
             else:  # pragma: no cover
                 raise KeyError(name)
+        if df is None:  # a score with no usable inputs -> an all-NaN panel (never passes a filter)
+            df = pd.DataFrame(np.nan, index=close.index, columns=close.columns)
         cache[name] = df
         return df
 
     def eval_expr(expr: str) -> pd.DataFrame | None:
         ns: dict[str, pd.DataFrame] = {}
         for tok in feature_names(expr):
-            if not (tok in _BASE or tok in _SPECIAL or tok in _FUND or _PARAM.match(tok)):
+            if not (tok in _BASE or tok in _SPECIAL or tok in _FUND or tok in _OWN
+                    or _PARAM.match(tok)):
                 warnings.append(f"unknown feature '{tok}' in '{expr}' — filter skipped")
                 return None
             ns[tok] = feat(tok)
