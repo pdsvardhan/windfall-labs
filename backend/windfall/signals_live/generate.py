@@ -41,8 +41,11 @@ def _select(rs: ResolvedStrategy, i: int, cfg: StrategyConfig) -> dict[str, tupl
 
 def generate_signals(config) -> dict:
     cfg = config if isinstance(config, StrategyConfig) else StrategyConfig(**config)
-    # Live signals always run on the latest available data, ignoring the strategy's backtest end.
-    cfg = cfg.model_copy(update={"end": None})
+    # Live signals run on the latest data, and load enough history (~2.2yr) for long indicators
+    # (sma200, roc125, rel_strength) to warm up regardless of the strategy's backtest start date.
+    warmup_start = (dt.date.today() - dt.timedelta(days=820)).isoformat()
+    start = min(cfg.start, warmup_start) if cfg.start else warmup_start
+    cfg = cfg.model_copy(update={"start": start, "end": None})
     rs = resolve(cfg)
     dates = rs.close_adj.index
     if len(dates) < 60:

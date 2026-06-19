@@ -14,7 +14,8 @@ from pydantic import BaseModel, Field
 class Universe(BaseModel):
     index: str = "nifty500"
     point_in_time: bool = False  # v1 uses current membership; honest flag, not yet survivorship-free
-    filters: list[str] = Field(default_factory=list)  # e.g. ["adtv_cr >= 10"]
+    filters: list[str] = Field(default_factory=list)  # e.g. ["adtv_cr >= 10", "durability > 50"]
+    exclude_sectors: list[str] = Field(default_factory=list)  # e.g. ["Financial Services"]
 
 
 class StopLoss(BaseModel):

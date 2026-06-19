@@ -7,6 +7,7 @@ import { StatCard } from "@/components/StatCard";
 
 const statusChip: Record<string, string> = {
   available: "border-gain/50 text-gain",
+  snapshot: "border-accent/50 text-accent",
   partial: "border-warn/50 text-warn",
   deferred: "border-border text-muted",
   "not-loaded": "border-loss/50 text-loss",
@@ -41,9 +42,10 @@ export default function DataPage() {
       {!ds ? <div className="text-muted">Loading…</div> : (
         <>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <StatCard label="Tickers" value={String(ds.coverage.n_tickers)} />
+            <StatCard label="Price tickers" value={String(ds.coverage.n_tickers)} />
             <StatCard label="Universe size" value={String(ds.n_universe)} tone="muted" />
-            <StatCard label="From" value={ds.coverage.date_min ?? "—"} tone="muted" />
+            <StatCard label="Fundamentals" value={ds.fundamentals ? String(ds.fundamentals.tickers) : "—"}
+              tone="muted" sub={ds.fundamentals?.latest ? `snapshot ${ds.fundamentals.latest}` : "none"} />
             <StatCard label="Through" value={ds.coverage.date_max ?? "—"} tone="muted" />
           </div>
 

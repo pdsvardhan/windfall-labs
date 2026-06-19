@@ -8,3 +8,4 @@ duckdb>=1.0
 yfinance>=0.2.40
 requests>=2.31
 python-dateutil>=2.9
+openpyxl>=3.1

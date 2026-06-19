@@ -12,6 +12,7 @@ from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel
 
 from windfall import store_meta
+from windfall.data import fundamentals as fund
 from windfall.data import store
 from windfall.jsonsafe import clean
 from windfall.data.pipeline import incremental_update
@@ -88,8 +89,14 @@ def coverage():
 @app.get("/api/data/status")
 def data_status():
     cov = store.coverage_summary()
-    return {"coverage": cov, "n_universe": len(store.universe_tickers("nifty500")),
-            "feasibility": _feasibility(cov)}
+    fcov = fund.coverage()
+    return {"coverage": cov, "n_universe": len(store.universe_tickers("niftytotalmarket")),
+            "fundamentals": fcov, "feasibility": _feasibility(cov, fcov)}
+
+
+@app.get("/api/fundamentals/status")
+def fundamentals_status():
+    return {"coverage": fund.coverage(), "snapshots": fund.snapshots(), "fields": fund.NUMERIC_FIELDS}
 
 
 @app.post("/api/data/refresh")
@@ -97,20 +104,26 @@ def data_refresh(index: str = "nifty500"):
     return incremental_update(index)
 
 
-def _feasibility(cov: dict) -> list[dict]:
+def _feasibility(cov: dict, fcov: dict | None = None) -> list[dict]:
     have = (cov.get("n_tickers") or 0) > 0
+    fcov = fcov or {}
+    n_fund = fcov.get("tickers") or 0
+    n_snap = fcov.get("snapshots") or 0
     return [
-        {"need": "Daily adjusted OHLCV (Nifty 500, ~12yr)", "source": "yfinance",
+        {"need": "Daily adjusted OHLCV (~12yr)", "source": "yfinance",
          "status": "available" if have else "not-loaded",
          "detail": f"{cov.get('n_tickers',0)} tickers, {cov.get('date_min')}..{cov.get('date_max')}"},
+        {"need": "Fundamentals + DVM scores (reporting-dated)", "source": "Trendlyne Pro",
+         "status": "snapshot" if n_fund else "deferred",
+         "detail": (f"{n_fund} stocks, {n_snap} snapshot(s), latest {fcov.get('latest')} — "
+                    f"powers live DVM signals; backtest history builds as snapshots accumulate")
+                   if n_fund else "DVM/fundamental strategies wait until this is sourced"},
         {"need": "Survivorship-free (delisted) history", "source": "NSE Bhavcopy",
          "status": "deferred", "detail": "v1 uses current membership; Bhavcopy is a later phase"},
         {"need": "Corporate actions", "source": "yfinance/NSE", "status": "partial",
          "detail": "adjusted prices used; explicit action log is a later phase"},
         {"need": "Point-in-time index membership", "source": "NSE", "status": "deferred",
          "detail": "current membership only in v1"},
-        {"need": "Fundamentals w/ reporting dates", "source": "Trendlyne Pro", "status": "deferred",
-         "detail": "DVM/fundamental strategies wait until this is sourced"},
     ]
 
 

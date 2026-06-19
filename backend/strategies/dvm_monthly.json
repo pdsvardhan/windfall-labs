@@ -1,0 +1,29 @@
+{
+  "name": "dvm_monthly",
+  "_note": "The methodology v2.2 DVM/momentum screen, now expressible thanks to the Trendlyne fundamentals snapshot. Screens on Durability>50, mcap 500-50000cr, P/E <= 2.5x sector, promoter pledge < 20%, trend (>50 & >200 DMA), liquidity (ADTV>=10cr), excludes Banking & Finance; ranks by 12-week price momentum (roc125). Fundamentals are snapshot-only, so this is a LIVE-SIGNALS strategy (run it on /signals) - a historical backtest is gated to NaN before the snapshot by design. The full percentile-blend scoring isn't replicated in a single rank expression.",
+  "universe": {
+    "index": "trendlyne",
+    "filters": ["mcap_cr >= 500", "mcap_cr <= 50000", "durability > 50", "adtv_cr >= 10",
+                "promoter_pledge < 20", "pe_to_sector <= 2.5", "close > sma50", "close > sma200"],
+    "exclude_sectors": ["bank", "financial", "finance"]
+  },
+  "entry_filters": ["rsi14 > 50"],
+  "rank_by": "roc125",
+  "rank_order": "desc",
+  "n_holdings": 10,
+  "weighting": "equal",
+  "invest_fully": true,
+  "rebalance": "monthly",
+  "entry_fill": "next_open",
+  "sector_cap": 2,
+  "max_position_adtv_pct": 0.1,
+  "stop_loss": { "type": "atr", "mult": 2.0, "atr_period": 14 },
+  "take_profit": { "type": "r_multiple", "r": 3.5 },
+  "max_hold_days": 45,
+  "regime_filter": { "enabled": true, "benchmark": "NIFTY500", "ma_period": 200, "mode": "scale", "below_exposure": 0.5 },
+  "costs_bps": { "brokerage": 3, "stt": 10, "slippage": 15 },
+  "capital": 1000000,
+  "start": "2026-01-01",
+  "end": "2026-06-18",
+  "benchmark": "NIFTY500"
+}

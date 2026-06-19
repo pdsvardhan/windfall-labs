@@ -98,8 +98,16 @@ export default function StrategyEditor() {
       </p>
       <p className="text-muted text-xs">
         Universe: <span className="mono">nifty500</span> or <span className="mono">niftytotalmarket</span> (~750).
-        {" "}<span className="mono">regime_filter</span> scales to cash when the index is below its MA
-        (kills deep drawdowns); <span className="mono">invest_fully</span> removes idle-cash drag.
+        {" "}<span className="mono">regime_filter</span> scales to cash below the index MA;{" "}
+        <span className="mono">invest_fully</span> removes idle-cash drag.
+      </p>
+      <p className="text-muted text-xs">
+        Fundamentals (Trendlyne snapshot): <span className="mono">durability</span>,{" "}
+        <span className="mono">valuation</span>, <span className="mono">pe</span>,{" "}
+        <span className="mono">pe_to_sector</span>, <span className="mono">roe</span>,{" "}
+        <span className="mono">piotroski</span>, <span className="mono">promoter_pledge</span>,{" "}
+        <span className="mono">mcap_cr</span>, <span className="mono">np_qtr_yoy</span>. Snapshot-only —
+        use for live signals; <span className="mono">exclude_sectors</span> drops e.g. banks.
       </p>
 
       <div className="flex items-center gap-3">

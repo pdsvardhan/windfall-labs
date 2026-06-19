@@ -135,6 +135,7 @@ export interface FeasibilityRow {
 export interface DataStatus {
   coverage: Coverage;
   n_universe: number;
+  fundamentals?: { tickers: number; snapshots: number; latest: string | null };
   feasibility: FeasibilityRow[];
 }
 

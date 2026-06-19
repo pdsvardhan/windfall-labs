@@ -13,6 +13,7 @@ import numpy as np
 import pandas as pd
 
 from .. import signals as ind
+from ..data import fundamentals as fund
 from ..data import store
 from ..data.universe import benchmark_ticker
 from .safe_eval import SafeEvalError, feature_names, safe_eval
@@ -21,6 +22,8 @@ from .schema import StrategyConfig
 _PARAM = re.compile(r"^(sma|ema|roc|rsi|atr|adx|adtv|vol_avg|dist_high|rel_strength)(\d+)$")
 _BASE = {"close", "open", "high", "low", "volume", "adj_close", "price"}
 _SPECIAL = {"adtv_cr", "macd", "macd_signal", "macd_hist"}
+# Fundamental features from the Trendlyne snapshot (point-in-time; NaN before the snapshot date).
+_FUND = set(fund.NUMERIC_FIELDS) | {"pe_to_sector"}
 
 
 @dataclass
@@ -99,6 +102,10 @@ def resolve(cfg: StrategyConfig) -> ResolvedStrategy:
             df = ind.macd(close)[1]
         elif name == "macd_hist":
             df = ind.macd(close)[2]
+        elif name == "pe_to_sector":
+            df = feat("pe") / feat("sector_pe").replace(0.0, np.nan)
+        elif name in fund.NUMERIC_FIELDS:
+            df = fund.fundamental_panel(name, close.index, tickers)
         else:
             m = _PARAM.match(name)
             if not m:
@@ -132,7 +139,7 @@ def resolve(cfg: StrategyConfig) -> ResolvedStrategy:
     def eval_expr(expr: str) -> pd.DataFrame | None:
         ns: dict[str, pd.DataFrame] = {}
         for tok in feature_names(expr):
-            if not (tok in _BASE or tok in _SPECIAL or _PARAM.match(tok)):
+            if not (tok in _BASE or tok in _SPECIAL or tok in _FUND or _PARAM.match(tok)):
                 warnings.append(f"unknown feature '{tok}' in '{expr}' — filter skipped")
                 return None
             ns[tok] = feat(tok)
@@ -153,6 +160,29 @@ def resolve(cfg: StrategyConfig) -> ResolvedStrategy:
             continue
         res = res.reindex(index=close.index, columns=close.columns)
         mask &= res.fillna(False).astype(bool)
+
+    # Sector exclusion (e.g. the methodology's "exclude Banking & Finance").
+    if cfg.universe.exclude_sectors:
+        sect = fund.fundamentals_sector_map()
+        nse_sect = store.sector_map(index)
+        excl = [s.strip().lower() for s in cfg.universe.exclude_sectors]
+        drop = [t for t in close.columns
+                if any(e in (sect.get(t) or nse_sect.get(t) or "").lower() for e in excl)]
+        if drop:
+            mask[drop] = False
+            warnings.append(f"excluded {len(drop)} names in sectors {cfg.universe.exclude_sectors}")
+
+    # Honesty: fundamentals are snapshot-only until the owner accumulates a history of snapshots.
+    all_exprs = list(cfg.universe.filters) + list(cfg.entry_filters) + [cfg.rank_by]
+    if any(t in _FUND for e in all_exprs for t in feature_names(e)):
+        snaps = fund.snapshots()
+        if snaps:
+            warnings.append(
+                f"uses fundamental features — these come from Trendlyne snapshots {snaps} and are "
+                f"NaN before the first snapshot, so they apply to live signals / dates on-or-after "
+                f"the snapshot, not historical backtests.")
+        else:
+            warnings.append("uses fundamental features but no fundamentals snapshot is loaded.")
 
     # Rank score.
     rank = eval_expr(cfg.rank_by)
