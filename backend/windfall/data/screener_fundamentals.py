@@ -25,7 +25,7 @@ import datetime as dt
 import os
 import re
 import time
-from urllib.parse import quote
+from urllib.parse import quote, unquote
 
 import duckdb
 import requests
@@ -102,11 +102,20 @@ def resolve_slug(symbol: str, name: str | None = None, con=None) -> str | None:
         if row:
             return row[0]
     q = name or symbol
-    try:
-        arr = requests.get("https://www.screener.in/api/company/search/?q=" + quote(q),
-                           headers={"User-Agent": UA}, timeout=20).json()
-    except Exception:  # noqa: BLE001
-        return None
+    url = "https://www.screener.in/api/company/search/?q=" + quote(q)
+    arr = None
+    for attempt in range(3):  # the search API rate-limits bursts; back off + retry
+        try:
+            r = requests.get(url, headers={"User-Agent": UA}, timeout=20)
+            if r.status_code == 200:
+                arr = r.json()
+                break
+            if r.status_code not in (429, 503):
+                break
+        except Exception:  # noqa: BLE001
+            pass
+        time.sleep(2.0 * (attempt + 1))
+    time.sleep(FETCH_SLEEP)  # politeness between search calls
     if not arr:
         return None
     cand = [a for a in arr if "DVR" not in a.get("name", "")] or arr
@@ -135,8 +144,8 @@ def parse_company(html: str) -> dict:
     """-> {section_id: {row_label: {period_label: float}}}, with section 'shareholding' kept."""
     soup = BeautifulSoup(html, "lxml")
     out = {}
-    m = re.search(r"nseindia\.com[^\"']*symbol=([A-Z0-9&-]+)", html)
-    out["_nse"] = m.group(1) if m else None
+    m = re.search(r"nseindia\.com[^\"']*symbol=([A-Z0-9&%-]+)", html)
+    out["_nse"] = unquote(m.group(1)) if m else None  # decode %26 -> & (e.g. ARE&M)
     for sec in soup.find_all("section"):
         sid = sec.get("id") or ""
         table = sec.find("table", class_="data-table")
@@ -311,30 +320,66 @@ def yf_overlap(yf_ticker: str) -> dict:
 
 
 # ---------- ingest ----------
-def ingest_symbol(con, symbol: str, name: str | None, basis: str, cross_check: bool) -> dict:
-    slug = resolve_slug(symbol, name, con)
-    if not slug:
-        return {"symbol": symbol, "status": "failed", "reason": "slug-resolve"}
+def _try_fetch(slug: str, basis: str):
+    """Fetch consolidated, fall back to standalone. -> (html, code, basis)."""
     html, code = fetch_html(slug, basis)
     if code != 200 and basis == "consolidated":
-        html, code = fetch_html(slug, "standalone")
-        basis = "standalone"
-    if code != 200:
-        return {"symbol": symbol, "status": "failed", "reason": f"http-{code}", "slug": slug}
+        h2, c2 = fetch_html(slug, "standalone")
+        if c2 == 200:
+            return h2, c2, "standalone"
+    return html, code, basis
 
+
+def _load(slug: str, basis: str, ticker: str, yf_ni):
+    """Fetch -> parse -> build records. -> (parsed, recs, basis, code)."""
+    html, code, basis = _try_fetch(slug, basis)
+    if code != 200:
+        return None, [], basis, code
     parsed = parse_company(html)
     if "profit-loss" not in parsed:
-        return {"symbol": symbol, "status": "failed", "reason": "no-pl", "slug": slug}
+        return parsed, [], basis, code
+    return parsed, build_records(ticker, parsed, basis, yf_ni=yf_ni), basis, code
 
+
+def ingest_symbol(con, symbol: str, name: str | None, basis: str, cross_check: bool,
+                  sector: str | None = None) -> dict:
     ticker = f"{symbol}.NS"
+    # Sector pre-filter: financials are excluded from the fundamental-DVM (ADR-013 rule 2),
+    # so skip the fetch entirely rather than scrape + quarantine them.
+    if sector and "financ" in sector.lower():
+        return {"symbol": symbol, "status": "excluded", "confidence": "excluded-financial",
+                "periods": 0, "flags": ["SECTOR-FINANCIAL"], "slug": symbol}
+
+    # Direct page first: slug == NSE symbol for ~all stocks, so the rate-limited search API
+    # is only needed when the direct symbol 404s (renamed/demerged tickers, e.g. TATAMOTORS->TMCV).
+    row = con.execute("SELECT slug FROM slug_map WHERE symbol = ?", [symbol]).fetchone()
+    slug = row[0] if row else symbol
     yf = yf_overlap(ticker) if cross_check else None
-    recs = build_records(ticker, parsed, basis, yf_ni=(yf or {}).get("ni"))
+    yf_ni = (yf or {}).get("ni")
+
+    parsed, recs, basis, code = _load(slug, "consolidated", ticker, yf_ni)
+    if code != 200:
+        slug2 = resolve_slug(symbol, name, con)  # polite search-API fallback
+        if slug2 and slug2 != slug:
+            slug = slug2
+            parsed, recs, basis, code = _load(slug, "consolidated", ticker, yf_ni)
+    if code != 200:
+        return {"symbol": symbol, "status": "failed", "reason": f"http-{code}", "slug": slug}
+    # consolidated page exists but is empty (standalone-only MNCs, e.g. ABBOTINDIA/ABB) -> standalone
+    if not recs and basis == "consolidated":
+        parsed, recs, basis, _ = _load(slug, "standalone", ticker, yf_ni)
+    if not recs:
+        return {"symbol": symbol, "status": "failed", "reason": "empty-parse", "slug": slug}
+
     confidence, flags = self_check(parsed, recs, yf)
     # mapping guard: the resolved page must be the company we asked for
     nse = parsed.get("_nse")
     if nse and nse.upper() != symbol.upper():
         confidence = "quarantined"
         flags = [f"MAP-MISMATCH(page={nse})"] + flags
+    else:
+        con.execute("INSERT OR REPLACE INTO slug_map VALUES (?,?,?,?)",
+                    [symbol, slug, nse, dt.datetime.now(dt.timezone.utc)])
     fnow = dt.datetime.now(dt.timezone.utc)
     fl = ",".join(flags) or None
 
@@ -356,9 +401,12 @@ def ingest(symbols: list[tuple[str, str | None]], basis="consolidated", cross_ch
     con = connect()
     counts = {"ok": 0, "low": 0, "quarantined": 0, "excluded": 0, "failed": 0}
     results = []
-    for symbol, name in symbols:
+    for entry in symbols:
+        symbol = entry[0]
+        name = entry[1] if len(entry) > 1 else None
+        sector = entry[2] if len(entry) > 2 else None
         try:
-            res = ingest_symbol(con, symbol, name, basis, cross_check)
+            res = ingest_symbol(con, symbol, name, basis, cross_check, sector)
         except Exception as e:  # noqa: BLE001
             res = {"symbol": symbol, "status": "failed", "reason": f"{type(e).__name__}: {e}"}
         st = res.get("confidence", res["status"])
@@ -389,7 +437,7 @@ def status() -> dict:
 def main():
     ap = argparse.ArgumentParser(description="screener.in historical fundamentals ingester")
     ap.add_argument("--symbols", help="comma-separated NSE symbols")
-    ap.add_argument("--symbols-file", help="CSV with columns symbol[,name]")
+    ap.add_argument("--symbols-file", help="CSV with columns symbol[,name[,sector]]")
     ap.add_argument("--basis", default="consolidated", choices=["consolidated", "standalone"])
     ap.add_argument("--cross-check", action="store_true", help="yfinance cross-vote per stock")
     ap.add_argument("--status", action="store_true")
@@ -405,7 +453,9 @@ def main():
         import csv
         for row in csv.reader(open(args.symbols_file, encoding="utf-8")):
             if row and row[0] and row[0].strip().lower() != "symbol":
-                syms.append((row[0].strip().upper(), row[1].strip() if len(row) > 1 else None))
+                syms.append((row[0].strip().upper(),
+                             row[1].strip() if len(row) > 1 else None,
+                             row[2].strip() if len(row) > 2 else None))
     if not syms:
         ap.error("need --symbols, --symbols-file, or --status")
 
