@@ -27,3 +27,8 @@ frontend/.env.local
 # OS
 .DS_Store
 Thumbs.db
+
+# Windfall data-layer raw exports (large, derived; rebuilt by backend/scripts)
+backend/data/trendlyne_data/
+backend/data/trendlyne_data_v2/
+backend/data/*.csv
