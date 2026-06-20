@@ -1,0 +1,901 @@
+ticker,sector,klass,in_ntm
+360ONE.NS,Banking and Finance,financial,True
+5PAISA.NS,Banking and Finance,financial,False
+AADHARHFC.NS,Banking and Finance,financial,True
+AAVAS.NS,Banking and Finance,financial,True
+ABSLAMC.NS,Banking and Finance,financial,True
+AFIL.NS,Banking and Finance,financial,False
+AFSL.NS,Banking and Finance,financial,False
+AIIL.NS,Banking and Finance,financial,True
+ALGOQUANT.NS,Banking and Finance,financial,False
+ALMONDZ.NS,Banking and Finance,financial,False
+ANANDRATHI.NS,Banking and Finance,financial,True
+ANGELONE.NS,Banking and Finance,financial,True
+APTUS.NS,Banking and Finance,financial,True
+ARIHANTCAP.NS,Banking and Finance,financial,False
+ARMANFIN.NS,Banking and Finance,financial,False
+ARSSBL.NS,Banking and Finance,financial,False
+ASCOM.NS,Banking and Finance,financial,False
+AUBANK.NS,Banking and Finance,financial,True
+AVONMORE.NS,Banking and Finance,financial,False
+AXISBANK.NS,Banking and Finance,financial,True
+AYE.NS,Banking and Finance,financial,False
+BAIDFIN.NS,Banking and Finance,financial,False
+BAJAJHFL.NS,Banking and Finance,financial,True
+BAJFINANCE.NS,Banking and Finance,financial,True
+BANDHANBNK.NS,Banking and Finance,financial,True
+BANKBARODA.NS,Banking and Finance,financial,True
+BANKINDIA.NS,Banking and Finance,financial,True
+BIRLAMONEY.NS,Banking and Finance,financial,False
+BLBLIMITED.NS,Banking and Finance,financial,False
+BLUECHIP.NS,Banking and Finance,financial,False
+BSE.NS,Banking and Finance,financial,True
+CANBK.NS,Banking and Finance,financial,True
+CANFINHOME.NS,Banking and Finance,financial,True
+CANHLIFE.NS,Banking and Finance,financial,True
+CAPITALSFB.NS,Banking and Finance,financial,False
+CAPTRUST.NS,Banking and Finance,financial,False
+CARERATING.NS,Banking and Finance,financial,False
+CDSL.NS,Banking and Finance,financial,True
+CENTRALBK.NS,Banking and Finance,financial,True
+CENTRUM.NS,Banking and Finance,financial,False
+CGCL.NS,Banking and Finance,financial,True
+CHOICEIN.NS,Banking and Finance,financial,True
+CHOLAFIN.NS,Banking and Finance,financial,True
+CIFL.NS,Banking and Finance,financial,False
+CONSOFINVT.NS,Banking and Finance,financial,False
+CORALFINAC.NS,Banking and Finance,financial,False
+CRAMC.NS,Banking and Finance,financial,True
+CREDITACC.NS,Banking and Finance,financial,True
+CREST.NS,Banking and Finance,financial,False
+CRISIL.NS,Banking and Finance,financial,True
+CSBBANK.NS,Banking and Finance,financial,True
+CSLFINANCE.NS,Banking and Finance,financial,False
+CUB.NS,Banking and Finance,financial,True
+DAMCAPITAL.NS,Banking and Finance,financial,False
+DBSTOCKBRO.NS,Banking and Finance,financial,False
+DCBBANK.NS,Banking and Finance,financial,True
+DCCL.NS,Banking and Finance,financial,False
+DCMFINSERV.NS,Banking and Finance,financial,False
+DELPHIFX.NS,Banking and Finance,financial,False
+DHANBANK.NS,Banking and Finance,financial,False
+DHUNINV.NS,Banking and Finance,financial,False
+DOLATALGO.NS,Banking and Finance,financial,False
+DVL.NS,Banking and Finance,financial,False
+EDELWEISS.NS,Banking and Finance,financial,True
+EMKAY.NS,Banking and Finance,financial,False
+EQUITASBNK.NS,Banking and Finance,financial,True
+ESAFSFB.NS,Banking and Finance,financial,False
+FEDERALBNK.NS,Banking and Finance,financial,True
+FEDFINA.NS,Banking and Finance,financial,True
+FINBUD.NS,Banking and Finance,financial,False
+FINKURVE.NS,Banking and Finance,financial,False
+FINOPB.NS,Banking and Finance,financial,False
+FIVESTAR.NS,Banking and Finance,financial,True
+FUSION.NS,Banking and Finance,financial,False
+GATECH.NS,Banking and Finance,financial,False
+GCSL.NS,Banking and Finance,financial,False
+GEOJITFSL.NS,Banking and Finance,financial,False
+GICHSGFIN.NS,Banking and Finance,financial,False
+GICRE.NS,Banking and Finance,financial,True
+GKWLIMITED.NS,Banking and Finance,financial,False
+GLFL.NS,Banking and Finance,financial,False
+GODIGIT.NS,Banking and Finance,financial,True
+GROWW.NS,Banking and Finance,financial,True
+HBSL.NS,Banking and Finance,financial,False
+HDBFS.NS,Banking and Finance,financial,True
+HDFCAMC.NS,Banking and Finance,financial,True
+HDFCBANK.NS,Banking and Finance,financial,True
+HDFCLIFE.NS,Banking and Finance,financial,True
+MAHABANK.NS,Banking and Finance,financial,True
+ABGSEC.NS,Others,fund/etf/other,False
+ABSL10BANK.NS,Others,fund/etf/other,False
+ABSLBANETF.NS,Others,fund/etf/other,False
+ABSLLIQUID.NS,Others,fund/etf/other,False
+ABSLMSCIN.NS,Others,fund/etf/other,False
+ABSLNN50ET.NS,Others,fund/etf/other,False
+ABSLPSE.NS,Others,fund/etf/other,False
+ADVAIT.NS,Consumer Durables,fund/etf/other,False
+ALANKIT.NS,Commercial Services & Supplies,fund/etf/other,False
+AONEGOLD.NS,Others,fund/etf/other,False
+AONELIQUID.NS,Others,fund/etf/other,False
+AONENIFTY.NS,Others,fund/etf/other,False
+AONESILVER.NS,Others,fund/etf/other,False
+AONETMMQ50.NS,Others,fund/etf/other,False
+AONETOTAL.NS,Others,fund/etf/other,False
+ATLPP.NS,Others,fund/etf/other,False
+AXISBNKETF.NS,Others,fund/etf/other,False
+AXISCETF.NS,Others,fund/etf/other,False
+AXISGOLD.NS,Others,fund/etf/other,False
+AXISHCETF.NS,Others,fund/etf/other,False
+AXISILVER.NS,Others,fund/etf/other,False
+AXISNIFTY.NS,Others,fund/etf/other,False
+AXISTECETF.NS,Others,fund/etf/other,False
+AXISVALUE.NS,Others,fund/etf/other,False
+AXSENSEX.NS,Others,fund/etf/other,False
+BANK10ADD.NS,Others,fund/etf/other,False
+BANKADD.NS,Others,fund/etf/other,False
+BANKBETF.NS,Others,fund/etf/other,False
+BBETF0432.NS,Others,fund/etf/other,False
+BBNPNBETF.NS,Others,fund/etf/other,False
+BBNPPGOLD.NS,Others,fund/etf/other,False
+BSLGOLDETF.NS,Others,fund/etf/other,False
+BSLNIFTY.NS,Others,fund/etf/other,False
+BSLSENETFG.NS,Others,fund/etf/other,False
+CAPINVIT.NS,Realty,fund/etf/other,False
+CHOICEGOLD.NS,Others,fund/etf/other,False
+CPSEETF.NS,Others,fund/etf/other,False
+CUBEINVIT.NS,Utilities,fund/etf/other,False
+DEVIT.NS,Software & Services,fund/etf/other,False
+EBANKNIFTY.NS,Others,fund/etf/other,False
+EBBETF0430.NS,Others,fund/etf/other,False
+EBBETF0431.NS,Others,fund/etf/other,False
+EBBETF0433.NS,Others,fund/etf/other,False
+ECAPINSURE.NS,Others,fund/etf/other,False
+EGOLD.NS,Others,fund/etf/other,False
+ELIQUID.NS,Others,fund/etf/other,False
+ELM250.NS,Others,fund/etf/other,False
+EMULTIMQ.NS,Others,fund/etf/other,False
+ENEXT50.NS,Others,fund/etf/other,False
+ENIFTY.NS,Others,fund/etf/other,False
+EQUAL50ADD.NS,Others,fund/etf/other,False
+ESENSEX.NS,Others,fund/etf/other,False
+ESILVER.NS,Others,fund/etf/other,False
+ESPRIT.NS,Diversified Consumer Services,fund/etf/other,False
+FCONSUMER.NS,FMCG,fund/etf/other,False
+FLEXIADD.NS,Others,fund/etf/other,False
+FMCGADD.NS,Others,fund/etf/other,False
+GATECHDVR.NS,Others,fund/etf/other,False
+GOLD360.NS,Others,fund/etf/other,False
+GOLDADD.NS,Others,fund/etf/other,False
+GOLDBND.NS,Others,fund/etf/other,False
+GOLDENTOBC.NS,Realty,fund/etf/other,False
+GOLDIAM.NS,Textiles Apparels & Accessories,fund/etf/other,False
+GOLDKART.NS,Textiles Apparels & Accessories,fund/etf/other,False
+GOLDSTAR.NS,Automobiles & Auto Components,fund/etf/other,False
+GOLDTECH.NS,Software & Services,fund/etf/other,False
+GROWWCAPM.NS,Others,fund/etf/other,False
+GROWWCHEM.NS,Others,fund/etf/other,False
+GROWWDEFNC.NS,Others,fund/etf/other,False
+GROWWEV.NS,Others,fund/etf/other,False
+GROWWGOLD.NS,Others,fund/etf/other,False
+GROWWHOSPI.NS,Others,fund/etf/other,False
+GROWWLIQID.NS,Others,fund/etf/other,False
+GROWWLOVOL.NS,Others,fund/etf/other,False
+GROWWMC150.NS,Others,fund/etf/other,False
+GROWWMETAL.NS,Others,fund/etf/other,False
+GROWWMOM50.NS,Others,fund/etf/other,False
+GROWWN200.NS,Others,fund/etf/other,False
+GROWWNET.NS,Others,fund/etf/other,False
+GROWWNIFTY.NS,Others,fund/etf/other,False
+GROWWNXT50.NS,Others,fund/etf/other,False
+GROWWPOWER.NS,Others,fund/etf/other,False
+GROWWPSE.NS,Others,fund/etf/other,False
+GROWWPSUBK.NS,Others,fund/etf/other,False
+GROWWRAIL.NS,Others,fund/etf/other,False
+GROWWRLTY.NS,Others,fund/etf/other,False
+GROWWSC250.NS,Others,fund/etf/other,False
+GROWWSLVR.NS,Others,fund/etf/other,False
+GSEC10ABSL.NS,Others,fund/etf/other,False
+GVPTECHPP.NS,Others,fund/etf/other,False
+HDFCBSE500.NS,Others,fund/etf/other,False
+HDFCGOLD.NS,Others,fund/etf/other,False
+HDFCGROWTH.NS,Others,fund/etf/other,False
+HDFCLIQUID.NS,Others,fund/etf/other,False
+HDFCLOWVOL.NS,Others,fund/etf/other,False
+HDFCMID150.NS,Others,fund/etf/other,False
+HDFCMOMENT.NS,Others,fund/etf/other,False
+HDFCNEXT50.NS,Others,fund/etf/other,False
+HDFCNIF100.NS,Others,fund/etf/other,False
+HDFCNIFBAN.NS,Others,fund/etf/other,False
+HDFCNIFIT.NS,Others,fund/etf/other,False
+HDFCNIFTY.NS,Others,fund/etf/other,False
+HDFCPSUBK.NS,Others,fund/etf/other,False
+HDFCPVTBAN.NS,Others,fund/etf/other,False
+HDFCQUAL.NS,Others,fund/etf/other,False
+HDFCSENSEX.NS,Others,fund/etf/other,False
+HDFCSILVER.NS,Others,fund/etf/other,False
+HDFCSML250.NS,Others,fund/etf/other,False
+HDFCVALUE.NS,Others,fund/etf/other,False
+HEALTHADD.NS,Others,fund/etf/other,False
+HEALTHY.NS,Others,fund/etf/other,False
+ITADD.NS,Others,fund/etf/other,False
+LIQUIDADD.NS,Others,fund/etf/other,False
+LIQUIDBETF.NS,Others,fund/etf/other,False
+LIQUIDETF.NS,Others,fund/etf/other,False
+MIDCAPADD.NS,Others,fund/etf/other,False
+MIDQ50ADD.NS,Others,fund/etf/other,False
+MOMENTUM.NS,Others,fund/etf/other,False
+MSCI360.NS,Others,fund/etf/other,False
+MSCIADD.NS,Others,fund/etf/other,False
+NEXT30ADD.NS,Others,fund/etf/other,False
+NEXT50ADD.NS,Others,fund/etf/other,False
+NIFTYADD.NS,Others,fund/etf/other,False
+NIFTYBETF.NS,Others,fund/etf/other,False
+NIFTYQLITY.NS,Others,fund/etf/other,False
+PSUBANKADD.NS,Others,fund/etf/other,False
+PVTBANKADD.NS,Others,fund/etf/other,False
+PVTBKGROWW.NS,Others,fund/etf/other,False
+SENSEXADD.NS,Others,fund/etf/other,False
+SILVER.NS,Others,fund/etf/other,False
+SILVER360.NS,Others,fund/etf/other,False
+SILVERADD.NS,Others,fund/etf/other,False
+SILVERBND.NS,Others,fund/etf/other,False
+SMALLADD.NS,Others,fund/etf/other,False
+SMALLGROWW.NS,Others,fund/etf/other,False
+TECH.NS,Others,fund/etf/other,False
+TOP10ADD.NS,Others,fund/etf/other,False
+20MICRONS.NS,Metals & Mining,genuine-company,False
+3IINFOLTD.NS,Software & Services,genuine-company,False
+3PLAND.NS,Realty,genuine-company,False
+63MOONS.NS,Software & Services,genuine-company,False
+A2ZINFRA.NS,Cement and Construction,genuine-company,False
+AAATECH.NS,Commercial Services & Supplies,genuine-company,False
+AAKAAR.NS,Healthcare,genuine-company,False
+AAKASH.NS,Oil & Gas,genuine-company,False
+AARADHYA.NS,Commercial Services & Supplies,genuine-company,False
+AAREYDRUGS.NS,Pharmaceuticals & Biotechnology,genuine-company,False
+AARON.NS,General Industrials,genuine-company,False
+AARTECH.NS,General Industrials,genuine-company,False
+AARTISURF.NS,Chemicals & Petrochemicals,genuine-company,False
+AARVI.NS,Diversified Consumer Services,genuine-company,False
+AATMAJ.NS,Healthcare,genuine-company,False
+ABAN.NS,Oil & Gas,genuine-company,False
+ABCAPITAL.NS,Diversified,genuine-company,True
+ABCOTS.NS,Textiles Apparels & Accessories,genuine-company,False
+ABHAPOWER.NS,Metals & Mining,genuine-company,False
+ABINFRA.NS,Cement and Construction,genuine-company,False
+ABMINTLLTD.NS,Commercial Services & Supplies,genuine-company,False
+ABSMARINE.NS,Transportation,genuine-company,False
+ACCELYA.NS,Software & Services,genuine-company,False
+ACCENTMIC.NS,Pharmaceuticals & Biotechnology,genuine-company,False
+ACCORD.NS,Telecom Services,genuine-company,False
+ACCPL.NS,Pharmaceuticals & Biotechnology,genuine-company,False
+ACCURACY.NS,Transportation,genuine-company,False
+ACEINTEG.NS,Commercial Services & Supplies,genuine-company,False
+ACETEC.NS,Textiles Apparels & Accessories,genuine-company,False
+ACL.NS,Cement and Construction,genuine-company,False
+ACTIVEINFR.NS,Cement and Construction,genuine-company,False
+ADDICTIVE.NS,Diversified Consumer Services,genuine-company,False
+ADFFOODS.NS,FMCG,genuine-company,False
+ADISOFT.NS,General Industrials,genuine-company,False
+ADL.NS,Forest Materials,genuine-company,False
+ADOR.NS,General Industrials,genuine-company,False
+ADROITINFO.NS,Software & Services,genuine-company,False
+ADSL.NS,Software & Services,genuine-company,False
+ADVANCE.NS,Chemicals & Petrochemicals,genuine-company,False
+ADVANIHOTR.NS,Hotels Restaurants & Tourism,genuine-company,False
+ADVENTHTL.NS,Hotels Restaurants & Tourism,genuine-company,False
+AEROENTER.NS,Metals & Mining,genuine-company,False
+AEROFLEX.NS,Metals & Mining,genuine-company,False
+AERON.NS,General Industrials,genuine-company,False
+AERONEU.NS,Commercial Services & Supplies,genuine-company,False
+AESTHETIK.NS,Cement and Construction,genuine-company,False
+AFFORDABLE.NS,General Industrials,genuine-company,False
+AGARIND.NS,Chemicals & Petrochemicals,genuine-company,False
+AGARWALFT.NS,Commercial Services & Supplies,genuine-company,False
+AGARWALTUF.NS,Cement and Construction,genuine-company,False
+AGI.NS,Commercial Services & Supplies,genuine-company,False
+AGIIL.NS,Realty,genuine-company,False
+AGNI.NS,Utilities,genuine-company,False
+AGRITECH.NS,"Food, Beverages & Tobacco",genuine-company,False
+AGROPHOS.NS,Fertilizers,genuine-company,False
+AGSTRA.NS,Software & Services,genuine-company,False
+AGUL.NS,Metals & Mining,genuine-company,False
+AHCL.NS,Pharmaceuticals & Biotechnology,genuine-company,False
+AHLADA.NS,Metals & Mining,genuine-company,False
+AHLEAST.NS,Hotels Restaurants & Tourism,genuine-company,False
+AHLWEST.NS,Hotels Restaurants & Tourism,genuine-company,False
+AILIMITED.NS,Commercial Services & Supplies,genuine-company,False
+AIMTRON.NS,Commercial Services & Supplies,genuine-company,False
+AIRAN.NS,Software & Services,genuine-company,False
+AIROLAM.NS,Diversified Consumer Services,genuine-company,False
+AISL.NS,Commercial Services & Supplies,genuine-company,False
+AJAXENGG.NS,Automobiles & Auto Components,genuine-company,False
+AJMERA.NS,Realty,genuine-company,False
+AJOONI.NS,"Food, Beverages & Tobacco",genuine-company,False
+AKANKSHA.NS,Consumer Durables,genuine-company,False
+AKASH.NS,Cement and Construction,genuine-company,False
+AKG.NS,Commercial Services & Supplies,genuine-company,False
+AKI.NS,Textiles Apparels & Accessories,genuine-company,False
+AKIKO.NS,Commercial Services & Supplies,genuine-company,False
+AKSHAR.NS,Textiles Apparels & Accessories,genuine-company,False
+AKSHARCHEM.NS,Chemicals & Petrochemicals,genuine-company,False
+AKSHOPTFBR.NS,Telecommunications Equipment,genuine-company,False
+ALBERTDAVD.NS,Pharmaceuticals & Biotechnology,genuine-company,False
+ALCODIS.NS,"Food, Beverages & Tobacco",genuine-company,False
+ALEMBICLTD.NS,Pharmaceuticals & Biotechnology,genuine-company,False
+ALICON.NS,Automobiles & Auto Components,genuine-company,False
+ALKALI.NS,Chemicals & Petrochemicals,genuine-company,False
+ALLCARGO.NS,Transportation,genuine-company,False
+ALLDIGI.NS,Software & Services,genuine-company,False
+ALLETEC.NS,Software & Services,genuine-company,False
+ALLTIME.NS,Consumer Durables,genuine-company,False
+ALPA.NS,Pharmaceuticals & Biotechnology,genuine-company,False
+ALPEXSOLAR.NS,Utilities,genuine-company,False
+ALPHAGEO.NS,Oil & Gas,genuine-company,False
+ALUWIND.NS,Metals & Mining,genuine-company,False
+AMAGI.NS,Software & Services,genuine-company,False
+AMANTA.NS,Pharmaceuticals & Biotechnology,genuine-company,False
+AMBAAUTO.NS,Retailing,genuine-company,False
+AMBANIORGO.NS,Chemicals & Petrochemicals,genuine-company,False
+AMBICAAGAR.NS,Consumer Durables,genuine-company,False
+AMBIKCO.NS,Textiles Apparels & Accessories,genuine-company,False
+AMCL.NS,Metals & Mining,genuine-company,False
+AMDIND.NS,Commercial Services & Supplies,genuine-company,False
+AMEYA.NS,General Industrials,genuine-company,False
+AMIABLE.NS,Transportation,genuine-company,False
+AMIRCHAND.NS,"Food, Beverages & Tobacco",genuine-company,False
+AMJLAND.NS,Realty,genuine-company,False
+AMNPLST.NS,Chemicals & Petrochemicals,genuine-company,False
+AMRUTANJAN.NS,Pharmaceuticals & Biotechnology,genuine-company,False
+ANANTAM.NS,Realty,genuine-company,False
+ANDHRAPAP.NS,Commercial Services & Supplies,genuine-company,False
+ANDHRSUGAR.NS,Chemicals & Petrochemicals,genuine-company,False
+ANIKINDS.NS,Diversified,genuine-company,False
+ANKITMETAL.NS,Metals & Mining,genuine-company,False
+ANLON.NS,General Industrials,genuine-company,False
+ANMOL.NS,Commercial Services & Supplies,genuine-company,False
+ANNAPURNA.NS,FMCG,genuine-company,False
+ANONDITA.NS,FMCG,genuine-company,False
+ANSALAPI.NS,Realty,genuine-company,False
+ANTELOPUS.NS,Oil & Gas,genuine-company,False
+ANTGRAPHIC.NS,Commercial Services & Supplies,genuine-company,False
+ANUHPHR.NS,Pharmaceuticals & Biotechnology,genuine-company,False
+ANYA.NS,Commercial Services & Supplies,genuine-company,False
+ANZEN.NS,Utilities,genuine-company,False
+APCL.NS,Cement and Construction,genuine-company,False
+APCOTEXIND.NS,Automobiles & Auto Components,genuine-company,False
+APEX.NS,"Food, Beverages & Tobacco",genuine-company,False
+APEXECO.NS,Utilities,genuine-company,False
+APOLLOPIPE.NS,General Industrials,genuine-company,False
+APOLSINHOT.NS,Hotels Restaurants & Tourism,genuine-company,False
+APRAMEYA.NS,Hardware Technology & Equipment,genuine-company,False
+APS.NS,Utilities,genuine-company,False
+APSISAERO.NS,General Industrials,genuine-company,False
+APTECHT.NS,Software & Services,genuine-company,False
+AQYLON.NS,Media,genuine-company,False
+ARABIAN.NS,Oil & Gas,genuine-company,False
+ARCHIDPLY.NS,Forest Materials,genuine-company,False
+ARCHIES.NS,Retailing,genuine-company,False
+ARCIIL.NS,General Industrials,genuine-company,False
+ARFIN.NS,Metals & Mining,genuine-company,False
+ARHAM.NS,Consumer Durables,genuine-company,False
+ARIES.NS,Chemicals & Petrochemicals,genuine-company,False
+ARIHANTACA.NS,Diversified Consumer Services,genuine-company,False
+ARIHANTSUP.NS,Realty,genuine-company,False
+ARIS.NS,Cement and Construction,genuine-company,False
+ARISTO.NS,Chemicals & Petrochemicals,genuine-company,False
+ARKADE.NS,Realty,genuine-company,False
+ARMOUR.NS,Commercial Services & Supplies,genuine-company,False
+AROGRANITE.NS,Cement and Construction,genuine-company,False
+ARROWGREEN.NS,General Industrials,genuine-company,False
+ARSHIYA.NS,Transportation,genuine-company,False
+ARTEMISMED.NS,Healthcare,genuine-company,False
+ARTNIRMAN.NS,Realty,genuine-company,False
+ARUNAYA.NS,Chemicals & Petrochemicals,genuine-company,False
+ARVEE.NS,Chemicals & Petrochemicals,genuine-company,False
+ARVINDPORT.NS,Transportation,genuine-company,False
+ARVSMART.NS,Realty,genuine-company,False
+ASAHISONG.NS,Chemicals & Petrochemicals,genuine-company,False
+ASAL.NS,Automobiles & Auto Components,genuine-company,False
+ASALCBR.NS,"Food, Beverages & Tobacco",genuine-company,False
+ASHALOG.NS,Transportation,genuine-company,False
+ASHIANA.NS,Realty,genuine-company,False
+ASHIMASYN.NS,Textiles Apparels & Accessories,genuine-company,False
+ASHOKAMET.NS,Commercial Services & Supplies,genuine-company,False
+ASHWINI.NS,Transportation,genuine-company,False
+ASIANENE.NS,Oil & Gas,genuine-company,False
+ASIANHOTNR.NS,Hotels Restaurants & Tourism,genuine-company,False
+ASIANTILES.NS,Consumer Durables,genuine-company,False
+ASMS.NS,Commercial Services & Supplies,genuine-company,False
+ASPINWALL.NS,"Food, Beverages & Tobacco",genuine-company,False
+ASPIRE.NS,Consumer Durables,genuine-company,False
+ASTEC.NS,Chemicals & Petrochemicals,genuine-company,False
+ASTRAZEN.NS,Pharmaceuticals & Biotechnology,genuine-company,False
+ASTRON.NS,Commercial Services & Supplies,genuine-company,False
+ATALREAL.NS,Realty,genuine-company,False
+ATAM.NS,General Industrials,genuine-company,False
+ATCENERGY.NS,Consumer Durables,genuine-company,False
+ATL.NS,Transportation,genuine-company,False
+ATLANTAA.NS,Cement and Construction,genuine-company,False
+ATLASCYCLE.NS,Automobiles & Auto Components,genuine-company,False
+ATMASTCO.NS,Cement and Construction,genuine-company,False
+ATULAUTO.NS,Automobiles & Auto Components,genuine-company,False
+AURIGROW.NS,Consumer Durables,genuine-company,False
+AUROIMPEX.NS,General Industrials,genuine-company,False
+AURUM.NS,Software & Services,genuine-company,False
+AUSL.NS,Metals & Mining,genuine-company,False
+AUSOMENT.NS,Commercial Services & Supplies,genuine-company,False
+AUTOAXLES.NS,Automobiles & Auto Components,genuine-company,False
+AUTOIND.NS,Automobiles & Auto Components,genuine-company,False
+AVADHSUGAR.NS,"Food, Beverages & Tobacco",genuine-company,False
+AVANA.NS,General Industrials,genuine-company,False
+AVANTEL.NS,Telecommunications Equipment,genuine-company,False
+AVATAR.NS,General Industrials,genuine-company,False
+AVG.NS,Transportation,genuine-company,False
+AVIANSH.NS,Textiles Apparels & Accessories,genuine-company,False
+AVPINFRA.NS,Cement and Construction,genuine-company,False
+AVROIND.NS,General Industrials,genuine-company,False
+AVTNPL.NS,"Food, Beverages & Tobacco",genuine-company,False
+AWHCL.NS,Utilities,genuine-company,False
+AXITA.NS,Textiles Apparels & Accessories,genuine-company,False
+AYMSYNTEX.NS,Textiles Apparels & Accessories,genuine-company,False
+BABAFP.NS,"Food, Beverages & Tobacco",genuine-company,False
+BAFNAPH.NS,Pharmaceuticals & Biotechnology,genuine-company,False
+BAGDIGITAL.NS,Media,genuine-company,False
+BAGFILMS.NS,Media,genuine-company,False
+BAGMANE.NS,Realty,genuine-company,False
+BAHETI.NS,Metals & Mining,genuine-company,False
+BAJAJCON.NS,FMCG,genuine-company,False
+BAJAJFINSV.NS,Diversified,genuine-company,True
+BAJAJHCARE.NS,Pharmaceuticals & Biotechnology,genuine-company,False
+BAJAJHIND.NS,"Food, Beverages & Tobacco",genuine-company,False
+BAJAJHLDNG.NS,Diversified,genuine-company,True
+BAJEL.NS,General Industrials,genuine-company,False
+BALAJIPHOS.NS,Fertilizers,genuine-company,False
+BALAJITELE.NS,Media,genuine-company,False
+BALAXI.NS,Pharmaceuticals & Biotechnology,genuine-company,False
+BALKRISHNA.NS,Commercial Services & Supplies,genuine-company,False
+BALMLAWRIE.NS,Diversified,genuine-company,False
+BALPHARMA.NS,Pharmaceuticals & Biotechnology,genuine-company,False
+BANARBEADS.NS,Textiles Apparels & Accessories,genuine-company,False
+BANARISUG.NS,"Food, Beverages & Tobacco",genuine-company,False
+BANG.NS,Textiles Apparels & Accessories,genuine-company,False
+BANKA.NS,Utilities,genuine-company,False
+BANSALWIRE.NS,Metals & Mining,genuine-company,False
+BANSWRAS.NS,Textiles Apparels & Accessories,genuine-company,False
+BARFLEX.NS,Commercial Services & Supplies,genuine-company,False
+BASF.NS,Chemicals & Petrochemicals,genuine-company,False
+BASILIC.NS,Media,genuine-company,False
+BASML.NS,Textiles Apparels & Accessories,genuine-company,False
+BAWEJA.NS,Media,genuine-company,False
+BBL.NS,Consumer Durables,genuine-company,False
+BBTCL.NS,Commercial Services & Supplies,genuine-company,False
+BCG.NS,Software & Services,genuine-company,False
+BCLIND.NS,FMCG,genuine-company,False
+BCONCEPTS.NS,Retailing,genuine-company,False
+BEACON.NS,Commercial Services & Supplies,genuine-company,False
+BEARDSELL.NS,Commercial Services & Supplies,genuine-company,False
+BEDMUTHA.NS,Metals & Mining,genuine-company,False
+BELLACASA.NS,Textiles Apparels & Accessories,genuine-company,False
+BEPL.NS,Chemicals & Petrochemicals,genuine-company,False
+BESTAGRO.NS,Chemicals & Petrochemicals,genuine-company,False
+BETA.NS,Pharmaceuticals & Biotechnology,genuine-company,False
+BEWLTD.NS,General Industrials,genuine-company,False
+BFINVEST.NS,Diversified,genuine-company,False
+BFUTILITIE.NS,Utilities,genuine-company,False
+BGLOBAL.NS,Software & Services,genuine-company,False
+BGRENERGY.NS,Utilities,genuine-company,False
+BHADORA.NS,Consumer Durables,genuine-company,False
+BHAGCHEM.NS,Chemicals & Petrochemicals,genuine-company,False
+BHAGERIA.NS,Chemicals & Petrochemicals,genuine-company,False
+BHAGYANGR.NS,Metals & Mining,genuine-company,False
+BHANDARI.NS,Textiles Apparels & Accessories,genuine-company,False
+BHARATCOAL.NS,Metals & Mining,genuine-company,False
+BHARATGEAR.NS,Automobiles & Auto Components,genuine-company,False
+BHARATRAS.NS,Chemicals & Petrochemicals,genuine-company,False
+BHARATSE.NS,Automobiles & Auto Components,genuine-company,False
+BHARATWIRE.NS,Metals & Mining,genuine-company,False
+BIGBLOC.NS,Cement and Construction,genuine-company,False
+BIKEWO.NS,Retailing,genuine-company,False
+BIL.NS,Textiles Apparels & Accessories,genuine-company,False
+BILVYAPAR.NS,Media,genuine-company,False
+BIOFILCHEM.NS,Pharmaceuticals & Biotechnology,genuine-company,False
+BIOPOL.NS,Chemicals & Petrochemicals,genuine-company,False
+BIRDYS.NS,Hotels Restaurants & Tourism,genuine-company,False
+BIRET.NS,Realty,genuine-company,False
+BIRLACABLE.NS,Telecommunications Equipment,genuine-company,False
+BIRLANU.NS,Cement and Construction,genuine-company,False
+BLAL.NS,Realty,genuine-company,False
+BLISSGVS.NS,Pharmaceuticals & Biotechnology,genuine-company,False
+BLKASHYAP.NS,Cement and Construction,genuine-company,False
+BLSE.NS,Commercial Services & Supplies,genuine-company,False
+BLUECOAST.NS,Hotels Restaurants & Tourism,genuine-company,False
+BLUEPEBBLE.NS,Commercial Services & Supplies,genuine-company,False
+BLUEWATER.NS,Transportation,genuine-company,False
+BLUSPRING.NS,Commercial Services & Supplies,genuine-company,False
+BMETRICS.NS,Commercial Services & Supplies,genuine-company,False
+BMLL.NS,Pharmaceuticals & Biotechnology,genuine-company,False
+BMWVENTLTD.NS,Metals & Mining,genuine-company,False
+BODALCHEM.NS,Chemicals & Petrochemicals,genuine-company,False
+BOHRAIND.NS,Fertilizers,genuine-company,False
+BOMDYEING.NS,Textiles Apparels & Accessories,genuine-company,False
+BORANA.NS,Textiles Apparels & Accessories,genuine-company,False
+BOROLTD.NS,Consumer Durables,genuine-company,False
+BOROSCI.NS,Commercial Services & Supplies,genuine-company,False
+BOSCH-HCIL.NS,Consumer Durables,genuine-company,False
+BOSS.NS,General Industrials,genuine-company,False
+BPL.NS,Consumer Durables,genuine-company,False
+BRACEPORT.NS,Transportation,genuine-company,False
+BRANDMAN.NS,Retailing,genuine-company,False
+BRIGHOTEL.NS,Hotels Restaurants & Tourism,genuine-company,False
+BRNL.NS,Cement and Construction,genuine-company,False
+BROOKS.NS,Pharmaceuticals & Biotechnology,genuine-company,False
+BSHSL.NS,"Food, Beverages & Tobacco",genuine-company,False
+BSL.NS,Textiles Apparels & Accessories,genuine-company,False
+BTML.NS,Media,genuine-company,False
+BULKCORP.NS,Commercial Services & Supplies,genuine-company,False
+BUTTERFLY.NS,Consumer Durables,genuine-company,False
+BVCL.NS,Cement and Construction,genuine-company,False
+C2C.NS,General Industrials,genuine-company,False
+CALSOFT.NS,Software & Services,genuine-company,False
+CAMLINFINE.NS,Chemicals & Petrochemicals,genuine-company,False
+CAMS.NS,Software & Services,genuine-company,True
+CANARYS.NS,Software & Services,genuine-company,False
+CANTABIL.NS,Textiles Apparels & Accessories,genuine-company,False
+CAPACITE.NS,Cement and Construction,genuine-company,False
+CARRARO.NS,Automobiles & Auto Components,genuine-company,False
+CARYSIL.NS,Consumer Durables,genuine-company,False
+CCAVENUE.NS,Software & Services,genuine-company,True
+CCCL.NS,Cement and Construction,genuine-company,False
+CCHHL.NS,Hotels Restaurants & Tourism,genuine-company,False
+CEDAAR.NS,Textiles Apparels & Accessories,genuine-company,False
+CEIGALL.NS,Cement and Construction,genuine-company,False
+CELEBRITY.NS,Textiles Apparels & Accessories,genuine-company,False
+CELLECOR.NS,Commercial Services & Supplies,genuine-company,False
+CELLPOINT.NS,Retailing,genuine-company,False
+CENTENKA.NS,Textiles Apparels & Accessories,genuine-company,False
+CENTEXT.NS,Metals & Mining,genuine-company,False
+CENTUM.NS,Commercial Services & Supplies,genuine-company,False
+CEREBRAINT.NS,Hardware Technology & Equipment,genuine-company,False
+CEWATER.NS,Utilities,genuine-company,False
+CGRAPHICS.NS,Commercial Services & Supplies,genuine-company,False
+CHAMUNDA.NS,Cement and Construction,genuine-company,False
+CHANDAN.NS,Healthcare,genuine-company,False
+CHAVDA.NS,Cement and Construction,genuine-company,False
+CHEMBOND.NS,Chemicals & Petrochemicals,genuine-company,False
+CHEMBONDCH.NS,Chemicals & Petrochemicals,genuine-company,False
+CHEMCON.NS,Chemicals & Petrochemicals,genuine-company,False
+CHEMFAB.NS,Chemicals & Petrochemicals,genuine-company,False
+CHEMPLASTS.NS,Chemicals & Petrochemicals,genuine-company,False
+CHETANA.NS,Commercial Services & Supplies,genuine-company,False
+CHEVIOT.NS,Forest Materials,genuine-company,False
+CHOLAHLDNG.NS,Diversified,genuine-company,True
+CINELINE.NS,Media,genuine-company,False
+CINEVISTA.NS,Media,genuine-company,False
+CITIUSINVT.NS,Realty,genuine-company,False
+CKKRETAIL.NS,"Food, Beverages & Tobacco",genuine-company,False
+CLASSICEIL.NS,General Industrials,genuine-company,False
+CLCIND.NS,Textiles Apparels & Accessories,genuine-company,False
+CLEANMAX.NS,Utilities,genuine-company,False
+CLEDUCATE.NS,Diversified Consumer Services,genuine-company,False
+CLSEL.NS,"Food, Beverages & Tobacco",genuine-company,False
+CLSL.NS,Chemicals & Petrochemicals,genuine-company,False
+CMICABLES.NS,Consumer Durables,genuine-company,False
+CMNL.NS,Metals & Mining,genuine-company,False
+CMPDI.NS,Commercial Services & Supplies,genuine-company,False
+CMRGREEN.NS,Metals & Mining,genuine-company,False
+CMRSL.NS,Media,genuine-company,False
+CNL.NS,Retailing,genuine-company,False
+COASTCORP.NS,"Food, Beverages & Tobacco",genuine-company,False
+COFFEEDAY.NS,Hotels Restaurants & Tourism,genuine-company,False
+COMMITTED.NS,Transportation,genuine-company,False
+COMPINFO.NS,Commercial Services & Supplies,genuine-company,False
+COMPUSOFT.NS,Software & Services,genuine-company,False
+COMSYN.NS,Commercial Services & Supplies,genuine-company,False
+CONFIPET.NS,Oil & Gas,genuine-company,False
+CONNPLEX.NS,Media,genuine-company,False
+CONTI.NS,"Food, Beverages & Tobacco",genuine-company,False
+CONTROLPR.NS,Hardware Technology & Equipment,genuine-company,False
+COOLCAPS.NS,General Industrials,genuine-company,False
+CORDSCABLE.NS,Consumer Durables,genuine-company,False
+COSMOFIRST.NS,Commercial Services & Supplies,genuine-company,False
+COUNCODOS.NS,Realty,genuine-company,False
+CPCAP.NS,Diversified Consumer Services,genuine-company,False
+CPEDU.NS,Diversified Consumer Services,genuine-company,False
+CPS.NS,Textiles Apparels & Accessories,genuine-company,False
+CRAYONS.NS,Media,genuine-company,False
+CREATIVEYE.NS,Media,genuine-company,False
+CROWN.NS,Transportation,genuine-company,False
+CSSL.NS,Diversified Consumer Services,genuine-company,False
+CTE.NS,Software & Services,genuine-company,False
+CUBEXTUB.NS,Metals & Mining,genuine-company,False
+CUDML.NS,Media,genuine-company,False
+CURAA.NS,Software & Services,genuine-company,False
+CURIS.NS,Pharmaceuticals & Biotechnology,genuine-company,False
+CURRENT.NS,Utilities,genuine-company,False
+CYBERMEDIA.NS,Commercial Services & Supplies,genuine-company,False
+CYBERTECH.NS,Software & Services,genuine-company,False
+CYIENTDLM.NS,Commercial Services & Supplies,genuine-company,False
+DALMIASUG.NS,"Food, Beverages & Tobacco",genuine-company,False
+DAMODARIND.NS,Textiles Apparels & Accessories,genuine-company,False
+DANGEE.NS,"Food, Beverages & Tobacco",genuine-company,False
+DANISH.NS,General Industrials,genuine-company,False
+DAVANGERE.NS,"Food, Beverages & Tobacco",genuine-company,False
+DBCORP.NS,Commercial Services & Supplies,genuine-company,False
+DBEIL.NS,Cement and Construction,genuine-company,False
+DBOL.NS,"Food, Beverages & Tobacco",genuine-company,False
+DCAL.NS,Pharmaceuticals & Biotechnology,genuine-company,False
+DCG.NS,Consumer Durables,genuine-company,False
+DCI.NS,Hardware Technology & Equipment,genuine-company,False
+DCM.NS,General Industrials,genuine-company,False
+DCMNVL.NS,Textiles Apparels & Accessories,genuine-company,False
+DCMSIL.NS,General Industrials,genuine-company,False
+DCMSRIND.NS,"Food, Beverages & Tobacco",genuine-company,False
+DCW.NS,Chemicals & Petrochemicals,genuine-company,False
+DCXINDIA.NS,General Industrials,genuine-company,False
+DDEVPLSTIK.NS,General Industrials,genuine-company,False
+DECCANCE.NS,Cement and Construction,genuine-company,False
+DECCANTRAN.NS,Transportation,genuine-company,False
+DEEDEV.NS,Cement and Construction,genuine-company,False
+DEEM.NS,Metals & Mining,genuine-company,False
+DEEPINDS.NS,Oil & Gas,genuine-company,False
+DELAPLEX.NS,Software & Services,genuine-company,False
+DELTACORP.NS,Diversified Consumer Services,genuine-company,False
+DELTAMAGNT.NS,General Industrials,genuine-company,False
+DELTIC.NS,Automobiles & Auto Components,genuine-company,False
+DEN.NS,Media,genuine-company,False
+DENEERS.NS,Metals & Mining,genuine-company,False
+DENORA.NS,General Industrials,genuine-company,False
+DENTA.NS,Utilities,genuine-company,False
+DEVX.NS,Diversified Consumer Services,genuine-company,False
+DGCONTENT.NS,Media,genuine-company,False
+DHAMPURSUG.NS,"Food, Beverages & Tobacco",genuine-company,False
+DHANLAXMI.NS,"Food, Beverages & Tobacco",genuine-company,False
+DHANSA.NS,Chemicals & Petrochemicals,genuine-company,False
+DHANUKA.NS,Chemicals & Petrochemicals,genuine-company,False
+DHARAN.NS,Realty,genuine-company,False
+DHARARAIL.NS,Automobiles & Auto Components,genuine-company,False
+DHARIWAL.NS,Chemicals & Petrochemicals,genuine-company,False
+DHARMAJ.NS,Chemicals & Petrochemicals,genuine-company,False
+DHRUV.NS,Commercial Services & Supplies,genuine-company,False
+DHTL.NS,Diversified Consumer Services,genuine-company,False
+DIAMINESQ.NS,Chemicals & Petrochemicals,genuine-company,False
+DICIND.NS,Chemicals & Petrochemicals,genuine-company,False
+DIFFNKG.NS,General Industrials,genuine-company,False
+DIGIDRIVE.NS,Commercial Services & Supplies,genuine-company,False
+DIGIKORE.NS,Media,genuine-company,False
+DIGISPICE.NS,Software & Services,genuine-company,False
+DIGITIDE.NS,Software & Services,genuine-company,False
+DIGJAMLMTD.NS,Textiles Apparels & Accessories,genuine-company,False
+DIL.NS,Hotels Restaurants & Tourism,genuine-company,False
+DIRL.NS,Realty,genuine-company,False
+DISHTV.NS,Media,genuine-company,False
+DIVGIITTS.NS,Automobiles & Auto Components,genuine-company,False
+DIVINEHIRA.NS,Textiles Apparels & Accessories,genuine-company,False
+DIVYADHAN.NS,Textiles Apparels & Accessories,genuine-company,False
+DJML.NS,Transportation,genuine-company,False
+DKEGL.NS,Commercial Services & Supplies,genuine-company,False
+DLINKINDIA.NS,Hardware Technology & Equipment,genuine-company,False
+DMCC.NS,Chemicals & Petrochemicals,genuine-company,False
+DNAMEDIA.NS,Media,genuine-company,False
+DODLA.NS,FMCG,genuine-company,False
+DOLLAR.NS,Textiles Apparels & Accessories,genuine-company,False
+DOLLEX.NS,"Food, Beverages & Tobacco",genuine-company,False
+DOLPHIN.NS,Oil & Gas,genuine-company,False
+DONEAR.NS,Textiles Apparels & Accessories,genuine-company,False
+DPABHUSHAN.NS,Textiles Apparels & Accessories,genuine-company,False
+DPEL.NS,Consumer Durables,genuine-company,False
+DPWIRES.NS,Metals & Mining,genuine-company,False
+DRCSYSTEMS.NS,Software & Services,genuine-company,False
+DREAMFOLKS.NS,Diversified Consumer Services,genuine-company,False
+DREDGECORP.NS,Transportation,genuine-company,False
+DRONE.NS,Diversified Consumer Services,genuine-company,False
+DRSDILIP.NS,Transportation,genuine-company,False
+DSFCL.NS,Chemicals & Petrochemicals,genuine-company,False
+DSSL.NS,Software & Services,genuine-company,False
+DTIL.NS,"Food, Beverages & Tobacco",genuine-company,False
+DTL.NS,Software & Services,genuine-company,False
+DUCOL.NS,Chemicals & Petrochemicals,genuine-company,False
+DUCON.NS,General Industrials,genuine-company,False
+DUGLOBAL.NS,Diversified Consumer Services,genuine-company,False
+DURLAX.NS,Diversified Consumer Services,genuine-company,False
+DWARKESH.NS,"Food, Beverages & Tobacco",genuine-company,False
+DYCL.NS,Consumer Durables,genuine-company,False
+DYNAMIC.NS,Commercial Services & Supplies,genuine-company,False
+DYNPRO.NS,Chemicals & Petrochemicals,genuine-company,False
+E2E.NS,Software & Services,genuine-company,False
+E2ERAIL.NS,General Industrials,genuine-company,False
+EASEMYTRIP.NS,Diversified Consumer Services,genuine-company,False
+EASTSILK.NS,Textiles Apparels & Accessories,genuine-company,False
+EBGNG.NS,Hardware Technology & Equipment,genuine-company,False
+ECOLINE.NS,Textiles Apparels & Accessories,genuine-company,False
+ECOSMOBLTY.NS,Transportation,genuine-company,False
+EDUCOMP.NS,Diversified Consumer Services,genuine-company,False
+EEPL.NS,Consumer Durables,genuine-company,False
+EFACTOR.NS,Commercial Services & Supplies,genuine-company,False
+EFCIL.NS,Realty,genuine-company,False
+EFFWA.NS,Cement and Construction,genuine-company,False
+EFORCE.NS,Commercial Services & Supplies,genuine-company,False
+EIFFL.NS,FMCG,genuine-company,False
+EIHAHOTELS.NS,Hotels Restaurants & Tourism,genuine-company,False
+EIMCOELECO.NS,General Industrials,genuine-company,False
+EKC.NS,General Industrials,genuine-company,False
+ELDEHSG.NS,Realty,genuine-company,False
+ELECTHERM.NS,Metals & Mining,genuine-company,False
+ELGIRUBCO.NS,Automobiles & Auto Components,genuine-company,False
+ELGNZ.NS,Diversified Consumer Services,genuine-company,False
+ELIN.NS,Consumer Durables,genuine-company,False
+EMAMIPAP.NS,Commercial Services & Supplies,genuine-company,False
+EMAMIREAL.NS,Realty,genuine-company,False
+EMAPARTNER.NS,Commercial Services & Supplies,genuine-company,False
+EMBASSY.NS,Realty,genuine-company,False
+EMKAYTOOLS.NS,General Industrials,genuine-company,False
+EMMBI.NS,Commercial Services & Supplies,genuine-company,False
+EMMIL.NS,General Industrials,genuine-company,False
+EMSLIMITED.NS,Utilities,genuine-company,False
+EMUDHRA.NS,Commercial Services & Supplies,genuine-company,False
+ENCOMPAS.NS,Textiles Apparels & Accessories,genuine-company,False
+ENERGYDEV.NS,Utilities,genuine-company,False
+ENFUSE.NS,Software & Services,genuine-company,False
+ENIL.NS,Media,genuine-company,False
+ENSER.NS,Software & Services,genuine-company,False
+ENVIRO.NS,General Industrials,genuine-company,False
+EPACK.NS,Consumer Durables,genuine-company,False
+EPACKPEB.NS,Cement and Construction,genuine-company,False
+EPIGRAL.NS,Chemicals & Petrochemicals,genuine-company,False
+EPWINDIA.NS,Hardware Technology & Equipment,genuine-company,False
+EQUIPPP.NS,Software & Services,genuine-company,False
+ESABINDIA.NS,General Industrials,genuine-company,False
+ESCONET.NS,Software & Services,genuine-company,False
+ESFL.NS,Diversified Consumer Services,genuine-company,False
+ESSARSHPNG.NS,Transportation,genuine-company,False
+ESTER.NS,Commercial Services & Supplies,genuine-company,False
+ETL.NS,General Industrials,genuine-company,False
+ETML.NS,Automobiles & Auto Components,genuine-company,False
+EUROBOND.NS,Metals & Mining,genuine-company,False
+EUROPRATIK.NS,Diversified Consumer Services,genuine-company,False
+EUROTEXIND.NS,Textiles Apparels & Accessories,genuine-company,False
+EVEREADY.NS,Consumer Durables,genuine-company,False
+EVERESTIND.NS,Cement and Construction,genuine-company,False
+EXCELINDUS.NS,Chemicals & Petrochemicals,genuine-company,False
+EXCELLENT.NS,Metals & Mining,genuine-company,False
+EXCELSOFT.NS,Software & Services,genuine-company,False
+EXICOM.NS,Utilities,genuine-company,False
+EXIMROUTES.NS,Commercial Services & Supplies,genuine-company,False
+EXPLEOSOL.NS,Software & Services,genuine-company,False
+EXXARO.NS,Consumer Durables,genuine-company,False
+FABTECH.NS,Commercial Services & Supplies,genuine-company,False
+FAIRCHEMOR.NS,Chemicals & Petrochemicals,genuine-company,False
+FALCONTECH.NS,Commercial Services & Supplies,genuine-company,False
+FAZE3Q.NS,Textiles Apparels & Accessories,genuine-company,False
+FCL.NS,Chemicals & Petrochemicals,genuine-company,False
+FCSSOFT.NS,Software & Services,genuine-company,False
+FDC.NS,Pharmaceuticals & Biotechnology,genuine-company,False
+FEL.NS,Retailing,genuine-company,False
+FELDVR.NS,Retailing,genuine-company,False
+FELIX.NS,General Industrials,genuine-company,False
+FIBERWEB.NS,Textiles Apparels & Accessories,genuine-company,False
+FIDEL.NS,Software & Services,genuine-company,False
+FILATEX.NS,Textiles Apparels & Accessories,genuine-company,False
+FILATFASH.NS,Textiles Apparels & Accessories,genuine-company,False
+FINEORG.NS,Chemicals & Petrochemicals,genuine-company,False
+FISCHER.NS,Chemicals & Petrochemicals,genuine-company,False
+FLAIR.NS,Commercial Services & Supplies,genuine-company,False
+FLEXITUFF.NS,Textiles Apparels & Accessories,genuine-company,False
+FLFL.NS,Retailing,genuine-company,False
+FLYSBS.NS,Transportation,genuine-company,False
+FMGOETZE.NS,Automobiles & Auto Components,genuine-company,False
+FMNL.NS,Commercial Services & Supplies,genuine-company,False
+FOCE.NS,Textiles Apparels & Accessories,genuine-company,False
+FOCUS.NS,Consumer Durables,genuine-company,False
+FONEBOX.NS,Retailing,genuine-company,False
+FOODSIN.NS,"Food, Beverages & Tobacco",genuine-company,False
+FORCAS.NS,Textiles Apparels & Accessories,genuine-company,False
+FORGEAUTO.NS,General Industrials,genuine-company,False
+FOSECOIND.NS,Chemicals & Petrochemicals,genuine-company,False
+FRACTAL.NS,Software & Services,genuine-company,False
+FRESHARA.NS,"Food, Beverages & Tobacco",genuine-company,False
+FROG.NS,Telecommunications Equipment,genuine-company,False
+FWSTC.NS,Diversified Consumer Services,genuine-company,False
+GAJANAND.NS,Commercial Services & Supplies,genuine-company,False
+GALAPREC.NS,General Industrials,genuine-company,False
+GALAXYSURF.NS,Chemicals & Petrochemicals,genuine-company,False
+GANDHAR.NS,Oil & Gas,genuine-company,False
+GANDHITUBE.NS,Metals & Mining,genuine-company,False
+GANECOS.NS,Textiles Apparels & Accessories,genuine-company,False
+GANESHBE.NS,Chemicals & Petrochemicals,genuine-company,False
+GANESHCP.NS,FMCG,genuine-company,False
+GANESHHOU.NS,Realty,genuine-company,False
+GANESHIN.NS,Cement and Construction,genuine-company,False
+GANGABATH.NS,Consumer Durables,genuine-company,False
+GANGAFORGE.NS,General Industrials,genuine-company,False
+GANGESSECU.NS,"Food, Beverages & Tobacco",genuine-company,False
+GARFIBRES.NS,Textiles Apparels & Accessories,genuine-company,False
+GARUDA.NS,Cement and Construction,genuine-company,False
+GATEWAY.NS,Transportation,genuine-company,False
+GAUDIUMIVF.NS,Commercial Services & Supplies,genuine-company,False
+GAYAHWS.NS,Cement and Construction,genuine-company,False
+GAYAPROJ.NS,Cement and Construction,genuine-company,False
+GCHOTELS.NS,Hotels Restaurants & Tourism,genuine-company,False
+GEECEE.NS,Realty,genuine-company,False
+GEEKAYWIRE.NS,Metals & Mining,genuine-company,False
+GEMAROMA.NS,Chemicals & Petrochemicals,genuine-company,False
+GENCON.NS,Realty,genuine-company,False
+GENESYS.NS,Software & Services,genuine-company,False
+GENSOL.NS,Cement and Construction,genuine-company,False
+GENUSPAPER.NS,Commercial Services & Supplies,genuine-company,False
+GENUSPOWER.NS,Consumer Durables,genuine-company,False
+GENXAI.NS,Software & Services,genuine-company,False
+GFLLIMITED.NS,Diversified,genuine-company,False
+GFSTEELS.NS,Metals & Mining,genuine-company,False
+GGBL.NS,Utilities,genuine-company,False
+GHCLTEXTIL.NS,Textiles Apparels & Accessories,genuine-company,False
+GICL.NS,Transportation,genuine-company,False
+GILLANDERS.NS,"Food, Beverages & Tobacco",genuine-company,False
+GINNIFILA.NS,Textiles Apparels & Accessories,genuine-company,False
+GIPCL.NS,Utilities,genuine-company,False
+GIRIRAJ.NS,Cement and Construction,genuine-company,False
+GJL.NS,Textiles Apparels & Accessories,genuine-company,False
+GKENERGY.NS,General Industrials,genuine-company,False
+GKSL.NS,Healthcare,genuine-company,False
+GLOBAL.NS,Diversified Consumer Services,genuine-company,False
+GLOBALE.NS,Textiles Apparels & Accessories,genuine-company,False
+GLOBALPET.NS,General Industrials,genuine-company,False
+GLOBALVECT.NS,Transportation,genuine-company,False
+GLOBE.NS,Textiles Apparels & Accessories,genuine-company,False
+GLOBECIVIL.NS,Cement and Construction,genuine-company,False
+GLOBUSSPR.NS,"Food, Beverages & Tobacco",genuine-company,False
+GLOSTERLTD.NS,Forest Materials,genuine-company,False
+GLOTTIS.NS,Transportation,genuine-company,False
+GMBREW.NS,"Food, Beverages & Tobacco",genuine-company,False
+GML.NS,Healthcare,genuine-company,False
+GNA.NS,Automobiles & Auto Components,genuine-company,False
+GOACARBON.NS,Oil & Gas,genuine-company,False
+GOCLCORP.NS,Oil & Gas,genuine-company,False
+GOCOLORS.NS,Textiles Apparels & Accessories,genuine-company,False
+GODAVARIB.NS,Chemicals & Petrochemicals,genuine-company,False
+GOKUL.NS,FMCG,genuine-company,False
+GOODLUCK.NS,Metals & Mining,genuine-company,False
+GOPAL.NS,FMCG,genuine-company,False
+GOYALALUM.NS,Commercial Services & Supplies,genuine-company,False
+GOYALSALT.NS,"Food, Beverages & Tobacco",genuine-company,False
+GPECO.NS,Consumer Durables,genuine-company,False
+GPTHEALTH.NS,Healthcare,genuine-company,False
+GPTINFRA.NS,Cement and Construction,genuine-company,False
+GRAPHISAD.NS,Media,genuine-company,False
+GRCL.NS,Automobiles & Auto Components,genuine-company,False
+GREENCHEF.NS,Consumer Durables,genuine-company,False
+GREENLAM.NS,Diversified Consumer Services,genuine-company,False
+GREENLEAF.NS,Utilities,genuine-company,False
+GREENPANEL.NS,Forest Materials,genuine-company,False
+GREENPLY.NS,Forest Materials,genuine-company,False
+GRETEX.NS,Commercial Services & Supplies,genuine-company,False
+GRINDWELL.NS,General Industrials,genuine-company,False
+GRINFRA.NS,Cement and Construction,genuine-company,False
+GRMOVER.NS,"Food, Beverages & Tobacco",genuine-company,False
+GRPLTD.NS,Automobiles & Auto Components,genuine-company,False
+GSLSU.NS,Diversified Consumer Services,genuine-company,False
+GSMFOILS.NS,Commercial Services & Supplies,genuine-company,False
+GSPCROP.NS,Chemicals & Petrochemicals,genuine-company,False
+GSS.NS,Software & Services,genuine-company,False
+GSTL.NS,Software & Services,genuine-company,False
+GTECJAINX.NS,Software & Services,genuine-company,False
+GTL.NS,Telecom Services,genuine-company,False
+GTLINFRA.NS,Telecommunications Equipment,genuine-company,False
+GTPL.NS,Media,genuine-company,False
+GUFICBIO.NS,Pharmaceuticals & Biotechnology,genuine-company,False
+GUJALKALI.NS,Chemicals & Petrochemicals,genuine-company,False
+GUJAPOLLO.NS,General Industrials,genuine-company,False
+GUJGASLTD.NS,Utilities,genuine-company,False
+GUJRAFFIA.NS,Commercial Services & Supplies,genuine-company,False
+GUJTHEM.NS,Pharmaceuticals & Biotechnology,genuine-company,False
+GULFOILLUB.NS,Oil & Gas,genuine-company,False
+GULFPETRO.NS,Oil & Gas,genuine-company,False
+GULPOLY.NS,Chemicals & Petrochemicals,genuine-company,False
+GURUNANAK.NS,General Industrials,genuine-company,False
+GVKPIL.NS,Cement and Construction,genuine-company,False
+GVPIL.NS,General Industrials,genuine-company,False
+GVPTECH.NS,Software & Services,genuine-company,False
+HALDER.NS,"Food, Beverages & Tobacco",genuine-company,False
+HALEOSLABS.NS,Pharmaceuticals & Biotechnology,genuine-company,False
+HAPPYFORGE.NS,General Industrials,genuine-company,False
+HARDWYN.NS,Consumer Durables,genuine-company,False
+HARIOMPIPE.NS,Metals & Mining,genuine-company,False
+HARRMALAYA.NS,Automobiles & Auto Components,genuine-company,False
+HARSHA.NS,Cement and Construction,genuine-company,False
+HATHWAY.NS,Media,genuine-company,False
+HATSUN.NS,FMCG,genuine-company,False
+HCL-INSYS.NS,Hardware Technology & Equipment,genuine-company,False
+HEADSUP.NS,Retailing,genuine-company,False
+HEALTHX.NS,Healthcare,genuine-company,False
+HECPROJECT.NS,Cement and Construction,genuine-company,False
+HEIDELBERG.NS,Cement and Construction,genuine-company,False
+HGM.NS,Software & Services,genuine-company,False
+JISLDVREQS.NS,General Industrials,genuine-company,False
+KEEPLEARN.NS,Diversified Consumer Services,genuine-company,False
+MUFTI.NS,Retailing,genuine-company,False
+PARKHOTELS.NS,Hotels Restaurants & Tourism,genuine-company,False
+STYLEBAAZA.NS,Retailing,genuine-company,False
+WHITEFORCE.NS,Commercial Services & Supplies,genuine-company,False
