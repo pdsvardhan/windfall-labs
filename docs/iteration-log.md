@@ -97,3 +97,20 @@
 - **DVM scoreboard now (deployed):** momentum **0.835** · durability **0.875** · valuation **0.445**. Durability & momentum at data ceilings; valuation data-capped ~0.44.
 
 **Pick-up:** (#26) re-export Trendlyne with forward-PE/div-yield/EV-EBITDA to lift valuation; then the Trendlyne-parity DVM backtest end-to-end (all 3 factors now history-backed). Method to reuse: measure-first lstsq-ceiling + train/test before any reweight.
+
+## Session 2026-06-20 (cont.) — iter-28 + iter-29 + iter-16 (survivorship-free engine → live cockpit)
+
+**Stage:** Stage 4 — two verifier-APPROVED data/engine iterations (merged) + a full UI rebuild (on branch).
+
+- **iter-28 (ADR-017, merge e10605c, verifier APPROVE 3/3):** derived a corporate-action (split/bonus) master from canonical price gaps CONFIRMED by share-count steps (precision 0.95 vs Trendlyne adjusted/raw GT) — Bhavcopy `prev_close` is NOT CA-adjusted, so price-gap+share-step is the method, no NSE feed. Tables `ca_events`/`ca_factor`/`delistings`. Fixed a real ~10× pit_mcap bug (not the "transient" ADR-015 assumed — Trendlyne reflects splits in EPS on a different date than the price ex-date) via `mcap = adjusted_close × current_shares`; now ~90% within 15% of Trendlyne mcap. `trendlyne_store.py` read primitives; `test_ca_factor.py` (16).
+- **iter-29 (ADR-018 — amends ADR-017, merge 1805ebf, verifier APPROVE 3/3, NO look-ahead):** `data_source="trendlyne"` wires the survivorship-free layer into resolve()+backtest — adjusted OHLCV (live+delisted), time-varying PIT ₹500cr membership mask, Trendlyne daily DVM/valuation features + result-lag raw fundamentals (no look-ahead), real Nifty-500 benchmark, delisting terminal-exit. **ca_uncertain blow-ups/mergers now INCLUDED** (excluding them was optimistic survivorship bias), surfaced as a warning. Tests 102→111. Deployed live.
+- **iter-16 (commit 34d3134, branch `iter-16-ui-pastel`, deployed, PENDING user visual sign-off + merge):** full from-scratch Next.js cockpit rebuild in the "Pastel Pop" design system, wired to live API. Pages: Home (redesigned command center), Strategies library (recipe+result cards), guided Strategy builder (manual filter chips + live JSON + readiness verdict + auto survivorship status + Explore-variations sweep), Strategy result (metrics/cost-sensitivity/equity/drawdown/trades), Live signals, Reference. Strategy = recipe + one result; survivorship-free default with auto survivors-only on Trendlyne-DVM factors. Paper/walk-forward deferred; A/B dropped. Tracker: `docs/UI-REBUILD.md`.
+
+**Data reality (survivorship):** ~175 delisted names (Bhavcopy, 166 ever >₹500cr) carry the whole survivorship correction — adjusted prices + screener fundamentals, but NO Trendlyne DVM (0/175); all 1,924 Trendlyne names are current survivors.
+
+**To-dos:** #28, #29 done. #16 pending (branch deployed, awaiting visual sign-off → verifier → merge).
+
+**Next session pick-up:**
+1. User verifies live cockpit (http://192.168.1.10:8500) → run verifier, merge iter-16 → master, mark #16 done.
+2. #30 — reproduce a known Trendlyne backtest on the survivorship-free layer (success criterion #1).
+3. #31 — swing strategy suite on the survivorship-free engine.
