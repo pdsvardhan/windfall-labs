@@ -144,3 +144,13 @@ decisions:
       - curated
       - cat:reliability
     body_path: docs/decisions/adr-016-windfall-pit-fundamentals.md
+  - id: adr-017-windfall-ca-master
+    project_slug: windfall-labs
+    title: Reconstructing stock splits from price + share-count, with no
+      corporate-action feed
+    status: accepted
+    date: 2026-06-20T00:00:00.000Z
+    tags:
+      - curated
+      - cat:reliability
+    body_path: docs/decisions/adr-017-windfall-ca-master.md
