@@ -3,48 +3,131 @@
 @tailwind utilities;
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 body {
-  @apply bg-bg text-fg font-sans antialiased;
+  @apply text-ink font-sans antialiased;
+  background: linear-gradient(160deg, #efeaf8, #e7edf6);
+  min-height: 100vh;
 }
 
-.card {
-  @apply bg-card border border-border rounded-lg;
+.tn {
+  font-variant-numeric: tabular-nums;
 }
 
-.mono {
-  @apply font-mono;
+/* ── cards ─────────────────────────────────────────────────────────── */
+.wf-card {
+  @apply bg-card rounded-xl2;
+  box-shadow: 0 4px 16px rgba(80, 60, 120, 0.08);
+  transition: transform 0.25s cubic-bezier(0.2, 0.7, 0.2, 1), box-shadow 0.25s, border-color 0.25s;
+}
+.wf-card-lift:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 16px 34px rgba(80, 60, 120, 0.16);
 }
 
-table.data {
-  @apply w-full text-sm font-mono;
-}
-table.data th {
-  @apply text-left text-muted font-normal px-3 py-2 border-b border-border sticky top-0 bg-card;
-}
-table.data td {
-  @apply px-3 py-1.5 border-b border-border/50 whitespace-nowrap;
-}
-table.data tr:hover td {
-  @apply bg-white/5;
-}
-
+/* ── buttons ───────────────────────────────────────────────────────── */
 .btn {
-  @apply px-3 py-1.5 rounded-md text-sm font-medium border border-border bg-white/5
-    hover:bg-white/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed;
+  @apply inline-flex items-center justify-center gap-2 font-sans font-bold rounded-full px-4 py-2.5 text-[13px] cursor-pointer transition-all;
+  border: 0;
 }
-.btn-accent {
-  @apply bg-accent/20 border-accent/50 text-fg hover:bg-accent/30;
+.btn:disabled { @apply opacity-40 cursor-not-allowed; }
+.btn-ink { @apply bg-ink text-white; }
+.btn-ink:hover:not(:disabled) { transform: translateY(-2px); }
+.btn-acc { @apply bg-acc text-ink; }
+.btn-acc:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(196, 224, 90, 0.5); }
+.btn-soft { @apply bg-white text-ink; box-shadow: 0 3px 10px rgba(80, 60, 120, 0.1); }
+.btn-soft:hover:not(:disabled) { transform: translateY(-2px); }
+.btn-ghost { @apply bg-transparent text-muted; border: 1.5px solid #e6e2f0; }
+.btn-ghost:hover:not(:disabled) { @apply bg-white; }
+
+/* ── inputs ────────────────────────────────────────────────────────── */
+.wf-in {
+  @apply w-full font-sans text-[13.5px] font-medium rounded-[11px] bg-white text-ink outline-none;
+  padding: 10px 12px;
+  border: 1.5px solid #e6e2f0;
+  transition: border-color 0.15s;
+}
+.wf-in:focus { border-color: #9f86ee; }
+select.wf-in { cursor: pointer; }
+
+input[type="range"].wf-range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 6px;
+  background: #e1dcf0;
+  outline: none;
+  cursor: pointer;
+}
+input[type="range"].wf-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #16151c;
+  cursor: pointer;
+  border: 3px solid #fff;
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.3);
+}
+input[type="range"].wf-range::-moz-range-thumb {
+  width: 18px; height: 18px; border-radius: 50%; background: #16151c; border: 3px solid #fff; cursor: pointer;
 }
 
-.chip {
-  @apply inline-flex items-center px-2 py-0.5 rounded text-xs font-mono border;
+/* ── chips ─────────────────────────────────────────────────────────── */
+.wf-chip {
+  @apply inline-flex items-center gap-2 font-sans font-semibold text-[12.5px];
+  background: #f1ecfb;
+  border: 1px solid #e3d9f6;
+  color: #5b4a9e;
+  padding: 6px 8px 6px 11px;
+  border-radius: 9px;
+}
+.wf-chip button {
+  @apply border-0 bg-transparent cursor-pointer font-bold p-0 leading-none;
+  color: #9f86ee;
+  font-size: 15px;
 }
 
-/* thin scrollbars for data tables */
-.scroll-y {
-  @apply overflow-auto;
-  scrollbar-width: thin;
+/* ── segmented control ─────────────────────────────────────────────── */
+.wf-seg {
+  @apply flex-1 text-center font-bold text-[13px] rounded-lg cursor-pointer transition-all text-muted;
+  padding: 8px;
 }
+.wf-seg[data-active="1"] { @apply bg-ink text-white; }
+
+/* ── switch ────────────────────────────────────────────────────────── */
+.wf-switch {
+  width: 46px; height: 26px; border-radius: 30px; background: #dcd7ea;
+  position: relative; cursor: pointer; transition: background 0.2s; flex: none;
+}
+.wf-switch[data-on="1"] { background: #b9d24a; }
+.wf-switch[data-disabled="1"] { opacity: 0.5; cursor: not-allowed; }
+.wf-switch > span {
+  position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%;
+  background: #fff; transition: transform 0.2s; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+.wf-switch[data-on="1"] > span { transform: translateX(20px); }
+
+/* ── nav ───────────────────────────────────────────────────────────── */
+.wf-nav { @apply rounded-[11px] cursor-pointer transition-all text-[13px] font-semibold; padding: 8px 14px; color: #b9b7c4; }
+.wf-nav:hover { color: #fff; background: rgba(255, 255, 255, 0.06); }
+.wf-nav[data-active="1"] { background: #c4e05a; color: #16151c; }
+
+/* ── tables ────────────────────────────────────────────────────────── */
+.wf-row { transition: background 0.18s; }
+.wf-row:hover { background: #faf6fc; }
+
+/* ── json highlight ────────────────────────────────────────────────── */
+.wf-jsonpre {
+  @apply m-0 font-mono whitespace-pre overflow-auto;
+  font-size: 12px; line-height: 1.7; color: #cdbcff;
+}
+
+.scroll-y { @apply overflow-auto; scrollbar-width: thin; }
+.mono { @apply font-mono; }
+
+/* legacy .card so any un-migrated bit still renders as a clean white card */
+.card { @apply wf-card; }
