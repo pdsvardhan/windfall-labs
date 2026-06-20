@@ -30,9 +30,6 @@ export function Nav() {
         </div>
       </div>
       <div className="flex items-center gap-2.5">
-        <Link href="/reference" className="btn" style={{ background: "#26252e", color: "#eceaf2" }}>
-          How it works
-        </Link>
         <button className="btn btn-acc" onClick={() => router.push("/strategies/new")}>
           + New strategy
         </button>

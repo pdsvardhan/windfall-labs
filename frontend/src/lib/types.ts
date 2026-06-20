@@ -150,11 +150,23 @@ export interface FundamentalsStatus {
   fields: string[];
 }
 
+export interface TrendlyneCoverage {
+  available: boolean;
+  universe_ever?: number;
+  universe_now?: number;
+  price_tickers?: number;
+  delisted?: number;
+  date_min?: string | null;
+  date_max?: string | null;
+  floor_cr?: number;
+}
+
 export interface DataStatus {
   coverage: Coverage;
   n_universe: number;
   fundamentals?: FundamentalsCoverage;
   feasibility: FeasibilityRow[];
+  trendlyne?: TrendlyneCoverage;
 }
 
 export interface WalkForwardReport {

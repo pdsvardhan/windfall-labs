@@ -14,6 +14,8 @@ export default function ReferencePage() {
   const groups: Record<string, typeof ALL_FACTORS> = {};
   for (const f of ALL_FACTORS) (groups[f.group] ||= []).push(f);
 
+  // Prefer the survivorship-free Trendlyne layer (what backtests actually run on) over the legacy store.
+  const tl = data?.trendlyne?.available ? data.trendlyne : null;
   const cov = data?.coverage;
   return (
     <div>
@@ -23,10 +25,10 @@ export default function ReferencePage() {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5 mb-5">
-        <StatCard tone="lime" label="Price tickers" value={cov?.n_tickers ?? "…"} sub="daily adjusted OHLCV" />
-        <StatCard tone="sky" label="History from" value={cov?.date_min?.slice(0, 7) ?? "…"} sub="years of data" />
-        <StatCard tone="limeY" label="Through" value={cov?.date_max?.slice(0, 10) ?? "…"} sub="last close" />
-        <StatCard tone="pink" label="Universe" value={data?.n_universe ?? "…"} sub="names tracked" />
+        <StatCard tone="lime" label="Investable now" value={tl?.universe_now ?? data?.n_universe ?? "…"} sub={`names > ₹${tl?.floor_cr ?? 500}cr today`} />
+        <StatCard tone="pink" label="Ever in universe" value={tl?.universe_ever ?? "…"} sub={`incl. ${tl?.delisted ?? 0} delisted (survivorship-free)`} />
+        <StatCard tone="limeY" label="Price tickers" value={tl?.price_tickers ?? cov?.n_tickers ?? "…"} sub="split/bonus-adjusted OHLCV" />
+        <StatCard tone="sky" label="Data through" value={tl?.date_max?.slice(0, 10) ?? cov?.date_max?.slice(0, 10) ?? "…"} sub={`from ${tl?.date_min?.slice(0, 4) ?? cov?.date_min?.slice(0, 4) ?? "…"}`} />
       </div>
 
       <div className="grid lg:grid-cols-[1.4fr_1fr] gap-3.5">
@@ -53,6 +55,7 @@ export default function ReferencePage() {
         <div className="space-y-3.5">
           <Card className="p-5">
             <SectionTitle dot="#a9c9f2">Universes</SectionTitle>
+            <p className="text-[12px] text-muted mb-2.5">The starting pool a strategy screens from. <span className="font-mono">trendlyne</span> is the default — survivorship-free (includes delisted names).</p>
             <div className="space-y-2">
               {INDEXES.map((i) => <div key={i.value} className="text-[13px]"><span className="font-mono font-bold">{i.value}</span> — <span className="text-muted">{i.label}</span></div>)}
             </div>

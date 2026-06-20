@@ -5,8 +5,22 @@ import type { BacktestResultFull, CostSensitivity, StrategyConfig } from "@/lib/
 import { api } from "@/lib/api";
 import { pct, pctSigned, num, moneyCompact, signClass } from "@/lib/format";
 import { survivorsOnly } from "@/lib/catalog";
-import { MetricCard, MetricMini, Card, useReveal } from "@/components/ui";
+import { MetricCard, MetricMini, Card, Pill, useReveal } from "@/components/ui";
 import { EquityChart, DrawdownChart } from "@/components/charts";
+
+// One readable line summarising the screen that produced this result (the "query used").
+function queryLine(c?: StrategyConfig): string {
+  if (!c) return "";
+  const f = (c.universe?.filters ?? []);
+  const e = (c.entry_filters ?? []);
+  const screen = [...f, ...e];
+  const parts = [
+    screen.length ? `screen: ${screen.join(" & ")}` : "all names",
+    `rank ${c.rank_by || "—"} ${c.rank_order === "asc" ? "↑" : "↓"}`,
+    `top ${c.n_holdings} · ${c.rebalance}`,
+  ];
+  return parts.join("  →  ");
+}
 
 const EXIT_TONE: Record<string, string> = {
   target: "good", stop: "bad", time: "warn", delisted: "neutral", rebalance: "neutral", end: "neutral",
@@ -16,22 +30,22 @@ export function BacktestReport({ res, config }: { res: BacktestResultFull; confi
   const s = res.summary;
   const ref = useReveal();
   const sv = config ? survivorsOnly(config) : { survivorsOnly: false, offenders: [] };
+  const [showCfg, setShowCfg] = useState(false);
+  const [showNotes, setShowNotes] = useState(false);
 
   return (
     <div className="space-y-3.5">
-      {/* readiness / survivorship honesty banner */}
-      {(res.readiness || config) && (
-        <Card className="px-4 py-3 flex items-center gap-3" style={{ background: sv.survivorsOnly ? "#fff3da" : "#e6f4ea" }}>
-          <span className="text-[12px] font-extrabold px-2.5 py-1 rounded-full"
-            style={{ background: sv.survivorsOnly ? "#f6e2b0" : "#cdeacf", color: sv.survivorsOnly ? "#9a6c12" : "#1f7a4d" }}>
-            {sv.survivorsOnly ? "SURVIVORS-ONLY" : "SURVIVORSHIP-FREE"}
-          </span>
-          <span className="text-[12.5px] text-ink/80">
-            {sv.survivorsOnly
-              ? `Uses Trendlyne-only factors (${sv.offenders.join(", ")}) that delisted names lack — this run excludes dead names.`
-              : "Includes delisted names — results aren't survivorship-biased."}
-            {res.readiness?.summary ? ` · ${res.readiness.summary}` : ""}
-          </span>
+      {/* config-used bar (the "view query" the owner asked for) — survivorship as a small chip */}
+      {config && (
+        <Card className="px-4 py-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 flex-wrap min-w-0">
+              <Pill tone={sv.survivorsOnly ? "warn" : "good"}>{sv.survivorsOnly ? "SURVIVORS-ONLY" : "SURVIVORSHIP-FREE"}</Pill>
+              <span className="font-mono text-[12px] text-ink/70 truncate">{queryLine(config)}</span>
+            </div>
+            <button className="text-[12px] font-bold text-faint hover:text-ink shrink-0" onClick={() => setShowCfg(!showCfg)}>{showCfg ? "hide config" : "view config"}</button>
+          </div>
+          {showCfg && <ConfigDetails c={config} sv={sv} />}
         </Card>
       )}
 
@@ -59,7 +73,7 @@ export function BacktestReport({ res, config }: { res: BacktestResultFull; confi
         <MetricMini label="Exposure" value={pct(s.exposure, 0)} />
       </div>
 
-      <CostStrip config={config} />
+      <CostStrip config={config} nTrades={s.n_trades} />
 
       {/* equity + drawdown */}
       <div className="grid lg:grid-cols-[1.55fr_1fr] gap-3.5">
@@ -72,7 +86,7 @@ export function BacktestReport({ res, config }: { res: BacktestResultFull; confi
             </div>
           </div>
           <EquityChart strategy={res.equity_curve} benchmark={res.benchmark_curve} />
-          <div className="text-[12px] text-faint mt-1.5">₹{moneyCompact(res.equity_curve[0]?.[1])} → {moneyCompact(res.equity_curve.slice(-1)[0]?.[1])}</div>
+          <div className="text-[12px] text-faint mt-1.5">{moneyCompact(res.equity_curve[0]?.[1])} → {moneyCompact(res.equity_curve.slice(-1)[0]?.[1])}</div>
         </Card>
         <Card className="p-5">
           <div className="font-extrabold text-[15px] mb-1.5">Drawdown</div>
@@ -81,13 +95,18 @@ export function BacktestReport({ res, config }: { res: BacktestResultFull; confi
         </Card>
       </div>
 
-      {/* warnings */}
+      {/* engine notes — collapsed by default (the wall of data-provenance text the owner disliked) */}
       {res.warnings?.length > 0 && (
-        <Card className="p-4">
-          <div className="text-[12px] font-bold text-muted mb-2">Engine notes</div>
-          <ul className="text-[12px] text-muted space-y-1 list-disc pl-4">
-            {res.warnings.slice(0, 6).map((w, i) => <li key={i}>{w}</li>)}
-          </ul>
+        <Card className="px-4 py-3">
+          <button className="flex items-center gap-2 text-[12px] font-bold text-muted" onClick={() => setShowNotes(!showNotes)}>
+            <span className="text-faint">{showNotes ? "▾" : "▸"}</span> Engine notes
+            <span className="text-[11px] text-faint font-medium">— data provenance &amp; caveats ({res.warnings.length})</span>
+          </button>
+          {showNotes && (
+            <ul className="text-[12px] text-muted space-y-1 list-disc pl-4 mt-2.5">
+              {res.warnings.map((w, i) => <li key={i}>{w}</li>)}
+            </ul>
+          )}
         </Card>
       )}
 
@@ -127,12 +146,33 @@ function tonePill(tone: string): React.CSSProperties {
   return { background: bg, color };
 }
 
+// readable config detail (expanded from the "view config" bar).
+function ConfigDetails({ c, sv }: { c: StrategyConfig; sv: { survivorsOnly: boolean; offenders: string[] } }) {
+  const row = (k: string, v: React.ReactNode) => (
+    <div className="flex gap-2"><span className="text-faint w-[92px] shrink-0">{k}</span><span className="font-mono text-ink/80 break-words">{v}</span></div>
+  );
+  const f = c.universe?.filters ?? [], e = c.entry_filters ?? [];
+  return (
+    <div className="mt-3 pt-3 border-t grid sm:grid-cols-2 gap-x-6 gap-y-1 text-[12px]" style={{ borderColor: "#f0eef6" }}>
+      {row("Screener", f.length ? f.join("  ·  ") : "all names")}
+      {row("Entry", e.length ? e.join("  ·  ") : "—")}
+      {row("Rank", `${c.rank_by || "—"} ${c.rank_order === "asc" ? "↑ (min first)" : "↓ (max first)"}`)}
+      {row("Sizing", `top ${c.n_holdings} · ${c.weighting}${c.max_weight_per_stock ? ` · max ${c.max_weight_per_stock}/stock` : ""}${c.sector_cap ? ` · sector cap ${c.sector_cap}` : ""}`)}
+      {row("Exits", `stop ${c.stop_loss?.type ?? "none"} · tp ${c.take_profit?.type ?? "none"}${c.regime_filter?.enabled ? ` · regime MA${c.regime_filter.ma_period}` : ""}`)}
+      {row("Costs", `${c.costs_bps?.brokerage}+${c.costs_bps?.stt}+${c.costs_bps?.slippage} bps · capital ₹${(c.capital / 1e5).toFixed(2)}L`)}
+      {row("Window", `${c.start} → ${c.end || "today"} · vs ${c.benchmark}`)}
+      {row("Universe", sv.survivorsOnly ? `survivors-only (${sv.offenders.join(", ")})` : "survivorship-free, point-in-time ₹500cr")}
+    </div>
+  );
+}
+
 // collapsible cost-sensitivity strip — re-runs the strategy at 0x/1x/2x costs on demand.
-function CostStrip({ config }: { config?: StrategyConfig }) {
+function CostStrip({ config, nTrades }: { config?: StrategyConfig; nTrades?: number }) {
   const [open, setOpen] = useState(false);
   const [data, setData] = useState<CostSensitivity | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const noTrades = nTrades === 0;
 
   async function load() {
     if (!config) return;
@@ -146,13 +186,14 @@ function CostStrip({ config }: { config?: StrategyConfig }) {
 
   return (
     <Card className="px-5 py-3">
-      <button className="flex items-center gap-2 text-[13px] font-bold text-ink" onClick={() => (open ? setOpen(false) : load())}>
+      <button className="flex items-center gap-2 text-[13px] font-bold text-ink" onClick={() => (open ? setOpen(false) : (noTrades ? setOpen(true) : load()))}>
         <span className="text-faint">{open ? "▾" : "▸"}</span> Cost sensitivity
         <span className="text-[11.5px] text-faint font-medium">— how much do costs eat the edge?</span>
       </button>
       {open && (
         <div className="mt-3">
-          {busy && <div className="text-[12px] text-faint">running 0× / 1× / 2× …</div>}
+          {noTrades && <div className="text-[12px] text-faint">This strategy made no trades, so there's nothing to stress-test. Loosen the screen or pick a sort variable, then re-run.</div>}
+          {!noTrades && busy && <div className="text-[12px] text-faint">running 0× / 1× / 2× …</div>}
           {err && <div className="text-[12px] text-loss">{err}</div>}
           {data && (
             <div className="grid grid-cols-3 gap-3">

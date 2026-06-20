@@ -6,19 +6,20 @@ import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import type { BacktestRow, Strategy } from "@/lib/types";
 import { pctSigned, num, dateShort, signClass } from "@/lib/format";
-import { Card, StatCard, CountUp } from "@/components/ui";
-import { Sparkline } from "@/components/charts";
+import { Card, StatCard } from "@/components/ui";
 
 export default function Home() {
   const router = useRouter();
   const [strats, setStrats] = useState<Strategy[]>([]);
   const [bts, setBts] = useState<BacktestRow[]>([]);
+  const [through, setThrough] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
     Promise.all([api.listStrategies(), api.listBacktests()])
       .then(([s, b]) => { setStrats(s); setBts(b); })
       .catch((e) => setErr(e.message));
+    api.dataStatus().then((d) => setThrough(d.trendlyne?.date_max ?? d.coverage?.date_max ?? null)).catch(() => {});
   }, []);
 
   // latest backtest per strategy
@@ -26,6 +27,7 @@ export default function Home() {
   for (const b of bts) if (b.strategy_id && !latest.has(b.strategy_id)) latest.set(b.strategy_id, b);
   const tested = [...latest.values()];
   const best = tested.slice().sort((a, b) => (b.summary.cagr ?? -9) - (a.summary.cagr ?? -9))[0];
+  const avgCagr = tested.length ? tested.reduce((a, b) => a + (b.summary.cagr ?? 0), 0) / tested.length : null;
   const hour = new Date().getHours();
   const greet = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
 
@@ -33,18 +35,17 @@ export default function Home() {
     <div>
       <div className="my-7 animate-rise">
         <h1 className="text-[38px] font-extrabold tracking-tight leading-none">{greet} — your cockpit</h1>
-        <p className="text-muted text-[15px] mt-2">Define a screen, backtest it survivorship-free with real costs, then act on today's signals. You place every order.</p>
       </div>
 
       {err && <Card className="px-4 py-3 mb-4" style={{ background: "#fdeaf1" }}><span className="text-loss text-[13px]">API error: {err}</span></Card>}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5 mb-4">
-        <StatCard tone="limeY" label="Strategies" value={<CountUp to={strats.length} />} sub="in your library" delay={0} />
-        <StatCard tone="lime" label="Backtested" value={<CountUp to={tested.length} />} sub="with results" delay={60} />
-        <StatCard tone="sky" label="Best CAGR" value={best ? pctSigned(best.summary.cagr) : "—"} sub={best?.name} delay={120} />
-        <Link href="/strategies/new" className="wf-card wf-card-lift animate-pop flex flex-col justify-between" style={{ background: "linear-gradient(140deg,#7c5cd6,#6243b8)", padding: "20px 22px", animationDelay: "180ms" }}>
-          <div className="text-[13px] font-semibold" style={{ color: "#ddd6f5" }}>Create</div>
-          <div className="text-[26px] font-extrabold mt-1" style={{ color: "#e9f57a" }}>+ New strategy →</div>
+        <StatCard tone="sky" label="Best strategy" value={best ? <span className={signClass(best.summary.cagr)}>{pctSigned(best.summary.cagr)}</span> : "—"} sub={best?.name ?? "none backtested yet"} delay={0} />
+        <StatCard tone="lime" label="Avg CAGR" value={avgCagr != null ? <span className={signClass(avgCagr)}>{pctSigned(avgCagr)}</span> : "—"} sub={`across ${tested.length} backtested`} delay={60} />
+        <StatCard tone="limeY" label="Data through" value={through ? through.slice(0, 10) : "…"} sub="survivorship-free layer" delay={120} />
+        <Link href="/strategies/new" className="wf-card wf-card-lift animate-pop flex flex-col justify-center items-start" style={{ background: "#c4e05a", padding: "20px 22px", animationDelay: "180ms" }}>
+          <div className="text-[13px] font-bold" style={{ color: "#5b6b1f" }}>Build something</div>
+          <div className="text-[24px] font-extrabold mt-1 text-ink">+ New strategy →</div>
         </Link>
       </div>
 

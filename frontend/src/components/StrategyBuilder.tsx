@@ -27,10 +27,10 @@ function set(obj: any, path: string[], val: any) {
   cur[path[path.length - 1]] = val; return o;
 }
 
-export function StrategyBuilder({ initial }: { initial?: { id: string; name: string; config: StrategyConfig } }) {
+export function StrategyBuilder({ initial }: { initial?: { id?: string; name: string; config: StrategyConfig } }) {
   const router = useRouter();
   const [cfg, setCfg] = useState<StrategyConfig>(initial?.config || defaultConfig());
-  const [name, setName] = useState(initial?.name || "new_strategy");
+  const [name, setName] = useState(initial?.name ?? "");
   const [sid, setSid] = useState<string | null>(initial?.id || null);
   const [readiness, setReadiness] = useState<Readiness | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -67,34 +67,43 @@ export function StrategyBuilder({ initial }: { initial?: { id: string; name: str
 
   return (
     <div>
+      {busy === "run" && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(16,15,23,.55)", backdropFilter: "blur(2px)" }}>
+          <div className="wf-card px-7 py-6 text-center" style={{ background: "#fff" }}>
+            <div className="wf-spinner mx-auto mb-3" />
+            <div className="font-extrabold text-[15px]">Running backtest…</div>
+            <div className="text-[12px] text-faint mt-1">Screening, ranking and simulating across the window.</div>
+          </div>
+        </div>
+      )}
       <div className="flex items-end justify-between mt-6 mb-4 animate-rise">
-        <div>
+        <div className="w-full">
           <div className="text-[13px] text-faint font-bold uppercase tracking-wide">Strategy builder</div>
-          <input className="bg-transparent text-[34px] font-extrabold tracking-tight outline-none mt-1 w-full"
-            value={name} onChange={(e) => setName(e.target.value)} />
-          <p className="text-muted text-[14px] mt-1">Screen → rank → size → backtest. The JSON on the right mirrors every control. Survivorship-free by default.</p>
+          <div className="flex items-center gap-2 mt-1.5 max-w-[640px]">
+            <input className="bg-transparent text-[34px] font-extrabold tracking-tight outline-none w-full border-b-2 border-dashed pb-0.5 transition-colors focus:border-solid"
+              style={{ borderColor: name ? "#e3dff0" : "#cdaaff" }}
+              placeholder="Name your strategy…" value={name} onChange={(e) => setName(e.target.value)} />
+            <span className="text-faint text-[17px]" title="Click the name to edit">✎</span>
+          </div>
         </div>
       </div>
 
       <div className="grid lg:grid-cols-[1.65fr_1fr] gap-4 items-start">
         {/* ── FORM ── */}
-        <div className="grid md:grid-cols-2 gap-3.5">
+        <div className="grid md:grid-cols-2 gap-3.5 min-w-0">
           {/* Universe / screener */}
           <Card className="p-5 md:col-span-2">
             <SectionTitle dot="#a9c9f2">Universe &amp; screener</SectionTitle>
-            <div className="flex items-center justify-between p-3 rounded-xl mb-3" style={{ background: sv.survivorsOnly ? "#fff3da" : "#eef6dd" }}>
-              <div>
-                <div className="text-[13px] font-bold">{sv.survivorsOnly ? "Survivors-only universe" : "Survivorship-free universe"}</div>
-                <div className="text-[11.5px] text-muted">
-                  {sv.survivorsOnly
-                    ? `Auto-off: ${sv.offenders.join(", ")} has no data for delisted names`
-                    : "NSE names >₹500cr point-in-time, incl. delisted"}
-                </div>
-              </div>
-              <Switch on={!sv.survivorsOnly} disabled />
-            </div>
             <FilterBuilder label="Screener filters (qualify the universe)" placeholder="e.g. adtv_cr >= 5"
               list={cfg.universe.filters} onChange={(l) => upd(["universe", "filters"], l)} />
+            <div className="flex items-center justify-between mt-3 pt-3 border-t" style={{ borderColor: "#f0eef6" }}>
+              <span className="text-[12px]" style={{ color: sv.survivorsOnly ? "#9a6c12" : "#7a7689" }}>
+                {sv.survivorsOnly
+                  ? `Survivors-only — ${sv.offenders.join(", ")} lacks delisted-name data`
+                  : "Survivorship-free — incl. delisted, point-in-time ₹500cr"}
+              </span>
+              <Switch on={!sv.survivorsOnly} disabled />
+            </div>
           </Card>
 
           {/* Entry & ranking */}
@@ -178,6 +187,9 @@ export function StrategyBuilder({ initial }: { initial?: { id: string; name: str
               <Field label="STT"><input className="wf-in mt-1" type="number" value={cfg.costs_bps.stt} onChange={(e) => upd(["costs_bps", "stt"], parseFloat(e.target.value) || 0)} /></Field>
               <Field label="Slippage"><input className="wf-in mt-1" type="number" value={cfg.costs_bps.slippage} onChange={(e) => upd(["costs_bps", "slippage"], parseFloat(e.target.value) || 0)} /></Field>
             </div>
+            <Field label="Capital (₹) — only sizes the ADTV liquidity cap; returns are %-based" hint={`≈ ${(cfg.capital / 1e5).toFixed(2)} L`}>
+              <input className="wf-in mt-1.5" type="number" step="100000" value={cfg.capital} onChange={(e) => upd(["capital"], parseFloat(e.target.value) || 0)} />
+            </Field>
             <div className="mt-3.5"><span className="text-[12px] font-bold text-muted">Rebalance</span>
               <select className="wf-in mt-1.5" value={cfg.rebalance} onChange={(e) => upd(["rebalance"], e.target.value)}>
                 {FREQUENCIES.map((f) => <option key={f} value={f}>{f[0].toUpperCase() + f.slice(1)}</option>)}
@@ -192,7 +204,7 @@ export function StrategyBuilder({ initial }: { initial?: { id: string; name: str
         </div>
 
         {/* ── JSON PANE + actions ── */}
-        <div className="lg:sticky lg:top-5 space-y-3.5 animate-rise">
+        <div className="lg:sticky lg:top-5 space-y-3.5 animate-rise min-w-0">
           {readiness && (
             <Card className="px-4 py-3" style={{ background: readiness.verdict.includes("backtest") ? "#eef6dd" : "#fff3da" }}>
               <div className="text-[11.5px] font-extrabold uppercase tracking-wide" style={{ color: readiness.verdict.includes("backtest") ? "#5b6b1f" : "#9a6c12" }}>Readiness · {readiness.verdict}</div>
@@ -206,9 +218,11 @@ export function StrategyBuilder({ initial }: { initial?: { id: string; name: str
             </div>
             <JsonView value={fullCfg} />
             <div className="flex gap-2 mt-3.5">
-              <button className="btn flex-1" style={{ background: "#26252e", color: "#eceaf2" }} disabled={!!busy} onClick={save}>{busy === "save" ? "saving…" : "Save"}</button>
-              <button className="btn btn-acc flex-[1.4]" disabled={!!busy} onClick={run}>{busy === "run" ? "running…" : "Run backtest →"}</button>
+              <button className="btn flex-1" style={{ background: "#26252e", color: "#eceaf2" }} disabled={!!busy || !name.trim()} onClick={save}>{busy === "save" ? "saving…" : "Save"}</button>
+              <button className="btn btn-acc flex-[1.4]" disabled={!!busy || !cfg.rank_by || !name.trim()} onClick={run}>{busy === "run" ? "running…" : "Run backtest →"}</button>
             </div>
+            {!name.trim() && <div className="text-[11.5px] mt-2" style={{ color: "#f7b9dd" }}>Name your strategy to save or run.</div>}
+            {name.trim() && !cfg.rank_by && <div className="text-[11.5px] mt-2" style={{ color: "#f7b9dd" }}>Pick a “Sort by” variable in Entry &amp; ranking to run.</div>}
             {msg && <div className="text-[12px] mt-2.5" style={{ color: "#cdbcff" }}>{msg}</div>}
           </Card>
           <SweepPanel config={fullCfg} onSaved={(id) => router.push(`/strategies/${id}`)} />
@@ -218,47 +232,68 @@ export function StrategyBuilder({ initial }: { initial?: { id: string; name: str
   );
 }
 
-// ── filter chip builder (indicator + operator + value, with free-text escape) ──
+// ── filter builder: ONE input mode at a time (Builder dropdown OR Raw expression), owner pref ──
 function FilterBuilder({ label, placeholder, list, onChange }:
   { label: string; placeholder: string; list: string[]; onChange: (l: string[]) => void }) {
-  const [tok, setTok] = useState("close");
+  const [mode, setMode] = useState<"builder" | "raw">("builder");
+  const [tok, setTok] = useState("");
   const [op, setOp] = useState(">=");
   const [val, setVal] = useState("");
   const [raw, setRaw] = useState("");
-  const add = () => { if (!val.trim()) return; onChange([...list, `${tok} ${op} ${val.trim()}`]); setVal(""); };
+  const add = () => { if (!tok || !val.trim()) return; onChange([...list, `${tok} ${op} ${val.trim()}`]); setVal(""); };
   const addRaw = () => { if (!raw.trim()) return; onChange([...list, raw.trim()]); setRaw(""); };
   return (
     <div>
-      <span className="text-[12px] font-bold text-muted">{label}</span>
+      <div className="flex items-center justify-between">
+        <span className="text-[12px] font-bold text-muted">{label}</span>
+        <div className="flex gap-0.5 p-0.5 rounded-lg" style={{ background: "#f1eef8" }}>
+          {(["builder", "raw"] as const).map((m) => (
+            <button key={m} className="wf-seg" data-active={mode === m ? "1" : "0"} style={{ padding: "3px 11px", fontSize: 11 }} onClick={() => setMode(m)}>{m === "builder" ? "Builder" : "Raw"}</button>
+          ))}
+        </div>
+      </div>
       <div className="flex flex-wrap gap-1.5 mt-2 mb-2">
         {list.map((f, i) => (
           <span key={i} className="wf-chip">{f}<button onClick={() => onChange(list.filter((_, j) => j !== i))}>×</button></span>
         ))}
         {list.length === 0 && <span className="text-[12px] text-faint">none yet</span>}
       </div>
-      <div className="flex gap-1.5">
-        <FactorSelect value={tok} onChange={setTok} compact />
-        <select className="wf-in" style={{ width: 64 }} value={op} onChange={(e) => setOp(e.target.value)}>{OPERATORS.map((o) => <option key={o}>{o}</option>)}</select>
-        <input className="wf-in" style={{ width: 90 }} placeholder="value" value={val} onChange={(e) => setVal(e.target.value)} onKeyDown={(e) => e.key === "Enter" && add()} />
-        <button className="btn btn-ink" style={{ borderRadius: 11 }} onClick={add}>Add</button>
-      </div>
-      <div className="flex gap-1.5 mt-1.5">
-        <input className="wf-in" placeholder={`or type a raw expression — ${placeholder}`} value={raw} onChange={(e) => setRaw(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addRaw()} />
-        <button className="btn btn-ghost" style={{ borderRadius: 11 }} onClick={addRaw}>+ raw</button>
-      </div>
+      {mode === "builder" ? (
+        <div className="flex gap-1.5">
+          <FactorSelect value={tok} onChange={setTok} compact />
+          <select className="wf-in" style={{ width: 64 }} value={op} onChange={(e) => setOp(e.target.value)}>{OPERATORS.map((o) => <option key={o}>{o}</option>)}</select>
+          <input className="wf-in" style={{ width: 90 }} placeholder="value" value={val} onChange={(e) => setVal(e.target.value)} onKeyDown={(e) => e.key === "Enter" && add()} />
+          <button className="btn btn-ink" style={{ borderRadius: 11 }} onClick={add}>Add</button>
+        </div>
+      ) : (
+        <div>
+          <div className="flex gap-1.5">
+            <input className="wf-in" style={{ minWidth: 0 }} placeholder={placeholder} value={raw} onChange={(e) => setRaw(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addRaw()} />
+            <button className="btn btn-ink" style={{ borderRadius: 11 }} onClick={addRaw}>Add</button>
+          </div>
+          <div className="text-[11px] text-faint mt-1.5">
+            Use <span className="font-mono">&amp;</span> / <span className="font-mono">|</span> to combine, chained compares (<span className="font-mono">50 &lt; rsi14 &lt; 80</span>), and arithmetic — e.g. <span className="font-mono">close &gt; sma200 &amp; roc126 &gt; 0</span>.
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-function FactorSelect({ value, onChange, compact = false }: { value: string; onChange: (v: string) => void; compact?: boolean }) {
+function FactorSelect({ value, onChange, compact = false, placeholder = "— pick a variable —" }:
+  { value: string; onChange: (v: string) => void; compact?: boolean; placeholder?: string }) {
+  const known = QUICK.includes(value);
   return (
-    <select className="wf-in" style={compact ? { flex: 1, minWidth: 0 } : { marginTop: 6 }} value={QUICK.includes(value) ? value : "__custom"} onChange={(e) => e.target.value !== "__custom" && onChange(e.target.value)}>
+    <select className="wf-in" style={compact ? { flex: 1, minWidth: 0 } : { marginTop: 6 }}
+      value={known ? value : value ? "__custom" : ""}
+      onChange={(e) => { if (e.target.value !== "__custom") onChange(e.target.value); }}>
+      <option value="" disabled>{placeholder}</option>
       {QUICK.map((q) => {
         const f = FACTOR_BY_TOKEN[q] || FACTOR_BY_TOKEN[q.replace(/\d+$/, "{N}")];
         const so = f?.survivorsOnly ? " ⚠" : "";
         return <option key={q} value={q}>{q}{so}</option>;
       })}
-      {!QUICK.includes(value) && <option value="__custom">{value} (custom)</option>}
+      {!known && value && <option value="__custom">{value} (custom)</option>}
     </select>
   );
 }

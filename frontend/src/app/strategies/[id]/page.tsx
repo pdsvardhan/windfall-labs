@@ -46,7 +46,15 @@ export default function StrategyResult() {
             {res && <span className="text-[11px] font-extrabold px-2.5 py-1 rounded-full" style={{ background: "#b9d24a", color: "#3a4512" }}>BACKTESTED</span>}
           </div>
           <h1 className="text-[34px] font-extrabold tracking-tight mt-2">{s.name}</h1>
-          {res && <p className="text-faint text-[13px] mt-1 font-mono">{res.period.start} → {res.period.end} · {res.period.years}y · {cfg.rebalance} · top {cfg.n_holdings} · sort {cfg.rank_by} {cfg.rank_order === "desc" ? "↓" : "↑"}</p>}
+          {res && (
+            <div className="inline-flex flex-wrap items-center gap-x-2.5 gap-y-1 mt-2 text-[13px] font-semibold font-mono px-3 py-1.5 rounded-lg" style={{ background: "#f1ecfb", color: "#4b3b86" }}>
+              <span>{res.period.start} → {res.period.end}</span><span className="opacity-40">·</span>
+              <span>{res.period.years}y</span><span className="opacity-40">·</span>
+              <span>{cfg.rebalance}</span><span className="opacity-40">·</span>
+              <span>top {cfg.n_holdings}</span><span className="opacity-40">·</span>
+              <span>sort {cfg.rank_by} {cfg.rank_order === "desc" ? "↓" : "↑"}</span>
+            </div>
+          )}
         </div>
         <div className="flex gap-2">
           <button className="btn btn-soft" disabled={busy} onClick={run}>{busy ? "running…" : res ? "↻ Re-run" : "Run backtest"}</button>

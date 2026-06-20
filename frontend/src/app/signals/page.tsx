@@ -32,6 +32,10 @@ function SignalsInner() {
     finally { setBusy(false); }
   }
 
+  // Recompute on the latest data we hold whenever the selected strategy changes (owner pref iter-30).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (sid && strats.length) generate(); }, [sid]);
+
   async function exportCsv() {
     if (!strat) return;
     const res = await fetch(api.exportSignalsUrl(), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ config: strat.config }) });

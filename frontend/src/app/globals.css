@@ -129,5 +129,27 @@ input[type="range"].wf-range::-moz-range-thumb {
 .scroll-y { @apply overflow-auto; scrollbar-width: thin; }
 .mono { @apply font-mono; }
 
+/* ── spinner (run-backtest overlay) ─────────────────────────────────── */
+.wf-spinner {
+  width: 34px; height: 34px; border-radius: 50%;
+  border: 3.5px solid #ece7f7; border-top-color: #16151c;
+  animation: wfSpin 0.8s linear infinite;
+}
+@keyframes wfSpin { to { transform: rotate(360deg); } }
+@keyframes wfPulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+/* ── interactive charts (crosshair + tooltip) ───────────────────────── */
+.wf-chartwrap { position: relative; }
+.wf-chartwrap svg { display: block; }
+.wf-tip {
+  position: absolute; pointer-events: none; z-index: 5;
+  background: #16151c; color: #fff; font-size: 11px; line-height: 1.45;
+  padding: 6px 9px; border-radius: 8px; white-space: nowrap;
+  transform: translate(-50%, calc(-100% - 10px));
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.28);
+}
+.wf-tip b { font-weight: 800; }
+.wf-tip .d { color: #b9b7c4; }
+
 /* legacy .card so any un-migrated bit still renders as a clean white card */
 .card { @apply wf-card; }

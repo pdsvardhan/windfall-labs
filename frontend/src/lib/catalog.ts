@@ -100,13 +100,16 @@ export function survivorsOnly(cfg: Partial<StrategyConfig>): { survivorsOnly: bo
   return { survivorsOnly: offenders.length > 0, offenders };
 }
 
-export function defaultConfig(name = "new_strategy"): StrategyConfig {
+// Blank slate (owner pref iter-30): nothing pre-screened, no entry rules, no sort, no default
+// exits/regime — the user builds everything explicitly. Only structural, non-opinionated defaults
+// remain (data source, holdings count, equal weighting, monthly rebalance, costs, window).
+export function defaultConfig(name = ""): StrategyConfig {
   return {
     name,
     data_source: "trendlyne", // survivorship-free by default
-    universe: { index: "trendlyne", point_in_time: true, filters: ["adtv_cr >= 5"], exclude_sectors: [] },
-    entry_filters: ["close > sma200", "roc126 > 0"],
-    rank_by: "roc126",
+    universe: { index: "trendlyne", point_in_time: true, filters: [], exclude_sectors: [] },
+    entry_filters: [],
+    rank_by: "",
     rank_order: "desc",
     rank_blend: [],
     n_holdings: 15,
@@ -116,13 +119,13 @@ export function defaultConfig(name = "new_strategy"): StrategyConfig {
     rebalance: "monthly",
     entry_fill: "next_open",
     sector_cap: null,
-    stop_loss: { type: "atr", mult: 2.5, atr_period: 14 },
+    stop_loss: { type: "none", mult: 2.5, atr_period: 14 },
     take_profit: { type: "none" },
     max_hold_days: null,
     max_position_adtv_pct: 0.1,
-    regime_filter: { enabled: true, ma_period: 200, mode: "binary", below_exposure: 0.0 },
+    regime_filter: { enabled: false, ma_period: 200, mode: "binary", below_exposure: 0.0 },
     costs_bps: { brokerage: 3, stt: 10, slippage: 15 },
-    capital: 1000000,
+    capital: 100000,
     start: "2016-07-01",
     end: "2024-12-31",
     benchmark: "NIFTY500",
