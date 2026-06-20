@@ -67,6 +67,10 @@ class RegimeFilter(BaseModel):
 
 class StrategyConfig(BaseModel):
     name: str = "unnamed_strategy"
+    # "windfall" = the legacy yfinance/windfall.duckdb store (current-membership, snapshot DVM).
+    # "trendlyne" = the survivorship-free Trendlyne full-history layer (adjusted OHLCV incl. delisted
+    # names, point-in-time Rs500cr membership, real result-lag fundamentals, Trendlyne's own DVM).
+    data_source: Literal["windfall", "trendlyne"] = "windfall"
     universe: Universe = Field(default_factory=Universe)
     entry_filters: list[str] = Field(default_factory=list)
     rank_by: str = "roc21"                     # single-factor rank (used when rank_blend is empty)

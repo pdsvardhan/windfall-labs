@@ -15,6 +15,7 @@ import pandas as pd
 from .. import signals as ind
 from ..data import fundamentals as fund
 from ..data import store
+from ..data import trendlyne_store as ts
 from ..scores import own_dvm as own
 from ..data.universe import benchmark_ticker
 from .safe_eval import SafeEvalError, feature_names, safe_eval
@@ -32,6 +33,11 @@ _OWN = {"momentum_own", "durability_own", "valuation_own"}
 # valuation pe/pb (in SCREENER_HISTORY_FIELDS), plus the own-scores built on them. 120d-lagged
 # point-in-time over ~2006->present, not snapshot-gated.
 _HIST_FUND = set(fund.SCREENER_HISTORY_FIELDS) | {"durability_own", "valuation_own"}
+# Trendlyne full-history features (data_source="trendlyne"): the platform's own daily DVM scores
+# and valuation multiples (point-in-time by construction), plus result-lag-gated raw fundamentals.
+_TL_DAILY = {"tl_durability", "tl_valuation", "tl_momentum", "tl_pe", "tl_peg", "tl_pbv"}
+_TL_LAGGED = {"tl_roe", "tl_roce", "tl_de", "tl_opm", "tl_eps"}
+_TL_FEATURES = _TL_DAILY | _TL_LAGGED
 
 
 @dataclass
@@ -91,35 +97,71 @@ def _percentile_blend(factors, mask, eval_expr, idx, cols, warnings) -> pd.DataF
 
 
 def resolve(cfg: StrategyConfig) -> ResolvedStrategy:
-    index = cfg.universe.index
-    members = store.universe_tickers(index)
-    have = set(store.available_tickers())
-    tickers = [t for t in members if t in have] or [t for t in have if t.endswith(".NS")]
-
-    # Adjusted panels for the trading universe.
-    close = store.price_panel("close", tickers, cfg.start, cfg.end, adjusted=True)
-    open_ = store.price_panel("open", tickers, cfg.start, cfg.end, adjusted=True)
-    high = store.price_panel("high", tickers, cfg.start, cfg.end, adjusted=True)
-    low = store.price_panel("low", tickers, cfg.start, cfg.end, adjusted=True)
-    if close.empty:
-        raise ValueError("No price data for the resolved universe — load data first.")
-    tickers = list(close.columns)
-
-    # Raw panels for traded-value (ADTV uses real, unadjusted price * volume).
-    raw_close = store.price_panel("close", tickers, cfg.start, cfg.end, adjusted=False)
-    raw_vol = store.price_panel("volume", tickers, cfg.start, cfg.end, adjusted=False)
-
     warnings: list[str] = []
-    bt = benchmark_ticker(cfg.benchmark)
-    bench_panel = store.price_panel("close", [bt], cfg.start, cfg.end, adjusted=True)
-    if not bench_panel.empty and bt in bench_panel.columns:
-        benchmark = bench_panel[bt]
-    else:
-        benchmark = close.mean(axis=1)
-        warnings.append(
-            f"benchmark '{cfg.benchmark}' ({bt}) not loaded — falling back to an equal-weight "
-            f"universe average; benchmark_cagr/active_return are NOT the real index.")
+    index = cfg.universe.index
+    use_tl = cfg.data_source == "trendlyne"
+    tv: pd.DataFrame | None = None              # daily rupee traded value (trendlyne ADTV source)
+    membership_mask: pd.DataFrame | None = None  # point-in-time Rs500cr eligibility (survivorship-free)
 
+    if use_tl:
+        if not ts.available():
+            raise ValueError("data_source='trendlyne' but trendlyne.duckdb is not present.")
+        end = cfg.end or str(pd.Timestamp.today().date())
+        tickers = ts.universe_over_window(cfg.start, end)
+        if not tickers:
+            raise ValueError("Empty survivorship-free universe for this window.")
+        close = ts.adjusted_close_panel(tickers, cfg.start, cfg.end, "close")
+        if close.empty:
+            raise ValueError("No Trendlyne price data for the resolved universe.")
+        tickers = list(close.columns)
+        open_ = ts.adjusted_close_panel(tickers, cfg.start, cfg.end, "open").reindex(
+            index=close.index, columns=tickers)
+        high = ts.adjusted_close_panel(tickers, cfg.start, cfg.end, "high").reindex(
+            index=close.index, columns=tickers)
+        low = ts.adjusted_close_panel(tickers, cfg.start, cfg.end, "low").reindex(
+            index=close.index, columns=tickers)
+        tv = ts.traded_value_panel(tickers, cfg.start, cfg.end).reindex(
+            index=close.index, columns=tickers)
+        raw_close, raw_vol = close, None        # traded value handled via tv; ADTV is split-invariant
+        benchmark = ts.benchmark_series(cfg.benchmark, cfg.start, cfg.end).reindex(close.index).ffill()
+        if benchmark.dropna().empty:
+            benchmark = close.mean(axis=1)
+            warnings.append("benchmark index not in trendlyne — equal-weight average fallback.")
+        membership_mask = ts.membership_panel(tickers, close.index)
+        n_uncertain = len(set(tickers) & ts.ca_uncertain_symbols())
+        warnings.append(
+            f"survivorship-free Trendlyne layer: {len(tickers)} names ever >Rs{int(ts.MCAP_FLOOR_CR)}cr "
+            f"in-window (live + delisted, blow-ups included); membership is point-in-time; prices are "
+            f"split/bonus-adjusted (delisted via the iter-28 CA master).")
+        if n_uncertain:
+            warnings.append(
+                f"data-quality: {n_uncertain} delisted name(s) in the universe have an unconfirmed "
+                f"corporate action (ca_uncertain) — included to avoid survivorship bias, but their "
+                f"split adjustment may be imperfect.")
+    else:
+        members = store.universe_tickers(index)
+        have = set(store.available_tickers())
+        tickers = [t for t in members if t in have] or [t for t in have if t.endswith(".NS")]
+        close = store.price_panel("close", tickers, cfg.start, cfg.end, adjusted=True)
+        open_ = store.price_panel("open", tickers, cfg.start, cfg.end, adjusted=True)
+        high = store.price_panel("high", tickers, cfg.start, cfg.end, adjusted=True)
+        low = store.price_panel("low", tickers, cfg.start, cfg.end, adjusted=True)
+        if close.empty:
+            raise ValueError("No price data for the resolved universe — load data first.")
+        tickers = list(close.columns)
+        raw_close = store.price_panel("close", tickers, cfg.start, cfg.end, adjusted=False)
+        raw_vol = store.price_panel("volume", tickers, cfg.start, cfg.end, adjusted=False)
+        bt = benchmark_ticker(cfg.benchmark)
+        bench_panel = store.price_panel("close", [bt], cfg.start, cfg.end, adjusted=True)
+        if not bench_panel.empty and bt in bench_panel.columns:
+            benchmark = bench_panel[bt]
+        else:
+            benchmark = close.mean(axis=1)
+            warnings.append(
+                f"benchmark '{cfg.benchmark}' ({bt}) not loaded — falling back to an equal-weight "
+                f"universe average; benchmark_cagr/active_return are NOT the real index.")
+
+    sectors_map = ts.sector_map() if use_tl else store.sector_map(index)
     cache: dict[str, pd.DataFrame] = {}
 
     def feat(name: str) -> pd.DataFrame:
@@ -135,9 +177,20 @@ def resolve(cfg: StrategyConfig) -> ResolvedStrategy:
         elif name == "low":
             df = low
         elif name == "volume":
-            df = raw_vol
+            df = (tv / close) if use_tl else raw_vol      # trendlyne: approx shares from traded value
         elif name == "adtv_cr":
-            df = ind.adtv(raw_close, raw_vol, 20) / 1e7
+            df = (tv.rolling(20, min_periods=5).mean() / 1e7) if use_tl \
+                else ind.adtv(raw_close, raw_vol, 20) / 1e7
+        elif name in _TL_FEATURES:
+            if not use_tl:
+                warnings.append(f"'{name}' needs data_source='trendlyne' — feature is all-NaN here")
+                df = None
+            elif name in ("tl_durability", "tl_valuation", "tl_momentum"):
+                df = ts.dvm_panel(name, tickers).reindex(index=close.index, columns=tickers).ffill()
+            elif name in ("tl_pe", "tl_peg", "tl_pbv"):
+                df = ts.valuation_panel(name, tickers).reindex(index=close.index, columns=tickers).ffill()
+            else:  # result-lag-gated raw annual fundamentals (no look-ahead per adr-016)
+                df = ts.raw_fundamental_panel(name, tickers, close.index).reindex(columns=tickers)
         elif name == "macd":
             df = ind.macd(close)[0]
         elif name == "macd_signal":
@@ -207,9 +260,11 @@ def resolve(cfg: StrategyConfig) -> ResolvedStrategy:
             elif kind == "adx":
                 df = ind.adx(high, low, close, n_s)
             elif kind == "adtv":
-                df = ind.adtv(raw_close, raw_vol, n_s)
+                df = tv.rolling(n_s, min_periods=max(2, n_s // 2)).mean() if use_tl \
+                    else ind.adtv(raw_close, raw_vol, n_s)
             elif kind == "vol_avg":
-                df = ind.volume_avg(raw_vol, n_s)
+                df = (tv / close).rolling(n_s, min_periods=max(2, n_s // 2)).mean() if use_tl \
+                    else ind.volume_avg(raw_vol, n_s)
             elif kind == "dist_high":
                 df = ind.dist_from_high(close, n_s)
             elif kind == "rel_strength":
@@ -225,7 +280,7 @@ def resolve(cfg: StrategyConfig) -> ResolvedStrategy:
         ns: dict[str, pd.DataFrame] = {}
         for tok in feature_names(expr):
             if not (tok in _BASE or tok in _SPECIAL or tok in _FUND or tok in _OWN
-                    or _PARAM.match(tok)):
+                    or tok in _TL_FEATURES or _PARAM.match(tok)):
                 warnings.append(f"unknown feature '{tok}' in '{expr}' — filter skipped")
                 return None
             ns[tok] = feat(tok)
@@ -247,13 +302,19 @@ def resolve(cfg: StrategyConfig) -> ResolvedStrategy:
         res = res.reindex(index=close.index, columns=close.columns)
         mask &= res.fillna(False).astype(bool)
 
+    # Point-in-time survivorship-free membership gate (trendlyne): a name is eligible only on the
+    # dates its market cap actually exceeded the floor — dead names drop out when they shrink/delist.
+    if use_tl and membership_mask is not None:
+        mm = membership_mask.reindex(index=close.index, columns=close.columns).fillna(False).astype(bool)
+        mask &= mm
+        warnings.append("universe gated to point-in-time Rs500cr membership (survivorship-free).")
+
     # Sector exclusion (e.g. the methodology's "exclude Banking & Finance").
     if cfg.universe.exclude_sectors:
         sect = fund.fundamentals_sector_map()
-        nse_sect = store.sector_map(index)
         excl = [s.strip().lower() for s in cfg.universe.exclude_sectors]
         drop = [t for t in close.columns
-                if any(e in (sect.get(t) or nse_sect.get(t) or "").lower() for e in excl)]
+                if any(e in (sect.get(t) or sectors_map.get(t) or "").lower() for e in excl)]
         if drop:
             mask[drop] = False
             warnings.append(f"excluded {len(drop)} names in sectors {cfg.universe.exclude_sectors}")
@@ -305,11 +366,12 @@ def resolve(cfg: StrategyConfig) -> ResolvedStrategy:
 
     ret = close.pct_change()
     ret_vol = ret.rolling(20, min_periods=10).std()
-    adtv_value = ind.adtv(raw_close, raw_vol, 20)
+    adtv_value = (tv.rolling(20, min_periods=5).mean() if use_tl
+                  else ind.adtv(raw_close, raw_vol, 20))
 
     return ResolvedStrategy(
         config=cfg, tickers=tickers, entry_mask=mask, rank_score=rank,
         open_adj=open_, close_adj=close, high_adj=high, low_adj=low,
         atr_stop=atr_stop, ret_vol=ret_vol, adtv_value=adtv_value,
-        sectors=store.sector_map(index), benchmark=benchmark, warnings=warnings,
+        sectors=sectors_map, benchmark=benchmark, warnings=warnings,
     )
