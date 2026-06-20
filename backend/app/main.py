@@ -15,6 +15,7 @@ from windfall import store_meta
 from windfall.data import fundamentals as fund
 from windfall.data import store
 from windfall.data import surveillance
+from windfall.data import trendlyne_store as ts
 from windfall.jsonsafe import clean
 from windfall.data.pipeline import incremental_update
 from windfall.engine.backtest import run_backtest
@@ -104,7 +105,10 @@ def data_status():
     cov = store.coverage_summary()
     fcov = fund.coverage()
     return {"coverage": cov, "n_universe": len(store.universe_tickers("niftytotalmarket")),
-            "fundamentals": fcov, "feasibility": _feasibility(cov, fcov)}
+            "fundamentals": fcov, "feasibility": _feasibility(cov, fcov),
+            # The survivorship-free Trendlyne layer is what backtests actually use; surface its real
+            # counts so the Reference page stops reporting the legacy yfinance store (755/1505).
+            "trendlyne": ts.coverage() if ts.available() else {"available": False}}
 
 
 @app.get("/api/fundamentals/status")

@@ -65,25 +65,35 @@ def data_readiness(cfg) -> dict:
     # real history from 2016-06, so the strategy is backtestable over that window (no snapshot gate).
     if cfg.data_source == "trendlyne":
         tl_feats = sorted(f for f in all_feats if f in _TL)
+        # own-DVM + raw fundamentals (durability_own / valuation_own / roe / roa / opm / np_qtr_yoy).
+        # Since iter-30 these join the screener history correctly, so they ARE backtestable — we no
+        # longer hide them. Report them honestly so the card can't claim a clean run that won't trade.
+        fund_feats = sorted(f for f in all_feats if f in _FUND)
+        fund_in_filter = sorted(f for f in filter_feats if f in _FUND)
+        fund_in_rank = sorted(f for f in rank_feats if f in _FUND)
         unknown = sorted(f for f in all_feats
-                         if f not in _TL and _classify(f) == "unknown")
-        summary = (f"Backtestable from {TL_HISTORY_FROM} on the survivorship-free Trendlyne layer: "
-                   f"split/bonus-adjusted prices (incl. delisted names), point-in-time Rs500cr "
-                   f"membership, and Trendlyne's daily DVM/valuation"
-                   + (f"; result-lag-gated raw fundamentals {sorted(f for f in tl_feats if f in _TL_LAGGED)}"
-                      if any(f in _TL_LAGGED for f in tl_feats) else "") + ".")
+                         if f not in _TL and f not in _FUND and _classify(f) == "unknown")
+        sccov = fund.screener_coverage()
+        # Concise, honest one-liner — no wall of caveats (owner feedback iter-30).
+        summary = (f"Backtestable from {TL_HISTORY_FROM} — survivorship-free Trendlyne prices, "
+                   f"point-in-time ₹500cr membership, split/bonus-adjusted incl. delisted names.")
+        if fund_feats:
+            summary += (f" Fundamentals {fund_feats} are screener-history-backed"
+                        + (f" ({sccov['tickers']} names, {fund.PIT_LAG_DAYS}d-lagged)" if sccov.get("available") else "")
+                        + ".")
         if unknown:
-            summary += f" Note: unrecognized feature(s) {unknown} will be skipped."
+            summary += f" Unrecognized {unknown} will be skipped."
         return {
             "verdict": "backtestable", "backtestable_from": TL_HISTORY_FROM,
             "price_coverage": {"from": TL_HISTORY_FROM, "to": None},
-            "fundamentals_snapshot": None, "screener_history": {"available": False},
-            "fundamentals_in_filter": [], "fundamentals_in_rank": [],
+            "fundamentals_snapshot": None, "screener_history": sccov,
+            "fundamentals_in_filter": fund_in_filter, "fundamentals_in_rank": fund_in_rank,
             "unknown_features": unknown,
-            "features": [{"name": f, "kind": "trendlyne",
+            "features": [{"name": f, "kind": "trendlyne" if f in _TL else "fundamental",
                           "used_in": [u for u, s in (("filter", filter_feats), ("rank", rank_feats)) if f in s],
                           "coverage_from": TL_HISTORY_FROM,
-                          "source": "trendlyne-history"} for f in tl_feats],
+                          "source": "screener-history" if f in _FUND else "trendlyne-history"}
+                         for f in (tl_feats + fund_feats)],
             "summary": summary,
         }
 

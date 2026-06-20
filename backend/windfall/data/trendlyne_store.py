@@ -35,6 +35,32 @@ def available() -> bool:
 
 
 @functools.lru_cache(maxsize=1)
+def coverage(floor_cr: float = MCAP_FLOOR_CR) -> dict:
+    """Survivorship-free Trendlyne-layer coverage for the Reference page — the data that backtests
+    ACTUALLY run on, not the legacy yfinance store (whose 755/1505 counts confused the owner).
+    `universe_ever` = every name that cleared the ₹500cr floor at any point (live + delisted);
+    `universe_now` = names clearing it in the latest fortnight; `price_tickers` = adjusted-OHLCV pks."""
+    if not available():
+        return {"available": False}
+    con = _con()
+    ever = con.execute(
+        "SELECT COUNT(DISTINCT symbol) FROM universe_membership WHERE mcap_cr > ?", [floor_cr]).fetchone()[0]
+    last = con.execute("SELECT MAX(date) FROM universe_membership").fetchone()[0]
+    now = con.execute(
+        "SELECT COUNT(DISTINCT symbol) FROM universe_membership "
+        "WHERE mcap_cr > ? AND date >= CAST(? AS DATE) - 14", [floor_cr, str(last)]).fetchone()[0]
+    px_n, px_min, px_max = con.execute(
+        "SELECT COUNT(DISTINCT pk), MIN(date), MAX(date) FROM ohlcv").fetchone()
+    dead = con.execute("SELECT COUNT(*) FROM delistings").fetchone()[0]
+    return {"available": True,
+            "universe_ever": int(ever or 0), "universe_now": int(now or 0),
+            "price_tickers": int(px_n or 0), "delisted": int(dead or 0),
+            "date_min": str(px_min) if px_min else None,
+            "date_max": str(px_max) if px_max else None,
+            "floor_cr": floor_cr}
+
+
+@functools.lru_cache(maxsize=1)
 def _con() -> duckdb.DuckDBPyConnection:
     """Process-wide read-only connection; bhavcopy attached read-only for dead-name raw prices."""
     con = duckdb.connect(str(TRENDLYNE_DB), read_only=True)
