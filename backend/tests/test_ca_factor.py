@@ -20,7 +20,8 @@ pytestmark = pytest.mark.skipif(not _TL.exists(), reason="trendlyne.duckdb data 
 @pytest.fixture(scope="module")
 def con():
     c = duckdb.connect(str(_TL), read_only=True)
-    if _BC.exists():
+    if _BC.exists() and not c.execute(
+            "SELECT count(*) FROM duckdb_databases() WHERE database_name='bc'").fetchone()[0]:
         c.execute(f"ATTACH '{_BC}' AS bc (READ_ONLY)")
     yield c
     c.close()
@@ -31,8 +32,8 @@ def store():
     from windfall.data import trendlyne_store as ts
     ts.TRENDLYNE_DB = _TL
     ts.BHAVCOPY_DB = _BC
-    ts._con.cache_clear()
-    ts.symbol_pk_map.cache_clear()
+    for fn in (ts._con, ts.symbol_pk_map, ts.sector_map, ts.ca_uncertain_symbols):
+        fn.cache_clear()
     return ts
 
 
@@ -159,9 +160,9 @@ def test_store_pit_universe(store):
     u2024 = store.pit_universe("2024-06-30")
     assert 300 < len(u2016) < 1200
     assert len(u2024) > len(u2016)            # the market grew
-    # ca_uncertain dead names are excluded from tradeability
-    uncertain = set(store.delistings().query("ca_uncertain")["symbol"])
-    assert not (set(u2016) & uncertain)
+    # Survivorship-free: blow-ups / mergers are INCLUDED, never silently excluded for ca_uncertain
+    # (excluding them would bias backtests optimistically). RCOM was a large-cap in 2017.
+    assert "RCOM" in store.pit_universe("2017-06-30")
 
 
 def test_store_membership_panel(store):

@@ -130,6 +130,16 @@ def run_backtest(config) -> BacktestResult:
             return 1.0  # insufficient history to judge regime — stay invested
         return 1.0 if bv >= bm else rf.below_exposure
 
+    # Delisting terminal exit (survivorship-free runs): the last bar a name has a price is its
+    # delisting date — a held position must be force-closed there at the last traded (adjusted)
+    # price, never marked forward at a stale value. For live names this is just the final bar.
+    delist_on = getattr(cfg, "data_source", "windfall") == "trendlyne"
+    last_valid: list[int | None] = [None] * len(tickers)
+    if delist_on:
+        for j in range(len(tickers)):
+            valid = np.where(~np.isnan(C[:, j]))[0]
+            last_valid[j] = int(valid[-1]) if len(valid) else None
+
     nav_dates, nav_vals, exposure_vals = [], [], []
     pending: dict | None = None
 
@@ -247,6 +257,13 @@ def run_backtest(config) -> BacktestResult:
         # 2) daily exit checks
         for j in list(sim.positions):
             check_exit(j, i)
+
+        # 2b) delisting terminal exit — a held name that stops trading today exits at its last close
+        if delist_on:
+            for j in list(sim.positions):
+                if last_valid[j] is not None and i == last_valid[j] and i < n - 1:
+                    px = C[i, j]
+                    close_pos(j, px if not math.isnan(px) else Cmark[i, j], i, "delisted")
 
         # 3) mark NAV at close
         invested = sum(p.shares * Cmark[i, p.j] for p in sim.positions.values())

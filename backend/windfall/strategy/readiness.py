@@ -29,6 +29,13 @@ _FUND = set(fund.NUMERIC_FIELDS) | {"pe_to_sector", "durability_own", "valuation
 # SCREENER_HISTORY_FIELDS) + the own-scores (durability_own / valuation_own). 120d-lagged point-in-time
 # over ~2006->present, NOT snapshot-gated — a strategy using only these IS backtestable.
 _HIST_FUND = set(fund.SCREENER_HISTORY_FIELDS) | {"durability_own", "valuation_own"}
+# Trendlyne full-history features (data_source="trendlyne"): DVM scores + valuation multiples are
+# published daily (point-in-time by construction); raw fundamentals are result-lag-gated. All carry
+# real history from 2016-06, so a trendlyne strategy is backtestable — never snapshot-gated.
+_TL_DAILY = {"tl_durability", "tl_valuation", "tl_momentum", "tl_pe", "tl_peg", "tl_pbv"}
+_TL_LAGGED = {"tl_roe", "tl_roce", "tl_de", "tl_opm", "tl_eps"}
+_TL = _TL_DAILY | _TL_LAGGED
+TL_HISTORY_FROM = "2016-06-10"
 
 
 def _features(exprs: list[str]) -> set[str]:
@@ -53,6 +60,32 @@ def data_readiness(cfg) -> dict:
     rank_exprs = [rf.factor for rf in cfg.rank_blend] if cfg.rank_blend else [cfg.rank_by]
     rank_feats = _features(rank_exprs)
     all_feats = filter_feats | rank_feats
+
+    # Trendlyne survivorship-free layer: prices + DVM + valuation + result-lag fundamentals all carry
+    # real history from 2016-06, so the strategy is backtestable over that window (no snapshot gate).
+    if cfg.data_source == "trendlyne":
+        tl_feats = sorted(f for f in all_feats if f in _TL)
+        unknown = sorted(f for f in all_feats
+                         if f not in _TL and _classify(f) == "unknown")
+        summary = (f"Backtestable from {TL_HISTORY_FROM} on the survivorship-free Trendlyne layer: "
+                   f"split/bonus-adjusted prices (incl. delisted names), point-in-time Rs500cr "
+                   f"membership, and Trendlyne's daily DVM/valuation"
+                   + (f"; result-lag-gated raw fundamentals {sorted(f for f in tl_feats if f in _TL_LAGGED)}"
+                      if any(f in _TL_LAGGED for f in tl_feats) else "") + ".")
+        if unknown:
+            summary += f" Note: unrecognized feature(s) {unknown} will be skipped."
+        return {
+            "verdict": "backtestable", "backtestable_from": TL_HISTORY_FROM,
+            "price_coverage": {"from": TL_HISTORY_FROM, "to": None},
+            "fundamentals_snapshot": None, "screener_history": {"available": False},
+            "fundamentals_in_filter": [], "fundamentals_in_rank": [],
+            "unknown_features": unknown,
+            "features": [{"name": f, "kind": "trendlyne",
+                          "used_in": [u for u, s in (("filter", filter_feats), ("rank", rank_feats)) if f in s],
+                          "coverage_from": TL_HISTORY_FROM,
+                          "source": "trendlyne-history"} for f in tl_feats],
+            "summary": summary,
+        }
 
     cov = store.coverage_summary()
     price_from, price_to = cov.get("date_min"), cov.get("date_max")

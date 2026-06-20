@@ -87,8 +87,13 @@ def adjusted_close_panel(symbols, start=None, end=None, field: str = "close") ->
 
     dead = [s for s in syms if s not in pkmap]
     if dead:
+        # Include ALL delisted names (not just CA-confirmed ones): excluding a name because it has a
+        # large unexplained gap silently drops blow-ups (RCOM) and mergers (HDFC/RANBAXY) — that is
+        # OPTIMISTIC survivorship bias, the very thing this layer exists to remove. A large gap is
+        # usually a real crash/merger, not an unconfirmed split; ca_uncertain is surfaced as a
+        # data-quality warning by the caller, never a silent exclusion.
         ok_dead = [r[0] for r in con.execute(
-            "SELECT symbol FROM delistings WHERE NOT ca_uncertain AND symbol IN ("
+            "SELECT DISTINCT symbol FROM delistings WHERE symbol IN ("
             + ",".join(["?"] * len(dead)) + ")", dead).fetchall()]
         if ok_dead:
             cond = ("WHERE b.series='EQ' AND b.close>0 AND upper(regexp_replace(b.ticker,'\\.NS$',''))"
@@ -123,7 +128,6 @@ def pit_universe(asof_date, floor_cr: float = MCAP_FLOOR_CR) -> list[str]:
         SELECT symbol FROM (
           SELECT symbol, arg_max(mcap_cr, date) m FROM universe_membership
           WHERE date BETWEEN CAST(? AS DATE) - 14 AND CAST(? AS DATE)
-            AND symbol NOT IN (SELECT symbol FROM delistings WHERE ca_uncertain)
           GROUP BY symbol)
         WHERE m > ?""", [str(asof_date), str(asof_date), floor_cr]).fetchall()
     return sorted(r[0] for r in rows)
@@ -144,7 +148,9 @@ def membership_panel(symbols, dates, floor_cr: float = MCAP_FLOOR_CR) -> pd.Data
         return pd.DataFrame(False, index=idx, columns=syms)
     df["date"] = pd.to_datetime(df["date"])
     wide = df.pivot_table(index="date", columns="symbol", values="mcap_cr").sort_index()
-    wide = wide.reindex(wide.index.union(idx)).ffill().reindex(idx)
+    # Bridge small daily gaps (≈2 trading weeks) but DO NOT forward-fill past a name's last
+    # observation — a delisted name must drop out of the universe, not look perpetually eligible.
+    wide = wide.reindex(wide.index.union(idx)).ffill(limit=10).reindex(idx)
     return (wide > floor_cr).reindex(columns=syms).fillna(False)
 
 
@@ -153,3 +159,147 @@ def delistings() -> pd.DataFrame:
     return _con().execute(
         "SELECT symbol, last_date, last_raw_close, ever_mcap_cr, ca_uncertain FROM delistings"
     ).fetchdf()
+
+
+@functools.lru_cache(maxsize=1)
+def ca_uncertain_symbols() -> frozenset[str]:
+    """Delisted names whose corporate-action adjustment could not be confirmed (a large unexplained
+    gap). Surfaced as a data-quality WARNING — these names are still tradeable (excluding them would
+    drop real blow-ups/mergers = optimistic survivorship bias)."""
+    return frozenset(r[0] for r in _con().execute(
+        "SELECT symbol FROM delistings WHERE ca_uncertain").fetchall())
+
+
+def universe_over_window(start, end, floor_cr: float = MCAP_FLOOR_CR) -> list[str]:
+    """Every symbol that was EVER above the floor between start and end (live + ALL delisted).
+
+    This is the survivorship-free candidate set for a backtest window; membership_panel then gates
+    each name to the specific dates it actually qualified. Delisted names are included regardless of
+    ca_uncertain (excluding them would bias out blow-ups/mergers); ca_uncertain is a warning only.
+    """
+    rows = _con().execute("""
+        SELECT DISTINCT symbol FROM universe_membership
+        WHERE date >= CAST(? AS DATE) AND date <= CAST(? AS DATE) AND mcap_cr > ?
+        GROUP BY symbol HAVING max(mcap_cr) > ?""",
+        [str(start), str(end), floor_cr, floor_cr]).fetchall()
+    return sorted(r[0] for r in rows)
+
+
+def traded_value_panel(symbols, start=None, end=None) -> pd.DataFrame:
+    """Daily rupee turnover (raw NSE Bhavcopy `turnover`) for ADTV / liquidity sizing — wide
+    date x symbol. Uses real traded value (split-invariant), live and dead names alike."""
+    syms = [s.upper() for s in symbols]
+    cond = ("WHERE series='EQ' AND turnover>0 AND upper(regexp_replace(ticker,'\\.NS$','')) IN ("
+            + ",".join(["?"] * len(syms)) + ")")
+    params = syms[:]
+    if start:
+        cond += " AND date >= ?"; params.append(start)
+    if end:
+        cond += " AND date <= ?"; params.append(end)
+    df = _con().execute(
+        f"SELECT upper(regexp_replace(ticker,'\\.NS$','')) symbol, date, turnover v "
+        f"FROM bc.bhavcopy_prices {cond}", params).fetchdf()
+    if df.empty:
+        return pd.DataFrame()
+    df["date"] = pd.to_datetime(df["date"])
+    return df.pivot_table(index="date", columns="symbol", values="v").sort_index()
+
+
+_DVM = {"durability": "d", "valuation": "v", "momentum": "m",
+        "tl_durability": "d", "tl_valuation": "v", "tl_momentum": "m"}
+_VAL = {"tl_pe": "PE_TTM", "tl_peg": "PEG_TTM", "tl_pbv": "PBV_A",
+        "pe_ttm": "PE_TTM", "peg_ttm": "PEG_TTM", "pbv": "PBV_A"}
+
+
+def _pk_panel(table, col, key, symbols) -> pd.DataFrame:
+    """Wide date x symbol panel for a pk-keyed (score|metric, date, value) table."""
+    syms = [s.upper() for s in symbols]
+    pkmap = symbol_pk_map()
+    live = {pk: s for s, pk in ((s, pkmap[s]) for s in syms if s in pkmap)}
+    if not live:
+        return pd.DataFrame()
+    pks = list(live.keys())
+    df = _con().execute(
+        f"SELECT pk, date, value FROM {table} WHERE {col}=? AND pk IN ("
+        + ",".join(["?"] * len(pks)) + ")", [key] + pks).fetchdf()
+    if df.empty:
+        return pd.DataFrame()
+    df["symbol"] = df["pk"].map(live)
+    df["date"] = pd.to_datetime(df["date"])
+    return df.pivot_table(index="date", columns="symbol", values="value").sort_index()
+
+
+def dvm_panel(score: str, symbols) -> pd.DataFrame:
+    """Trendlyne's own daily Durability/Valuation/Momentum score (0-100). Published daily, so it is
+    inherently point-in-time (no look-ahead lag needed)."""
+    return _pk_panel("dvm_history", "score", _DVM[score], symbols)
+
+
+def valuation_panel(metric: str, symbols) -> pd.DataFrame:
+    """Trendlyne daily valuation multiple: PE_TTM / PEG_TTM / PBV_A. Published daily -> point-in-time."""
+    return _pk_panel("valuation_ratios", "metric", _VAL[metric], symbols)
+
+
+# Raw earnings-derived fundamentals that DO need an announcement-date lag (result_lag, adr-016).
+_RAW_FUND = {"tl_roe": ("ratios_annual", "ROE_A"), "tl_roce": ("ratios_annual", "ROCE_A"),
+             "tl_de": ("ratios_annual", "DEBT_CE_A"), "tl_opm": ("ratios_annual", "OPM_A"),
+             "tl_eps": ("pnl_annual", "EPS_A")}
+
+
+def raw_fundamental_panel(metric: str, symbols, dates) -> pd.DataFrame:
+    """Point-in-time annual fundamental, readable only on/after its real result-announcement date.
+
+    Joins the metric's period_end value to `result_lag.available_from` (board-meeting/result date,
+    else period_end+45d) so a value is visible only once it was genuinely public — no look-ahead
+    (adr-016). Reindexed to `dates` and forward-filled within each name.
+    """
+    table, col = _RAW_FUND[metric]
+    syms = [s.upper() for s in symbols]
+    pkmap = symbol_pk_map()
+    live = {pk: s for s, pk in ((s, pkmap[s]) for s in syms if s in pkmap)}
+    if not live:
+        return pd.DataFrame()
+    pks = list(live.keys())
+    df = _con().execute(f"""
+        SELECT f.pk, r.available_from AS avail, f.value
+        FROM {table} f JOIN result_lag r ON f.pk=r.pk AND f.date=r.period_end
+        WHERE f.metric=? AND f.pk IN ({",".join(["?"]*len(pks))})""",
+        [col] + pks).fetchdf()
+    if df.empty:
+        return pd.DataFrame()
+    df["symbol"] = df["pk"].map(live)
+    df["avail"] = pd.to_datetime(df["avail"])
+    idx = pd.DatetimeIndex(sorted(pd.to_datetime(dates).unique()))
+    wide = df.pivot_table(index="avail", columns="symbol", values="value").sort_index()
+    wide = wide.reindex(wide.index.union(idx)).ffill().reindex(idx)
+    return wide
+
+
+_BENCH_PK = {"NIFTY50": 1887, "NIFTY500": 1893, "NIFTYNEXT50": 1888,
+             "NIFTYMIDCAP": 910393, "NIFTYSMALLCAP": 910398}
+
+
+@functools.lru_cache(maxsize=1)
+def sector_map() -> dict[str, str]:
+    """NSE symbol -> sector (Trendlyne `sector_map`, pk-keyed)."""
+    rows = _con().execute("""
+        SELECT m.sym, coalesce(sm.sector, 'Unknown') FROM sector_map sm
+        JOIN (SELECT pk, upper(nsecode) sym FROM stocks WHERE nsecode<>''
+              UNION SELECT pk, upper(nse_symbol) FROM recovered_symbols WHERE nse_symbol<>'') m
+          ON sm.pk=m.pk""").fetchall()
+    return {s: sec for s, sec in rows}
+
+
+def benchmark_series(name: str, start=None, end=None) -> pd.Series:
+    """Real index close from Trendlyne `index_ohlcv` (e.g. Nifty 500), not a yfinance proxy."""
+    pk = _BENCH_PK.get(name.upper().replace(" ", ""), 1893)
+    cond = "WHERE pk=? AND close>0"
+    params = [pk]
+    if start:
+        cond += " AND date >= ?"; params.append(start)
+    if end:
+        cond += " AND date <= ?"; params.append(end)
+    df = _con().execute(f"SELECT date, close FROM index_ohlcv {cond} ORDER BY date", params).fetchdf()
+    if df.empty:
+        return pd.Series(dtype=float)
+    return pd.Series(df["close"].values, index=pd.to_datetime(df["date"]), name=name)
