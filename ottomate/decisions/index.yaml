@@ -154,3 +154,12 @@ decisions:
       - curated
       - cat:reliability
     body_path: docs/decisions/adr-017-windfall-ca-master.md
+  - id: adr-018-windfall-survivorship-engine
+    project_slug: windfall-labs
+    title: "A survivorship-free backtest engine: dead companies experience their fate"
+    status: accepted
+    date: 2026-06-20T00:00:00.000Z
+    tags:
+      - curated
+      - cat:reliability
+    body_path: docs/decisions/adr-018-windfall-survivorship-engine.md
