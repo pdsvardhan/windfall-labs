@@ -117,3 +117,30 @@ decisions:
       - curated
       - cat:reliability
     body_path: docs/decisions/adr-013-windfall-screener-fundamentals.md
+  - id: adr-014-windfall-trendlyne-primary
+    project_slug: windfall-labs
+    title: Trendlyne full history as the primary price + fundamentals + DVM data layer
+    status: accepted
+    date: 2026-06-20T00:00:00.000Z
+    tags:
+      - curated
+      - cat:system
+    body_path: docs/decisions/adr-014-windfall-trendlyne-primary.md
+  - id: adr-015-windfall-survivorship-membership
+    project_slug: windfall-labs
+    title: Survivorship-free point-in-time universe membership (live + delisted)
+    status: accepted
+    date: 2026-06-20T00:00:00.000Z
+    tags:
+      - curated
+      - cat:reliability
+    body_path: docs/decisions/adr-015-windfall-survivorship-membership.md
+  - id: adr-016-windfall-pit-fundamentals
+    project_slug: windfall-labs
+    title: Point-in-time fundamentals via real result-announcement lag
+    status: accepted
+    date: 2026-06-20T00:00:00.000Z
+    tags:
+      - curated
+      - cat:reliability
+    body_path: docs/decisions/adr-016-windfall-pit-fundamentals.md
