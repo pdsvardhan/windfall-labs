@@ -20,7 +20,6 @@ from windfall.jsonsafe import clean
 from windfall.data.pipeline import incremental_update
 from windfall.engine.backtest import run_backtest
 from windfall.paper import commit_signal, list_positions, mark_to_market, scoreboard
-from windfall.scores.validate import validate_own_dvm
 from windfall.scripts_validation import run_validation
 from windfall.signals_live import generate_signals
 from windfall.signals_live.generate import signals_to_csv
@@ -114,12 +113,6 @@ def data_status():
 @app.get("/api/fundamentals/status")
 def fundamentals_status():
     return {"coverage": fund.coverage(), "snapshots": fund.snapshots(), "fields": fund.NUMERIC_FIELDS}
-
-
-@app.get("/api/scores/own-validate")
-def scores_own_validate(snapshot_date: str | None = None):
-    """Rank-correlate our own D/V/M against Trendlyne's scores on the snapshot (verify/tune loop)."""
-    return validate_own_dvm(snapshot_date)
 
 
 @app.post("/api/data/refresh")
@@ -234,20 +227,16 @@ _COST_METRICS = ("cagr", "total_return", "sharpe", "sortino", "max_drawdown",
 def backtests_cost_sensitivity(body: CostSensitivityIn):
     """Run one strategy at several cost multipliers (default 0x/1x/2x) so realism-vs-optimism is
     explicit: how much net CAGR / Sharpe / return the modelled costs + turnover give back."""
-    base = StrategyConfig(**body.config)  # validate + resolve cost defaults
-    c = base.costs_bps
+    base = StrategyConfig(**body.config)  # validate
     runs = []
     for m in body.multipliers:
-        scaled = {"brokerage": c.brokerage * m, "stt": c.stt * m, "slippage": c.slippage * m}
         try:
-            res = run_backtest({**body.config, "costs_bps": scaled})
+            res = run_backtest(body.config, cost_mult=m)  # engine scales the NSE delivery costs
         except Exception as exc:  # noqa: BLE001
             raise HTTPException(400, f"cost-sensitivity run (x{m}) failed: {exc}")
         s = res.summary.model_dump()
-        runs.append({"cost_multiplier": m, "costs_bps": scaled,
-                     "summary": {k: s.get(k) for k in _COST_METRICS}})
-    return clean({"name": base.name, "base_costs_bps": c.model_dump(),
-                  "multipliers": body.multipliers, "runs": runs})
+        runs.append({"cost_multiplier": m, "summary": {k: s.get(k) for k in _COST_METRICS}})
+    return clean({"name": base.name, "multipliers": body.multipliers, "runs": runs})
 
 
 @app.post("/api/backtests/compare")

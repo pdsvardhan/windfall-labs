@@ -269,9 +269,9 @@ def screener_history_panel(field: str, dates: pd.DatetimeIndex, tickers: list[st
     # SYMBOL NORMALIZATION (iter-30 bugfix): the screener store keys tickers as "<NSE>.NS" (e.g.
     # "ABB.NS"), but the Trendlyne layer — and every caller in the trendlyne path — asks with the
     # bare NSE symbol ("ABB"). Without stripping ".NS" on both sides the reindex matched ZERO names,
-    # so durability_own / valuation_own / historical pe-pb came back all-NaN and every fundamental
-    # backtest made 0 trades. Pivot on the bare symbol, reindex by the bare form of the requested
-    # tickers, then relabel the columns back to the caller's exact spelling.
+    # so the raw fundamentals (roe/roa/opm/np_qtr_yoy and historical pe-pb) came back all-NaN and
+    # every fundamental backtest made 0 trades. Pivot on the bare symbol, reindex by the bare form of
+    # the requested tickers, then relabel the columns back to the caller's exact spelling.
     df["sym"] = df["ticker"].str.upper().str.replace(r"\.NS$", "", regex=True)
     wide = df.pivot_table(index="known", columns="sym", values="val", aggfunc="last")
     base = [t.upper()[:-3] if t.upper().endswith(".NS") else t.upper() for t in tickers]
