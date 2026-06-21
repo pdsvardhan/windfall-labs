@@ -84,12 +84,13 @@ decisions:
   - id: adr-010-windfall-own-dvm
     project_slug: windfall-labs
     title: Build our own reproducible D/V/M, validated against Trendlyne
-    status: accepted
+    status: superseded
     date: 2026-06-19T00:00:00.000Z
     tags:
       - curated
       - cat:system
     body_path: docs/decisions/adr-010-windfall-own-dvm.md
+    superseded_by: adr-019-windfall-remove-own-dvm
   - id: adr-011-windfall-bhavcopy-survivorship
     project_slug: windfall-labs
     title: Survivorship-free prices via NSE Bhavcopy in a standalone store
@@ -163,3 +164,41 @@ decisions:
       - curated
       - cat:reliability
     body_path: docs/decisions/adr-018-windfall-survivorship-engine.md
+  - id: adr-019-windfall-remove-own-dvm
+    project_slug: windfall-labs
+    title: Remove the homegrown D/V/M — use raw fundamentals + Trendlyne DVM directly
+    status: accepted
+    date: 2026-06-21T00:00:00.000Z
+    tags:
+      - curated
+      - cat:system
+    body_path: docs/decisions/adr-019-windfall-remove-own-dvm.md
+  - id: adr-020-windfall-cost-model
+    project_slug: windfall-labs
+    title: Accurate NSE delivery cost model — side-aware fees + flat DP, no slippage
+    status: accepted
+    date: 2026-06-21T00:00:00.000Z
+    tags:
+      - curated
+      - cat:system
+    body_path: docs/decisions/adr-020-windfall-cost-model.md
+  - id: adr-021-windfall-config-validation
+    project_slug: windfall-labs
+    title: Server-side config validation — reject nonsensical strategies before any
+      backtest or signal
+    status: accepted
+    date: 2026-06-21T00:00:00.000Z
+    tags:
+      - curated
+      - cat:reliability
+    body_path: docs/decisions/adr-021-windfall-config-validation.md
+  - id: adr-022-windfall-live-price-splice
+    project_slug: windfall-labs
+    title: Live signals splice the latest Bhavcopy EOD beyond the Trendlyne layer
+      (read-only) + nightly cron
+    status: accepted
+    date: 2026-06-21T00:00:00.000Z
+    tags:
+      - curated
+      - cat:reliability
+    body_path: docs/decisions/adr-022-windfall-live-price-splice.md
