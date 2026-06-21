@@ -180,8 +180,14 @@ def strategies_create(body: StrategyIn):
 
 @app.post("/api/strategies/readiness")
 def strategies_readiness(body: BacktestIn):
-    """Tell the owner whether a strategy can be backtested (and from when) before they run it."""
-    return data_readiness(body.config)
+    """Tell the owner whether a strategy can be backtested (and from when) before they run it.
+    On an invalid config, fail soft with an 'invalid' verdict the builder can render inline."""
+    try:
+        return data_readiness(body.config)
+    except ValidationError as exc:
+        return {"verdict": "invalid", "backtestable_from": None,
+                "summary": "Fix before running — " + _cfg_error(exc),
+                "unknown_features": [], "features": []}
 
 
 @app.get("/api/strategies/{sid}")
@@ -265,13 +271,19 @@ def backtests_compare(body: CompareIn):
 # ── sweep / walk-forward ─────────────────────────────────────────────────────
 @app.post("/api/sweep")
 def sweep_run(body: SweepIn):
-    return clean(sweep(body.config, body.grid, metric=body.metric))
+    try:
+        return clean(sweep(body.config, body.grid, metric=body.metric))
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(400, f"sweep failed: {_cfg_error(exc)}")
 
 
 @app.post("/api/walkforward")
 def walkforward_run(body: WalkForwardIn):
-    return clean(walk_forward(body.config, body.grid, metric=body.metric,
-                              is_years=body.is_years, oos_years=body.oos_years))
+    try:
+        return clean(walk_forward(body.config, body.grid, metric=body.metric,
+                                  is_years=body.is_years, oos_years=body.oos_years))
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(400, f"walk-forward failed: {_cfg_error(exc)}")
 
 
 # ── signals ──────────────────────────────────────────────────────────────────
