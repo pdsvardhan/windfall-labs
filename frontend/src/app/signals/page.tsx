@@ -29,9 +29,12 @@ function SignalsInner() {
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
-    api.listStrategies().then((s) => {
+    Promise.all([api.listStrategies(), api.listBacktests()]).then(([s, b]) => {
       setStrats(s);
-      setSid(preselect && s.some((x) => x.id === preselect) ? preselect : s[0]?.id || "");
+      // Default to a real, backtested strategy (most recent) rather than blindly s[0] — otherwise an
+      // invalid/leftover strategy at the top auto-runs and errors on load.
+      const firstTested = b.map((x) => x.strategy_id).find((id) => id && s.some((x) => x.id === id));
+      setSid(preselect && s.some((x) => x.id === preselect) ? preselect : (firstTested || s[0]?.id || ""));
     }).catch((e) => setErr(e.message));
   }, [preselect]);
 
