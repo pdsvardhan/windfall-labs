@@ -35,15 +35,15 @@ export const PRICE_FACTORS: FactorDef[] = [
   { token: "macd_hist", label: "MACD histogram", group: "Momentum" },
 ];
 
-// Fundamentals backed by the screener history (covers delisted names) — survivorship-safe.
+// Raw fundamentals backed by the screener history (covers delisted names) — survivorship-safe.
+// (own-DVM composites removed iter-31; use these raw factors or Trendlyne's tl_DVM directly.)
 export const OWN_FACTORS: FactorDef[] = [
-  { token: "durability_own", label: "Durability (own, history-backed)", group: "Fundamental · survivorship-free" },
-  { token: "valuation_own", label: "Valuation (own, history-backed)", group: "Fundamental · survivorship-free" },
-  { token: "momentum_own", label: "Momentum (own, price-based)", group: "Fundamental · survivorship-free" },
   { token: "roe", label: "Return on equity %", group: "Fundamental · survivorship-free" },
   { token: "roa", label: "Return on assets %", group: "Fundamental · survivorship-free" },
   { token: "opm", label: "Operating margin %", group: "Fundamental · survivorship-free" },
   { token: "np_qtr_yoy", label: "Net-profit YoY %", group: "Fundamental · survivorship-free" },
+  { token: "pe", label: "P/E (price ÷ EPS)", group: "Fundamental · survivorship-free" },
+  { token: "pb", label: "P/B (price ÷ book)", group: "Fundamental · survivorship-free" },
 ];
 
 // Trendlyne's own DVM + valuation + snapshot fundamentals — NOT available for delisted names.

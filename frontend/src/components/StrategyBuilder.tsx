@@ -3,19 +3,18 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
-import type { Readiness, StrategyConfig, SweepResult } from "@/lib/types";
+import type { Readiness, StrategyConfig } from "@/lib/types";
 import { ALL_FACTORS, OPERATORS, FREQUENCIES, BENCHMARKS, defaultConfig, survivorsOnly } from "@/lib/catalog";
-import { num, pctSigned } from "@/lib/format";
 import { Card, Field, Switch, Segmented, Slider, SectionTitle } from "@/components/ui";
 import { JsonView } from "@/components/JsonView";
 
-// curated ready-to-use tokens for the pickers (parametric instances pre-baked)
+// curated ready-to-use tokens for the pickers (own-DVM removed iter-31 — raw fundamentals + tl_DVM remain)
 const QUICK = [
   "close", "open", "high", "low", "adtv_cr",
   "sma50", "sma100", "sma200", "ema50", "ema200",
   "roc21", "roc63", "roc126", "roc252", "rsi14", "atr14", "adx14",
   "dist_high252", "rel_strength126",
-  "durability_own", "valuation_own", "momentum_own", "roe", "roa", "opm", "np_qtr_yoy",
+  "roe", "roa", "opm", "np_qtr_yoy", "pe", "pb",
   "tl_durability", "tl_valuation", "tl_momentum", "tl_pe", "tl_peg", "tl_pbv", "tl_roe", "tl_roce", "tl_de",
   "piotroski", "promoter_pledge", "eps_growth",
 ];
@@ -39,6 +38,31 @@ export function StrategyBuilder({ initial }: { initial?: { id?: string; name: st
   const upd = (path: string[], v: any) => setCfg((c) => set(c, path, v));
   const sv = useMemo(() => survivorsOnly(cfg), [cfg]);
   const fullCfg = useMemo(() => ({ ...cfg, name }), [cfg, name]);
+
+  // Merged filters: the engine ANDs universe.filters + entry_filters anyway, so we show ONE list and
+  // write it all to universe.filters (clearing entry_filters) — no behaviour change, less confusion.
+  const filters = useMemo(() => [...(cfg.universe.filters || []), ...(cfg.entry_filters || [])], [cfg]);
+  const setFilters = (l: string[]) =>
+    setCfg((c) => ({ ...c, universe: { ...c.universe, filters: l }, entry_filters: [] }));
+
+  // Client-side guardrails — instant inline feedback mirroring the server validators.
+  const errs = useMemo(() => {
+    const e: string[] = [];
+    if (!name.trim()) e.push("Name your strategy.");
+    if (!cfg.rank_by?.trim()) e.push("Pick a “Sort by” variable (or write an expression).");
+    if (cfg.end && cfg.start && cfg.end <= cfg.start) e.push("End date must be after start date.");
+    if (cfg.capital < 1000) e.push("Capital must be at least ₹1,000.");
+    if (cfg.max_weight_per_stock != null && !(cfg.max_weight_per_stock > 0 && cfg.max_weight_per_stock <= 1))
+      e.push("Max weight / stock must be between 0 and 100%.");
+    if (cfg.max_hold_days != null && cfg.max_hold_days < 1) e.push("Max hold days must be at least 1.");
+    if (cfg.sector_cap != null && cfg.sector_cap < 1) e.push("Sector cap must be at least 1.");
+    return e;
+  }, [name, cfg]);
+
+  const capWarn = (cfg.max_weight_per_stock != null && cfg.max_weight_per_stock > 0
+    && cfg.max_weight_per_stock * cfg.n_holdings < 1)
+    ? `${Math.round(cfg.max_weight_per_stock * 100)}% cap × ${cfg.n_holdings} holdings = ${Math.round(cfg.max_weight_per_stock * cfg.n_holdings * 100)}% invested — the rest sits in cash.`
+    : null;
 
   // debounced readiness check
   const t = useRef<ReturnType<typeof setTimeout>>();
@@ -64,6 +88,7 @@ export function StrategyBuilder({ initial }: { initial?: { id?: string; name: st
     } catch (e) { setMsg(`backtest failed: ${(e as Error).message}`); }
     finally { setBusy(null); }
   }
+  const blocked = !!busy || errs.length > 0;
 
   return (
     <div>
@@ -81,7 +106,7 @@ export function StrategyBuilder({ initial }: { initial?: { id?: string; name: st
           <div className="text-[13px] text-faint font-bold uppercase tracking-wide">Strategy builder</div>
           <div className="flex items-center gap-2 mt-1.5 max-w-[640px]">
             <input className="bg-transparent text-[34px] font-extrabold tracking-tight outline-none w-full border-b-2 border-dashed pb-0.5 transition-colors focus:border-solid"
-              style={{ borderColor: name ? "#e3dff0" : "#cdaaff" }}
+              style={{ borderColor: name ? "#e3dff0" : "#cdaaff" }} maxLength={100}
               placeholder="Name your strategy…" value={name} onChange={(e) => setName(e.target.value)} />
             <span className="text-faint text-[17px]" title="Click the name to edit">✎</span>
           </div>
@@ -91,11 +116,12 @@ export function StrategyBuilder({ initial }: { initial?: { id?: string; name: st
       <div className="grid lg:grid-cols-[1.65fr_1fr] gap-4 items-start">
         {/* ── FORM ── */}
         <div className="grid md:grid-cols-2 gap-3.5 min-w-0">
-          {/* Universe / screener */}
+          {/* Universe & filters (merged) */}
           <Card className="p-5 md:col-span-2">
-            <SectionTitle dot="#a9c9f2">Universe &amp; screener</SectionTitle>
-            <FilterBuilder label="Screener filters (qualify the universe)" placeholder="e.g. adtv_cr >= 5"
-              list={cfg.universe.filters} onChange={(l) => upd(["universe", "filters"], l)} />
+            <SectionTitle dot="#a9c9f2">Universe &amp; filters</SectionTitle>
+            <FilterBuilder label="Filters — every condition must pass for a stock to qualify"
+              placeholder="raw expression, e.g. close > sma200 & roc126 > 0"
+              list={filters} onChange={setFilters} />
             <div className="flex items-center justify-between mt-3 pt-3 border-t" style={{ borderColor: "#f0eef6" }}>
               <span className="text-[12px]" style={{ color: sv.survivorsOnly ? "#9a6c12" : "#7a7689" }}>
                 {sv.survivorsOnly
@@ -106,15 +132,11 @@ export function StrategyBuilder({ initial }: { initial?: { id?: string; name: st
             </div>
           </Card>
 
-          {/* Entry & ranking */}
+          {/* Ranking */}
           <Card className="p-5 md:col-span-2">
-            <SectionTitle dot="#b9d24a">Entry &amp; ranking</SectionTitle>
-            <FilterBuilder label="Entry filters (all must pass)" placeholder="e.g. close > sma200"
-              list={cfg.entry_filters} onChange={(l) => upd(["entry_filters"], l)} />
-            <div className="grid grid-cols-[1.4fr_1fr] gap-3.5 mt-4">
-              <Field label="Sort by (rank variable)">
-                <FactorSelect value={cfg.rank_by} onChange={(v) => upd(["rank_by"], v)} />
-              </Field>
+            <SectionTitle dot="#b9d24a">Ranking</SectionTitle>
+            <div className="grid grid-cols-[1.4fr_1fr] gap-3.5 items-start">
+              <RankInput value={cfg.rank_by} onChange={(v) => upd(["rank_by"], v)} />
               <div>
                 <span className="text-[12px] font-bold text-muted">Order</span>
                 <Segmented value={cfg.rank_order} onChange={(v) => upd(["rank_order"], v)}
@@ -128,6 +150,7 @@ export function StrategyBuilder({ initial }: { initial?: { id?: string; name: st
             <SectionTitle dot="#f5e049">Position sizing</SectionTitle>
             <div className="flex items-center justify-between"><span className="text-[12.5px] font-bold text-muted">Holdings</span><span className="text-[20px] font-extrabold">{cfg.n_holdings}</span></div>
             <Slider value={cfg.n_holdings} min={3} max={50} onChange={(v) => upd(["n_holdings"], v)} />
+            <div className="flex justify-between text-[10.5px] text-faint mt-0.5"><span>3</span><span>50</span></div>
             <div className="mt-4"><span className="text-[12px] font-bold text-muted">Weighting</span>
               <Segmented value={cfg.weighting} onChange={(v) => upd(["weighting"], v)}
                 options={[{ value: "equal", label: "Equal" }, { value: "inverse_vol", label: "Inverse-vol" }]} />
@@ -137,9 +160,10 @@ export function StrategyBuilder({ initial }: { initial?: { id?: string; name: st
               <Switch on={cfg.invest_fully} onClick={() => upd(["invest_fully"], !cfg.invest_fully)} />
             </div>
             <div className="grid grid-cols-2 gap-3 mt-3.5">
-              <Field label="Max weight / stock"><input className="wf-in mt-1.5" type="number" step="0.05" value={cfg.max_weight_per_stock ?? ""} placeholder="none" onChange={(e) => upd(["max_weight_per_stock"], e.target.value === "" ? null : parseFloat(e.target.value))} /></Field>
-              <Field label="Sector cap"><input className="wf-in mt-1.5" type="number" value={cfg.sector_cap ?? ""} placeholder="none" onChange={(e) => upd(["sector_cap"], e.target.value === "" ? null : parseInt(e.target.value))} /></Field>
+              <Field label="Max weight / stock (%)"><input className="wf-in mt-1.5" type="number" step="1" min="0" max="100" value={cfg.max_weight_per_stock != null ? Math.round(cfg.max_weight_per_stock * 100) : ""} placeholder="none" onChange={(e) => upd(["max_weight_per_stock"], e.target.value === "" ? null : parseFloat(e.target.value) / 100)} /></Field>
+              <Field label="Sector cap (stocks)"><input className="wf-in mt-1.5" type="number" min="1" value={cfg.sector_cap ?? ""} placeholder="none" onChange={(e) => upd(["sector_cap"], e.target.value === "" ? null : parseInt(e.target.value))} /></Field>
             </div>
+            {capWarn && <div className="text-[11px] mt-2" style={{ color: "#9a6c12" }}>⚠ {capWarn}</div>}
           </Card>
 
           {/* Exits */}
@@ -155,41 +179,41 @@ export function StrategyBuilder({ initial }: { initial?: { id?: string; name: st
                 <Slider value={cfg.stop_loss.mult ?? 2} min={0.5} max={5} step={0.1} onChange={(v) => upd(["stop_loss", "mult"], v)} /></>
             )}
             {cfg.stop_loss.type === "pct" && (
-              <Field label="Stop %"><input className="wf-in mt-1.5" type="number" step="0.01" value={cfg.stop_loss.value ?? 0.15} onChange={(e) => upd(["stop_loss", "value"], parseFloat(e.target.value))} /></Field>
+              <Field label="Stop % (fraction, 0–1)"><input className="wf-in mt-1.5" type="number" step="0.01" min="0.01" max="0.99" value={cfg.stop_loss.value ?? 0.15} onChange={(e) => upd(["stop_loss", "value"], parseFloat(e.target.value))} /></Field>
             )}
             <Field label="Take profit"><select className="wf-in mt-1.5" value={cfg.take_profit.type} onChange={(e) => upd(["take_profit", "type"], e.target.value)}><option value="none">None</option><option value="pct">Percent</option><option value="r_multiple">R multiple</option></select></Field>
             {cfg.take_profit.type === "r_multiple" && (
               <><div className="flex items-center justify-between mt-3.5"><span className="text-[12.5px] font-bold text-muted">Target R</span><span className="text-[18px] font-extrabold">{cfg.take_profit.r ?? 2}</span></div>
                 <Slider value={cfg.take_profit.r ?? 2} min={1} max={5} step={0.5} onChange={(v) => upd(["take_profit", "r"], v)} /></>
             )}
-            <Field label="Max hold (days)"><input className="wf-in mt-1.5" type="number" value={cfg.max_hold_days ?? ""} placeholder="none" onChange={(e) => upd(["max_hold_days"], e.target.value === "" ? null : parseInt(e.target.value))} /></Field>
+            <Field label="Max hold (days)"><input className="wf-in mt-1.5" type="number" min="1" value={cfg.max_hold_days ?? ""} placeholder="none" onChange={(e) => upd(["max_hold_days"], e.target.value === "" ? null : parseInt(e.target.value))} /></Field>
           </Card>
 
           {/* Regime */}
           <Card className="p-5">
             <SectionTitle dot="#f7b9dd">Regime filter</SectionTitle>
             <div className="flex items-center justify-between p-3 rounded-xl" style={{ background: "#f7f5fc" }}>
-              <div><div className="text-[13px] font-bold">Enabled</div><div className="text-[11.5px] text-faint">Scale to cash below index MA</div></div>
+              <div><div className="text-[13px] font-bold">Enabled</div><div className="text-[11.5px] text-faint">Scale to cash when the index is below its MA</div></div>
               <Switch on={cfg.regime_filter.enabled} onClick={() => upd(["regime_filter", "enabled"], !cfg.regime_filter.enabled)} />
             </div>
-            <Field label="MA period"><input className="wf-in mt-1.5" type="number" value={cfg.regime_filter.ma_period} onChange={(e) => upd(["regime_filter", "ma_period"], parseInt(e.target.value) || 200)} /></Field>
-            <div className="mt-4"><span className="text-[12px] font-bold text-muted">Mode</span>
-              <Segmented value={cfg.regime_filter.mode} onChange={(v) => upd(["regime_filter", "mode"], v)} options={[{ value: "binary", label: "Binary" }, { value: "scale", label: "Scale" }]} />
-            </div>
+            {cfg.regime_filter.enabled && (
+              <>
+                <Field label="MA period"><input className="wf-in mt-1.5" type="number" min="1" value={cfg.regime_filter.ma_period} onChange={(e) => upd(["regime_filter", "ma_period"], parseInt(e.target.value) || 200)} /></Field>
+                <div className="mt-4"><span className="text-[12px] font-bold text-muted">Mode</span>
+                  <Segmented value={cfg.regime_filter.mode} onChange={(v) => upd(["regime_filter", "mode"], v)} options={[{ value: "binary", label: "Binary (cash)" }, { value: "scale", label: "Scale" }]} />
+                </div>
+              </>
+            )}
           </Card>
 
           {/* Costs & period */}
           <Card className="p-5">
             <SectionTitle dot="#c4b6f7">Costs &amp; period</SectionTitle>
-            <span className="text-[12px] font-bold text-muted">Costs (bps / side)</span>
-            <div className="grid grid-cols-3 gap-2 mt-1.5">
-              <Field label="Brokerage"><input className="wf-in mt-1" type="number" value={cfg.costs_bps.brokerage} onChange={(e) => upd(["costs_bps", "brokerage"], parseFloat(e.target.value) || 0)} /></Field>
-              <Field label="STT"><input className="wf-in mt-1" type="number" value={cfg.costs_bps.stt} onChange={(e) => upd(["costs_bps", "stt"], parseFloat(e.target.value) || 0)} /></Field>
-              <Field label="Slippage"><input className="wf-in mt-1" type="number" value={cfg.costs_bps.slippage} onChange={(e) => upd(["costs_bps", "slippage"], parseFloat(e.target.value) || 0)} /></Field>
+            <div className="rounded-xl p-3 text-[12px]" style={{ background: "#f7f5fc" }}>
+              <div className="font-bold text-[12.5px]">NSE delivery costs · fixed</div>
+              <div className="text-faint mt-1">≈11.9 bps buy · ≈10.4 bps sell · +₹15.93 DP/sell · ₹0 brokerage · no slippage</div>
+              <div className="text-faint mt-1">Stress them with the Cost-sensitivity card on the result page.</div>
             </div>
-            <Field label="Capital (₹) — only sizes the ADTV liquidity cap; returns are %-based" hint={`≈ ${(cfg.capital / 1e5).toFixed(2)} L`}>
-              <input className="wf-in mt-1.5" type="number" step="100000" value={cfg.capital} onChange={(e) => upd(["capital"], parseFloat(e.target.value) || 0)} />
-            </Field>
             <div className="mt-3.5"><span className="text-[12px] font-bold text-muted">Rebalance</span>
               <select className="wf-in mt-1.5" value={cfg.rebalance} onChange={(e) => upd(["rebalance"], e.target.value)}>
                 {FREQUENCIES.map((f) => <option key={f} value={f}>{f[0].toUpperCase() + f.slice(1)}</option>)}
@@ -199,15 +223,19 @@ export function StrategyBuilder({ initial }: { initial?: { id?: string; name: st
               <Field label="Start"><input className="wf-in mt-1.5" type="date" value={cfg.start} onChange={(e) => upd(["start"], e.target.value)} /></Field>
               <Field label="End"><input className="wf-in mt-1.5" type="date" value={cfg.end ?? ""} onChange={(e) => upd(["end"], e.target.value)} /></Field>
             </div>
+            {cfg.end && cfg.start && cfg.end <= cfg.start && <div className="text-[11px] text-loss mt-1">End date must be after start date.</div>}
             <Field label="Benchmark"><select className="wf-in mt-1.5" value={cfg.benchmark} onChange={(e) => upd(["benchmark"], e.target.value)}>{BENCHMARKS.map((b) => <option key={b.value} value={b.value}>{b.label}</option>)}</select></Field>
+            <Field label="Capital (₹) — sizes the ADTV liquidity cap; flat DP makes it matter" hint={`≈ ${(cfg.capital / 1e5).toFixed(2)} L`}>
+              <input className="wf-in mt-1.5" type="number" step="50000" min="1000" value={cfg.capital} onChange={(e) => upd(["capital"], parseFloat(e.target.value) || 0)} />
+            </Field>
           </Card>
         </div>
 
         {/* ── JSON PANE + actions ── */}
         <div className="lg:sticky lg:top-5 space-y-3.5 animate-rise min-w-0">
           {readiness && (
-            <Card className="px-4 py-3" style={{ background: readiness.verdict.includes("backtest") ? "#eef6dd" : "#fff3da" }}>
-              <div className="text-[11.5px] font-extrabold uppercase tracking-wide" style={{ color: readiness.verdict.includes("backtest") ? "#5b6b1f" : "#9a6c12" }}>Readiness · {readiness.verdict}</div>
+            <Card className="px-4 py-3" style={{ background: readiness.verdict === "invalid" ? "#fdeaf1" : readiness.verdict.includes("backtest") ? "#eef6dd" : "#fff3da" }}>
+              <div className="text-[11.5px] font-extrabold uppercase tracking-wide" style={{ color: readiness.verdict === "invalid" ? "#c23e74" : readiness.verdict.includes("backtest") ? "#5b6b1f" : "#9a6c12" }}>Readiness · {readiness.verdict}</div>
               <div className="text-[12px] text-ink/80 mt-1">{readiness.summary}</div>
             </Card>
           )}
@@ -218,21 +246,20 @@ export function StrategyBuilder({ initial }: { initial?: { id?: string; name: st
             </div>
             <JsonView value={fullCfg} />
             <div className="flex gap-2 mt-3.5">
-              <button className="btn flex-1" style={{ background: "#26252e", color: "#eceaf2" }} disabled={!!busy || !name.trim()} onClick={save}>{busy === "save" ? "saving…" : "Save"}</button>
-              <button className="btn btn-acc flex-[1.4]" disabled={!!busy || !cfg.rank_by || !name.trim()} onClick={run}>{busy === "run" ? "running…" : "Run backtest →"}</button>
+              <button className="btn flex-1" style={{ background: "#26252e", color: "#eceaf2" }} disabled={blocked} onClick={save}>{busy === "save" ? "saving…" : "Save"}</button>
+              <button className="btn btn-acc flex-[1.4]" disabled={blocked} onClick={run}>{busy === "run" ? "running…" : "Run backtest →"}</button>
             </div>
-            {!name.trim() && <div className="text-[11.5px] mt-2" style={{ color: "#f7b9dd" }}>Name your strategy to save or run.</div>}
-            {name.trim() && !cfg.rank_by && <div className="text-[11.5px] mt-2" style={{ color: "#f7b9dd" }}>Pick a “Sort by” variable in Entry &amp; ranking to run.</div>}
-            {msg && <div className="text-[12px] mt-2.5" style={{ color: "#cdbcff" }}>{msg}</div>}
+            {errs.length > 0 && <div className="mt-2.5 rounded-lg px-3 py-2 text-[12px] font-semibold" style={{ background: "#3a2230", color: "#ffadcb" }}>Fix to continue: {errs[0]}</div>}
+            {msg && <div className="mt-2.5 rounded-lg px-3 py-2 text-[12px] font-semibold" style={{ background: msg.includes("fail") ? "#3a2230" : "#23302a", color: msg.includes("fail") ? "#ffadcb" : "#c8f08a" }}>{msg}</div>}
           </Card>
-          <SweepPanel config={fullCfg} onSaved={(id) => router.push(`/strategies/${id}`)} />
+          <p className="text-[11.5px] text-faint px-1">Tune parameters after you've run a base backtest — Explore variations lives on the result page.</p>
         </div>
       </div>
     </div>
   );
 }
 
-// ── filter builder: ONE input mode at a time (Builder dropdown OR Raw expression), owner pref ──
+// ── filter builder: Builder dropdown OR Raw expression (one at a time) ──
 function FilterBuilder({ label, placeholder, list, onChange }:
   { label: string; placeholder: string; list: string[]; onChange: (l: string[]) => void }) {
   const [mode, setMode] = useState<"builder" | "raw">("builder");
@@ -240,7 +267,12 @@ function FilterBuilder({ label, placeholder, list, onChange }:
   const [op, setOp] = useState(">=");
   const [val, setVal] = useState("");
   const [raw, setRaw] = useState("");
-  const add = () => { if (!tok || !val.trim()) return; onChange([...list, `${tok} ${op} ${val.trim()}`]); setVal(""); };
+  const [err, setErr] = useState("");
+  const add = () => {
+    if (!tok) { setErr("Pick a variable."); return; }
+    if (val.trim() === "" || Number.isNaN(Number(val))) { setErr("Value must be a number."); return; }
+    setErr(""); onChange([...list, `${tok} ${op} ${val.trim()}`]); setVal("");
+  };
   const addRaw = () => { if (!raw.trim()) return; onChange([...list, raw.trim()]); setRaw(""); };
   return (
     <div>
@@ -260,9 +292,9 @@ function FilterBuilder({ label, placeholder, list, onChange }:
       </div>
       {mode === "builder" ? (
         <div className="flex gap-1.5">
-          <FactorSelect value={tok} onChange={setTok} compact />
+          <FactorSelect value={tok} onChange={(v) => { setTok(v); setErr(""); }} compact />
           <select className="wf-in" style={{ width: 64 }} value={op} onChange={(e) => setOp(e.target.value)}>{OPERATORS.map((o) => <option key={o}>{o}</option>)}</select>
-          <input className="wf-in" style={{ width: 90 }} placeholder="value" value={val} onChange={(e) => setVal(e.target.value)} onKeyDown={(e) => e.key === "Enter" && add()} />
+          <input className="wf-in" style={{ width: 90 }} placeholder="value" value={val} onChange={(e) => { setVal(e.target.value); setErr(""); }} onKeyDown={(e) => e.key === "Enter" && add()} />
           <button className="btn btn-ink" style={{ borderRadius: 11 }} onClick={add}>Add</button>
         </div>
       ) : (
@@ -272,10 +304,34 @@ function FilterBuilder({ label, placeholder, list, onChange }:
             <button className="btn btn-ink" style={{ borderRadius: 11 }} onClick={addRaw}>Add</button>
           </div>
           <div className="text-[11px] text-faint mt-1.5">
-            Use <span className="font-mono">&amp;</span> / <span className="font-mono">|</span> to combine, chained compares (<span className="font-mono">50 &lt; rsi14 &lt; 80</span>), and arithmetic — e.g. <span className="font-mono">close &gt; sma200 &amp; roc126 &gt; 0</span>.
+            Use <span className="font-mono">&amp;</span> / <span className="font-mono">|</span> to combine, chained compares (<span className="font-mono">50 &lt; rsi14 &lt; 80</span>), arithmetic — e.g. <span className="font-mono">close &gt; sma200 &amp; roc126 &gt; 0</span>.
           </div>
         </div>
       )}
+      {err && <div className="text-[11px] text-loss mt-1">{err}</div>}
+    </div>
+  );
+}
+
+// ── rank input: a single variable, or a derived expression ──
+function RankInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [mode, setMode] = useState<"builder" | "raw">(value && !QUICK.includes(value) ? "raw" : "builder");
+  return (
+    <div>
+      <div className="flex items-center justify-between">
+        <span className="text-[12px] font-bold text-muted">Sort by</span>
+        <div className="flex gap-0.5 p-0.5 rounded-lg" style={{ background: "#f1eef8" }}>
+          {(["builder", "raw"] as const).map((m) => (
+            <button key={m} className="wf-seg" data-active={mode === m ? "1" : "0"} style={{ padding: "3px 11px", fontSize: 11 }} onClick={() => setMode(m)}>{m === "builder" ? "Variable" : "Expression"}</button>
+          ))}
+        </div>
+      </div>
+      {mode === "builder"
+        ? <FactorSelect value={value} onChange={onChange} />
+        : <>
+          <input className="wf-in mt-1.5" placeholder="e.g. roc126 / atr14" value={value} onChange={(e) => onChange(e.target.value)} />
+          <span className="block text-[11px] text-faint mt-1">Any expression — combine factors &amp; arithmetic; names are ranked by the result.</span>
+        </>}
     </div>
   );
 }
@@ -296,83 +352,4 @@ function FactorSelect({ value, onChange, compact = false, placeholder = "— pic
       {!known && value && <option value="__custom">{value} (custom)</option>}
     </select>
   );
-}
-
-// ── explore variations (parameter sweep) ──
-function SweepPanel({ config, onSaved }: { config: StrategyConfig; onSaved: (id: string) => void }) {
-  const [open, setOpen] = useState(false);
-  const [grid, setGrid] = useState<Record<string, string>>({ n_holdings: "8, 10, 15, 20", "stop_loss.mult": "1.5, 2, 2.5, 3" });
-  const [metric, setMetric] = useState("sharpe");
-  const [res, setRes] = useState<SweepResult | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-
-  async function runSweep() {
-    setBusy(true); setErr(null); setRes(null);
-    const g: Record<string, unknown[]> = {};
-    for (const [k, v] of Object.entries(grid)) {
-      const parts = v.split(",").map((s) => s.trim()).filter(Boolean);
-      if (!parts.length) continue;
-      g[k] = parts.map((p) => (isNaN(Number(p)) ? p : Number(p)));
-    }
-    try { setRes(await api.sweep(config, g, metric)); }
-    catch (e) { setErr((e as Error).message); }
-    finally { setBusy(false); }
-  }
-  async function saveRow(overrides: Record<string, unknown>, rank: number) {
-    const merged = applyOverrides(config, overrides);
-    const s = await api.saveStrategy(`${config.name}_v${rank}`, merged);
-    await api.runBacktest(merged, s.id, true);
-    onSaved(s.id);
-  }
-
-  return (
-    <Card className="px-4 py-3">
-      <button className="flex items-center gap-2 text-[13px] font-extrabold" onClick={() => setOpen(!open)}>
-        <span className="text-faint">{open ? "▾" : "▸"}</span> Explore variations
-        <span className="text-[11.5px] text-faint font-medium">— auto-run a grid &amp; rank</span>
-      </button>
-      {open && (
-        <div className="mt-3 space-y-2.5">
-          {["n_holdings", "stop_loss.mult", "rebalance"].map((p) => (
-            <div key={p} className="flex items-center gap-2">
-              <span className="text-[12px] font-mono text-muted" style={{ width: 110 }}>{p}</span>
-              <input className="wf-in" placeholder="comma values e.g. 8, 10, 15" value={grid[p] || ""} onChange={(e) => setGrid({ ...grid, [p]: e.target.value })} />
-            </div>
-          ))}
-          <div className="flex items-center gap-2">
-            <select className="wf-in" style={{ width: 130 }} value={metric} onChange={(e) => setMetric(e.target.value)}>
-              <option value="sharpe">rank by sharpe</option><option value="cagr">rank by CAGR</option><option value="sortino">rank by sortino</option>
-            </select>
-            <button className="btn btn-ink flex-1" style={{ borderRadius: 11 }} disabled={busy} onClick={runSweep}>{busy ? "running grid…" : "Run sweep"}</button>
-          </div>
-          {err && <div className="text-[12px] text-loss">{err}</div>}
-          {res && (
-            <div className="rounded-xl overflow-hidden bg-white">
-              <div className="grid px-3 py-2 text-[11px] text-faint font-bold border-b" style={{ gridTemplateColumns: "1.6fr .7fr .7fr .7fr .8fr", borderColor: "#f0eef6" }}>
-                <span>Variant</span><span className="text-right">CAGR</span><span className="text-right">DD</span><span className="text-right">Sharpe</span><span></span>
-              </div>
-              <div className="scroll-y" style={{ maxHeight: 240 }}>
-                {res.ranked.filter((r) => r.summary).slice(0, 30).map((r, i) => (
-                  <div key={i} className="wf-row grid px-3 py-2 text-[12px] items-center tn border-b" style={{ gridTemplateColumns: "1.6fr .7fr .7fr .7fr .8fr", borderColor: "#f6f4fb" }}>
-                    <span className="font-mono text-[11px] text-muted truncate">{Object.entries(r.overrides).map(([k, v]) => `${k.split(".").pop()}=${v}`).join(" ") || "base"}</span>
-                    <span className="text-right text-gain font-bold">{pctSigned(r.summary!.cagr)}</span>
-                    <span className="text-right text-loss">{pctSigned(r.summary!.max_drawdown)}</span>
-                    <span className="text-right">{num(r.summary!.sharpe)}</span>
-                    <span className="text-right"><button className="text-[11px] font-bold px-2 py-1 rounded-full" style={{ border: "1.5px solid #c4e05a", background: "#f2fae0", color: "#3f7d1c" }} onClick={() => saveRow(r.overrides, i + 1)}>save</button></span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-    </Card>
-  );
-}
-
-function applyOverrides(base: StrategyConfig, ov: Record<string, unknown>): StrategyConfig {
-  let c: any = JSON.parse(JSON.stringify(base));
-  for (const [path, val] of Object.entries(ov)) c = set(c, path.split("."), val);
-  return c;
 }
