@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import type { BacktestResultFull, CostSensitivity, StrategyConfig } from "@/lib/types";
+import { useRouter } from "next/navigation";
+import type { BacktestResultFull, CostSensitivity, StrategyConfig, SweepResult } from "@/lib/types";
 import { api } from "@/lib/api";
 import { pct, pctSigned, num, moneyCompact, signClass } from "@/lib/format";
 import { survivorsOnly } from "@/lib/catalog";
@@ -74,6 +75,7 @@ export function BacktestReport({ res, config }: { res: BacktestResultFull; confi
       </div>
 
       <CostStrip config={config} nTrades={s.n_trades} />
+      {config && <ExploreVariations config={config} />}
 
       {/* equity + drawdown */}
       <div className="grid lg:grid-cols-[1.55fr_1fr] gap-3.5">
@@ -159,10 +161,98 @@ function ConfigDetails({ c, sv }: { c: StrategyConfig; sv: { survivorsOnly: bool
       {row("Rank", `${c.rank_by || "—"} ${c.rank_order === "asc" ? "↑ (min first)" : "↓ (max first)"}`)}
       {row("Sizing", `top ${c.n_holdings} · ${c.weighting}${c.max_weight_per_stock ? ` · max ${c.max_weight_per_stock}/stock` : ""}${c.sector_cap ? ` · sector cap ${c.sector_cap}` : ""}`)}
       {row("Exits", `stop ${c.stop_loss?.type ?? "none"} · tp ${c.take_profit?.type ?? "none"}${c.regime_filter?.enabled ? ` · regime MA${c.regime_filter.ma_period}` : ""}`)}
-      {row("Costs", `${c.costs_bps?.brokerage}+${c.costs_bps?.stt}+${c.costs_bps?.slippage} bps · capital ₹${(c.capital / 1e5).toFixed(2)}L`)}
+      {row("Costs", `NSE delivery · ~22 bps round-trip + ₹15.93 DP/sell · capital ₹${(c.capital / 1e5).toFixed(2)}L`)}
       {row("Window", `${c.start} → ${c.end || "today"} · vs ${c.benchmark}`)}
       {row("Universe", sv.survivorsOnly ? `survivors-only (${sv.offenders.join(", ")})` : "survivorship-free, point-in-time ₹500cr")}
     </div>
+  );
+}
+
+// ── explore variations (parameter sweep) — moved here from the builder (iter-31): you tune AFTER
+// you've seen a base result. Sweeps a small grid and ranks; "save" forks a new strategy + backtests it.
+function setPath(obj: any, path: string[], val: any) {
+  const o = { ...obj }; let cur = o;
+  for (let i = 0; i < path.length - 1; i++) { cur[path[i]] = { ...cur[path[i]] }; cur = cur[path[i]]; }
+  cur[path[path.length - 1]] = val; return o;
+}
+function applyOverrides(base: StrategyConfig, ov: Record<string, unknown>): StrategyConfig {
+  let c: any = JSON.parse(JSON.stringify(base));
+  for (const [path, val] of Object.entries(ov)) c = setPath(c, path.split("."), val);
+  return c;
+}
+
+function ExploreVariations({ config }: { config: StrategyConfig }) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [grid, setGrid] = useState<Record<string, string>>({ n_holdings: "8, 10, 15, 20", "stop_loss.mult": "1.5, 2, 2.5, 3" });
+  const [metric, setMetric] = useState("sharpe");
+  const [res, setRes] = useState<SweepResult | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function runSweep() {
+    setBusy(true); setErr(null); setRes(null);
+    const g: Record<string, unknown[]> = {};
+    for (const [k, v] of Object.entries(grid)) {
+      const parts = v.split(",").map((s) => s.trim()).filter(Boolean);
+      if (!parts.length) continue;
+      g[k] = parts.map((p) => (isNaN(Number(p)) ? p : Number(p)));
+    }
+    if (!Object.keys(g).length) { setErr("Enter at least one comma-separated value to sweep."); setBusy(false); return; }
+    try { setRes(await api.sweep({ ...config }, g, metric)); }
+    catch (e) { setErr((e as Error).message); }
+    finally { setBusy(false); }
+  }
+  async function saveRow(overrides: Record<string, unknown>, rank: number) {
+    const merged = applyOverrides(config, overrides);
+    const sName = `${config.name || "strategy"}_v${rank}`;
+    const sv = await api.saveStrategy(sName, merged);
+    await api.runBacktest(merged, sv.id, true);
+    router.push(`/strategies/${sv.id}`);
+  }
+
+  return (
+    <Card className="px-5 py-3">
+      <button className="flex items-center gap-2 text-[13px] font-bold text-ink" onClick={() => setOpen(!open)}>
+        <span className="text-faint">{open ? "▾" : "▸"}</span> Explore variations
+        <span className="text-[11.5px] text-faint font-medium">— sweep a parameter grid &amp; rank to find a better setup</span>
+      </button>
+      {open && (
+        <div className="mt-3 space-y-2.5">
+          {["n_holdings", "stop_loss.mult", "rebalance"].map((p) => (
+            <div key={p} className="flex items-center gap-2">
+              <span className="text-[12px] font-mono text-muted" style={{ width: 110 }}>{p}</span>
+              <input className="wf-in" placeholder="comma values e.g. 8, 10, 15" value={grid[p] || ""} onChange={(e) => setGrid({ ...grid, [p]: e.target.value })} />
+            </div>
+          ))}
+          <div className="flex items-center gap-2">
+            <select className="wf-in" style={{ width: 150 }} value={metric} onChange={(e) => setMetric(e.target.value)}>
+              <option value="sharpe">rank by sharpe</option><option value="cagr">rank by CAGR</option><option value="sortino">rank by sortino</option>
+            </select>
+            <button className="btn btn-ink flex-1" style={{ borderRadius: 11 }} disabled={busy} onClick={runSweep}>{busy ? "running grid…" : "Run sweep"}</button>
+          </div>
+          {err && <div className="text-[12px] text-loss">{err}</div>}
+          {res && (
+            <div className="rounded-xl overflow-hidden bg-white">
+              <div className="grid px-3 py-2 text-[11px] text-faint font-bold border-b" style={{ gridTemplateColumns: "1.6fr .7fr .7fr .7fr .8fr", borderColor: "#f0eef6" }}>
+                <span>Variant</span><span className="text-right">CAGR</span><span className="text-right">DD</span><span className="text-right">Sharpe</span><span></span>
+              </div>
+              <div className="scroll-y" style={{ maxHeight: 240 }}>
+                {res.ranked.filter((r) => r.summary).slice(0, 30).map((r, i) => (
+                  <div key={i} className="wf-row grid px-3 py-2 text-[12px] items-center tn border-b" style={{ gridTemplateColumns: "1.6fr .7fr .7fr .7fr .8fr", borderColor: "#f6f4fb" }}>
+                    <span className="font-mono text-[11px] text-muted truncate">{Object.entries(r.overrides).map(([k, v]) => `${k.split(".").pop()}=${v}`).join(" ") || "base"}</span>
+                    <span className="text-right text-gain font-bold">{pctSigned(r.summary!.cagr)}</span>
+                    <span className="text-right text-loss">{pctSigned(r.summary!.max_drawdown)}</span>
+                    <span className="text-right">{num(r.summary!.sharpe)}</span>
+                    <span className="text-right"><button className="text-[11px] font-bold px-2 py-1 rounded-full" style={{ border: "1.5px solid #c4e05a", background: "#f2fae0", color: "#3f7d1c" }} onClick={() => saveRow(r.overrides, i + 1)}>save</button></span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </Card>
   );
 }
 
@@ -192,6 +282,7 @@ function CostStrip({ config, nTrades }: { config?: StrategyConfig; nTrades?: num
       </button>
       {open && (
         <div className="mt-3">
+          {!noTrades && <div className="text-[11.5px] text-muted mb-2.5">Re-runs this strategy at <b>0×</b> (no costs), <b>1×</b> (your real NSE costs) and <b>2×</b> (stress). If it still beats the benchmark at 2×, fees aren't killing the edge.</div>}
           {noTrades && <div className="text-[12px] text-faint">This strategy made no trades, so there's nothing to stress-test. Loosen the screen or pick a sort variable, then re-run.</div>}
           {!noTrades && busy && <div className="text-[12px] text-faint">running 0× / 1× / 2× …</div>}
           {err && <div className="text-[12px] text-loss">{err}</div>}

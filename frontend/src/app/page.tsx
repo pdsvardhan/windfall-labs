@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import type { BacktestRow, Strategy } from "@/lib/types";
-import { pctSigned, num, dateShort, signClass } from "@/lib/format";
+import { pctSigned, num, dateShort, signClass, moneyCompact } from "@/lib/format";
 import { Card, StatCard } from "@/components/ui";
 
 export default function Home() {
@@ -13,6 +13,7 @@ export default function Home() {
   const [strats, setStrats] = useState<Strategy[]>([]);
   const [bts, setBts] = useState<BacktestRow[]>([]);
   const [through, setThrough] = useState<string | null>(null);
+  const [paper, setPaper] = useState<{ pnl: number; open: number } | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
@@ -20,6 +21,10 @@ export default function Home() {
       .then(([s, b]) => { setStrats(s); setBts(b); })
       .catch((e) => setErr(e.message));
     api.dataStatus().then((d) => setThrough(d.trendlyne?.date_max ?? d.coverage?.date_max ?? null)).catch(() => {});
+    api.scoreboard().then((rows) => setPaper({
+      pnl: rows.reduce((a, r) => a + (r.total_pnl ?? 0), 0),
+      open: rows.reduce((a, r) => a + (r.open ?? 0), 0),
+    })).catch(() => {});
   }, []);
 
   // latest backtest per strategy
@@ -43,10 +48,9 @@ export default function Home() {
         <StatCard tone="sky" label="Best strategy" value={best ? <span className={signClass(best.summary.cagr)}>{pctSigned(best.summary.cagr)}</span> : "—"} sub={best?.name ?? "none backtested yet"} delay={0} />
         <StatCard tone="lime" label="Avg CAGR" value={avgCagr != null ? <span className={signClass(avgCagr)}>{pctSigned(avgCagr)}</span> : "—"} sub={`across ${tested.length} backtested`} delay={60} />
         <StatCard tone="limeY" label="Data through" value={through ? through.slice(0, 10) : "…"} sub="survivorship-free layer" delay={120} />
-        <Link href="/strategies/new" className="wf-card wf-card-lift animate-pop flex flex-col justify-center items-start" style={{ background: "#c4e05a", padding: "20px 22px", animationDelay: "180ms" }}>
-          <div className="text-[13px] font-bold" style={{ color: "#5b6b1f" }}>Build something</div>
-          <div className="text-[24px] font-extrabold mt-1 text-ink">+ New strategy →</div>
-        </Link>
+        <StatCard tone="lilac" label="Open paper P&L" delay={180}
+          value={paper ? <span className={signClass(paper.pnl)}>{moneyCompact(paper.pnl)}</span> : "—"}
+          sub={paper ? (paper.open > 0 ? `${paper.open} open position${paper.open === 1 ? "" : "s"}` : "no open positions") : "paper a strategy to track"} />
       </div>
 
       <div className="grid lg:grid-cols-[1fr_1.5fr] gap-3.5">
