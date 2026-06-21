@@ -9,7 +9,7 @@ import os
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from windfall import store_meta
 from windfall.data import fundamentals as fund
@@ -26,6 +26,13 @@ from windfall.signals_live.generate import signals_to_csv
 from windfall.strategy.readiness import data_readiness
 from windfall.strategy.schema import StrategyConfig
 from windfall.walkforward import sweep, walk_forward
+
+def _cfg_error(exc: Exception) -> str:
+    """Flatten a pydantic ValidationError to a short human message (else the raw error)."""
+    if isinstance(exc, ValidationError):
+        return "; ".join(e.get("msg", "").replace("Value error, ", "") for e in exc.errors()) or str(exc)
+    return str(exc)
+
 
 app = FastAPI(title="Windfall Labs API", version="0.1.0")
 
@@ -197,7 +204,7 @@ def backtests_run(body: BacktestIn):
     try:
         res = run_backtest(body.config)
     except Exception as exc:  # noqa: BLE001
-        raise HTTPException(400, f"backtest failed: {exc}")
+        raise HTTPException(400, f"backtest failed: {_cfg_error(exc)}")
     d = clean(res.model_dump())
     d["readiness"] = data_readiness(body.config)  # so the UI can flag live-only / partial runs
     if body.save:
@@ -227,13 +234,16 @@ _COST_METRICS = ("cagr", "total_return", "sharpe", "sortino", "max_drawdown",
 def backtests_cost_sensitivity(body: CostSensitivityIn):
     """Run one strategy at several cost multipliers (default 0x/1x/2x) so realism-vs-optimism is
     explicit: how much net CAGR / Sharpe / return the modelled costs + turnover give back."""
-    base = StrategyConfig(**body.config)  # validate
+    try:
+        base = StrategyConfig(**body.config)  # validate
+    except ValidationError as exc:
+        raise HTTPException(400, f"invalid config: {_cfg_error(exc)}")
     runs = []
     for m in body.multipliers:
         try:
             res = run_backtest(body.config, cost_mult=m)  # engine scales the NSE delivery costs
         except Exception as exc:  # noqa: BLE001
-            raise HTTPException(400, f"cost-sensitivity run (x{m}) failed: {exc}")
+            raise HTTPException(400, f"cost-sensitivity run (x{m}) failed: {_cfg_error(exc)}")
         s = res.summary.model_dump()
         runs.append({"cost_multiplier": m, "summary": {k: s.get(k) for k in _COST_METRICS}})
     return clean({"name": base.name, "multipliers": body.multipliers, "runs": runs})
@@ -267,7 +277,10 @@ def walkforward_run(body: WalkForwardIn):
 # ── signals ──────────────────────────────────────────────────────────────────
 @app.post("/api/signals")
 def signals_run(body: SignalsIn):
-    out = surveillance.annotate_signals(clean(generate_signals(body.config)))
+    try:
+        out = surveillance.annotate_signals(clean(generate_signals(body.config)))
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(400, f"signals failed: {_cfg_error(exc)}")
     if body.save:
         out["signal_run_id"] = store_meta.save_signal_run(
             body.strategy_id, out.get("as_of"), out.get("signals", []))
