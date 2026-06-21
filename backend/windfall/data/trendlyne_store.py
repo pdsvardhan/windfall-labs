@@ -84,12 +84,16 @@ def symbol_pk_map() -> dict[str, int]:
     return {s: pk for s, pk in rows}
 
 
-def adjusted_close_panel(symbols, start=None, end=None, field: str = "close") -> pd.DataFrame:
+def adjusted_close_panel(symbols, start=None, end=None, field: str = "close",
+                         extend_live: bool = False) -> pd.DataFrame:
     """Wide date x symbol panel of split/bonus-ADJUSTED prices.
 
     Live names use Trendlyne's adjusted `ohlcv`; delisted names use raw Bhavcopy x the derived
     `ca_factor.adj_factor` so their returns are split-clean and tradeable. ca_uncertain dead names
     (a large unexplained gap we could not confirm as a CA) are EXCLUDED rather than mis-adjusted.
+
+    `extend_live` (iter-31): for live signals (end=None) only, append the most recent Bhavcopy EOD
+    beyond the last Trendlyne bar so signals reflect the latest close we hold — read-only, no write.
     """
     syms = [s.upper() for s in symbols]
     pkmap = symbol_pk_map()
@@ -110,6 +114,21 @@ def adjusted_close_panel(symbols, start=None, end=None, field: str = "close") ->
         if not df.empty:
             df["symbol"] = df["pk"].map(pk2sym)
             parts.append(df[["date", "symbol", "v"]])
+        if extend_live:
+            # Extend live names with Bhavcopy EOD beyond the last Trendlyne bar (back-adjusted series'
+            # tail = raw price, so no split adjustment needed for the recent window).
+            last_tl = con.execute(
+                f"SELECT MAX(date) FROM ohlcv WHERE pk IN ({','.join(['?'] * len(pks))})", pks).fetchone()[0]
+            fcol = {"close": "close", "open": "open", "high": "high", "low": "low"}.get(field, "close")
+            syms_live = list(live.keys())
+            if last_tl is not None and syms_live:
+                ext = con.execute(
+                    f"SELECT upper(regexp_replace(ticker,'\\.NS$','')) symbol, date, {fcol} v "
+                    f"FROM bc.bhavcopy_prices WHERE series='EQ' AND {fcol}>0 AND date > ? "
+                    f"AND upper(regexp_replace(ticker,'\\.NS$','')) IN ({','.join(['?'] * len(syms_live))})",
+                    [last_tl] + syms_live).fetchdf()
+                if not ext.empty:
+                    parts.append(ext[["date", "symbol", "v"]])
 
     dead = [s for s in syms if s not in pkmap]
     if dead:

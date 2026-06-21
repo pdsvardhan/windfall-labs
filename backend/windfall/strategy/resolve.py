@@ -102,18 +102,19 @@ def resolve(cfg: StrategyConfig) -> ResolvedStrategy:
         if not ts.available():
             raise ValueError("data_source='trendlyne' but trendlyne.duckdb is not present.")
         end = cfg.end or str(pd.Timestamp.today().date())
+        live = cfg.end is None  # live signals: extend prices with the latest Bhavcopy EOD we hold
         tickers = ts.universe_over_window(cfg.start, end)
         if not tickers:
             raise ValueError("Empty survivorship-free universe for this window.")
-        close = ts.adjusted_close_panel(tickers, cfg.start, cfg.end, "close")
+        close = ts.adjusted_close_panel(tickers, cfg.start, cfg.end, "close", extend_live=live)
         if close.empty:
             raise ValueError("No Trendlyne price data for the resolved universe.")
         tickers = list(close.columns)
-        open_ = ts.adjusted_close_panel(tickers, cfg.start, cfg.end, "open").reindex(
+        open_ = ts.adjusted_close_panel(tickers, cfg.start, cfg.end, "open", extend_live=live).reindex(
             index=close.index, columns=tickers)
-        high = ts.adjusted_close_panel(tickers, cfg.start, cfg.end, "high").reindex(
+        high = ts.adjusted_close_panel(tickers, cfg.start, cfg.end, "high", extend_live=live).reindex(
             index=close.index, columns=tickers)
-        low = ts.adjusted_close_panel(tickers, cfg.start, cfg.end, "low").reindex(
+        low = ts.adjusted_close_panel(tickers, cfg.start, cfg.end, "low", extend_live=live).reindex(
             index=close.index, columns=tickers)
         tv = ts.traded_value_panel(tickers, cfg.start, cfg.end).reindex(
             index=close.index, columns=tickers)
