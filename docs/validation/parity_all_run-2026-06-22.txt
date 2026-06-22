@@ -1,0 +1,570 @@
+##############################################################################
+# TEST 548012 — Tradeable (DVM-mom)
+# filters: ['tl_durability > 55', 'tl_valuation > 50', 'tl_momentum > 60', 'adtv_cr > 10']
+# rank: tl_momentum desc | freq=monthly floor=1000.0 nhold=10
+# window: 2021-07-30 -> 2026-06-12 (59 periods); resolve warmup from 2020-06-05
+##############################################################################
+/app/windfall/strategy/resolve.py:362: FutureWarning: The default fill_method='pad' in DataFrame.pct_change is deprecated and will be removed in a future version. Either fill in any non-leading NA values prior to calling pct_change or specify 'fill_method=None' to not fill NA values.
+  ret = close.pct_change()
+
+=== 1. SELECTION (name-by-name vs Trendlyne, Phase A current-membership) ===
+periods=59 avg_overlap=8.0/10 total_matches=474/547=87%
+distinct TL-only names=53 slot-misses=73 | most common: [('MIRZAINT', 5), ('JSLHISAR', 3), ('AMBIKCO', 3), ('UJJIVAN', 3), ('MANGCHEFER', 3), ('BCG', 2), ('TV18BRDCST', 2), ('UTTAMSUGAR', 2), ('GSPL', 2), ('JAIBALAJI', 2)]
+distinct ours-only names=64 slot-extras=78 | most common: [('PENIND', 3), ('FORCEMOT', 3), ('AIIL', 3), ('GOODLUCK', 2), ('VENUSREM', 2), ('TALBROAUTO', 2), ('KARURVYSYA', 2), ('DATAPATTNS', 2), ('MAHSEAMLES', 2), ('GMRP&UI', 2)]
+  boundary (first 3 periods, rank #nhold-1..nhold+3):
+   2021-07-30: TL-only=['JSLHISAR', 'TNPETRO'] ours-only=['GOODLUCK', 'KIRLFER']
+     our rank #9-13: ['NATIONALUM=76.1', 'KIRLFER=76.0', 'RAIN=75.7', 'TIRUMALCHM=75.6', 'CENTENKA=75.2']
+   2021-08-31: TL-only=['BCG', 'JSLHISAR', 'NITINSPIN'] ours-only=['GOODLUCK', 'USHAMART', 'VENUSREM']
+     our rank #9-13: ['OIL=68.6', 'USHAMART=68.5', 'BANCOINDIA=68.1', 'TATASTEEL=67.6', 'JSL=67.0']
+   2021-09-30: TL-only=['AMBIKCO', 'BCG'] ours-only=['FIEMIND', 'IGPL']
+     our rank #9-13: ['IGPL=71.1', 'FIEMIND=69.4', 'JSL=68.8', 'UFLEX=68.7', 'KPRMILL=68.5']
+
+=== 2. PRICING (our adj price vs Trendlyne CSV price, per stock-period) ===
+stock-periods=535 mean|Δ|=0.129pp median=0.003pp p95=0.35pp max=44.35pp
+  within 0.5pp=96% within 1pp=99% | gold names unpriceable=6/224
+  CA-adj mismatches (ratio start->end jumped >5%): 1
+    2023-09-29 GVKPIL       ratio 1.0->1.736 tl_chg=-39.8% our_chg=+4.6%
+  worst 6 |Δ|: [('2023-09-29', 'GVKPIL', 'tl=-39.75', 'ours=4.6'), ('2022-05-31', 'TIMETECHNO', 'tl=-2.3', 'ours=-0.3'), ('2022-10-31', 'POWERMECH', 'tl=29.79', 'ours=27.9'), ('2021-12-31', 'VTL', 'tl=2.55', 'ours=3.7'), ('2022-06-30', 'MAHSEAMLES', 'tl=16.66', 'ours=15.6'), ('2021-08-31', 'FIEMIND', 'tl=6.85', 'ours=5.8')]
+  gold names we cannot price at all (6): ['CIAN', 'DCMSRIND', 'GSPL', 'MIRZAINT', 'SREERAYALK', 'UGARSUGAR']
+
+=== 3. RETURN DECOMPOSITION (compounded NAV, ÷nhold fixed slots) ===
+  Trendlyne reported NAV                 : 227.0  (+127.0%)
+  gold picks @ Trendlyne prices (avg_row): 227.0  (+127.0%)
+  gold picks @ OUR prices (PRICING)      : 211.9  (+111.9%)  <- == above => prices reproduce TL
+  OUR picks  @ OUR prices (+ SELECTION)  : 210.4  (+110.4%)
+  (ca_uncertain slot-instances parked as cash in OUR-price recon: 4)
+
+=== 4. THIN PERIODS & CASH DRAG ===
+  gold pick-count distribution: {1: 1, 2: 1, 3: 2, 4: 2, 10: 53}
+  periods with <10 gold names: 6 (Trendlyne parks empty slots in cash)
+  if FULLY invested (÷actual count): 332.9  vs ÷10 227.0  -> cash drag = +106 NAV pts
+
+=== 5. LOCALIZE (per-period gold@ourpx vs avg_row, |Δ|>0.4pp) ===
+   [ 4] 2021-11-30 n_gold=10 priced_by_us=9 | ourpx=+9.07% avg_row=+13.83% Δ=-4.76pp
+   [ 5] 2021-12-31 n_gold=10 priced_by_us=9 | ourpx=+1.92% avg_row=+3.33% Δ=-1.41pp
+   [ 6] 2022-01-31 n_gold=10 priced_by_us=9 | ourpx=-6.15% avg_row=-5.36% Δ=-0.79pp
+   [ 7] 2022-02-28 n_gold=10 priced_by_us=9 | ourpx=+4.74% avg_row=+7.35% Δ=-2.61pp
+   [ 8] 2022-03-31 n_gold=10 priced_by_us=9 | ourpx=+3.58% avg_row=+6.75% Δ=-3.17pp
+   [ 9] 2022-04-29 n_gold=10 priced_by_us=9 | ourpx=-6.33% avg_row=-8.40% Δ=+2.07pp
+   [13] 2022-08-30 n_gold=10 priced_by_us=9 | ourpx=-5.86% avg_row=-4.38% Δ=-1.48pp
+   [19] 2023-02-28 n_gold=10 priced_by_us=9 | ourpx=+0.11% avg_row=-0.52% Δ=+0.63pp
+   [22] 2023-05-31 n_gold=10 priced_by_us=9 | ourpx=+4.89% avg_row=+4.36% Δ=+0.53pp
+   [23] 2023-06-30 n_gold=10 priced_by_us=9 | ourpx=+7.66% avg_row=+8.49% Δ=-0.83pp
+   [24] 2023-07-31 n_gold=10 priced_by_us=9 | ourpx=+8.46% avg_row=+9.38% Δ=-0.92pp
+   [26] 2023-09-29 n_gold=10 priced_by_us=10 | ourpx=-3.70% avg_row=-7.67% Δ=+3.97pp
+   [50] 2025-09-30 n_gold=10 priced_by_us=9 | ourpx=+6.41% avg_row=+5.68% Δ=+0.73pp
+
+=== PHASE B (PIT survivorship-free) summary ===
+/app/windfall/strategy/resolve.py:362: FutureWarning: The default fill_method='pad' in DataFrame.pct_change is deprecated and will be removed in a future version. Either fill in any non-leading NA values prior to calling pct_change or specify 'fill_method=None' to not fill NA values.
+  ret = close.pct_change()
+  PIT universe size=1646 | our-pick overlap vs gold=490/547=90% | OUR-picks NAV=218.4 (+118.4%)
+
+SUMMARY|548012|Tradeable (DVM-mom)|periods=59|overlapA=87%|priceMeanAbs=0.129|goldNAV=227.0|goldOurpx=211.9|ourNAV_A=210.4|ourNAV_B=218.4|overlapB=90%|unpriced=6|thin=6|caFlags=1
+  warnA: survivorship-free Trendlyne layer: 1385 names ever >Rs500cr in-window (live + delisted, blow-ups included); membership i
+  warnA: universe gated to point-in-time Rs500cr membership (survivorship-free).
+
+
+##############################################################################
+# TEST 548776 — Test A (value/PE)
+# filters: ['tl_durability > 55', 'tl_valuation > 50', 'tl_momentum > 60', 'adtv_cr > 10', 'tl_pe > 0']
+# rank: tl_pe asc | freq=monthly floor=1000.0 nhold=10
+# window: 2021-07-30 -> 2026-06-12 (59 periods); resolve warmup from 2020-06-05
+##############################################################################
+/app/windfall/strategy/resolve.py:362: FutureWarning: The default fill_method='pad' in DataFrame.pct_change is deprecated and will be removed in a future version. Either fill in any non-leading NA values prior to calling pct_change or specify 'fill_method=None' to not fill NA values.
+  ret = close.pct_change()
+
+=== 1. SELECTION (name-by-name vs Trendlyne, Phase A current-membership) ===
+periods=59 avg_overlap=8.3/10 total_matches=489/545=90%
+distinct TL-only names=40 slot-misses=56 | most common: [('IDFC', 5), ('JSLHISAR', 4), ('UJJIVAN', 3), ('RELINFRA', 3), ('GSPL', 2), ('GVKPIL', 2), ('FEDERALBNK', 2), ('PDMJEPAPER', 2), ('IBULLSLTD', 2), ('TATASTLBSL', 1)]
+distinct ours-only names=49 slot-extras=63 | most common: [('AEROENTER', 3), ('AIIL', 3), ('GMRP&UI', 3), ('NHPC', 2), ('PRECWIRE', 2), ('SARDAEN', 2), ('GESHIP', 2), ('DATAPATTNS', 2), ('KTKBANK', 2), ('JASH', 2)]
+  boundary (first 3 periods, rank #nhold-1..nhold+3):
+   2021-07-30: TL-only=['JSLHISAR', 'TATASTLBSL'] ours-only=['BEPL', 'VEDL']
+     our rank #9-13: ['BEPL=7.5', 'VEDL=7.6', 'NTPC=7.8', 'NMDC=8.5', 'CESC=8.5']
+   2021-08-31: TL-only=['BCG', 'JSLHISAR'] ours-only=['NHPC', 'SOTL']
+     our rank #9-13: ['SOTL=7.7', 'NHPC=8.0', 'TATASTEEL=8.4', 'GHCL=8.5', 'PANAMAPET=8.6']
+   2021-09-30: TL-only=['GPIL'] ours-only=['POWERGRID']
+     our rank #9-13: ['J&KBANK=5.2', 'POWERGRID=6.2', 'JKTYRE=6.6', 'PTC=7.2', 'GNFC=7.2']
+
+=== 2. PRICING (our adj price vs Trendlyne CSV price, per stock-period) ===
+stock-periods=540 mean|Δ|=0.135pp median=0.003pp p95=0.31pp max=44.35pp
+  within 0.5pp=96% within 1pp=99% | gold names unpriceable=3/173
+  CA-adj mismatches (ratio start->end jumped >5%): 1
+    2023-09-29 GVKPIL       ratio 1.0->1.736 tl_chg=-39.8% our_chg=+4.6%
+  worst 6 |Δ|: [('2023-09-29', 'GVKPIL', 'tl=-39.75', 'ours=4.6'), ('2021-07-30', 'TATASTLBSL', 'tl=-0.89', 'ours=3.5'), ('2021-11-30', 'VTL', 'tl=15.74', 'ours=14.1'), ('2021-09-30', 'GPIL', 'tl=11.06', 'ours=9.6'), ('2021-12-31', 'VTL', 'tl=2.55', 'ours=3.7'), ('2022-06-30', 'MAHSEAMLES', 'tl=16.66', 'ours=15.6')]
+  gold names we cannot price at all (3): ['3IINFOLTD', 'GSPL', 'SREERAYALK']
+
+=== 3. RETURN DECOMPOSITION (compounded NAV, ÷nhold fixed slots) ===
+  Trendlyne reported NAV                 : 260.3  (+160.3%)
+  gold picks @ Trendlyne prices (avg_row): 260.3  (+160.3%)
+  gold picks @ OUR prices (PRICING)      : 280.4  (+180.4%)  <- == above => prices reproduce TL
+  OUR picks  @ OUR prices (+ SELECTION)  : 320.0  (+220.0%)
+  (ca_uncertain slot-instances parked as cash in OUR-price recon: 9)
+
+=== 4. THIN PERIODS & CASH DRAG ===
+  gold pick-count distribution: {1: 1, 2: 1, 3: 2, 4: 2, 9: 2, 10: 51}
+  periods with <10 gold names: 8 (Trendlyne parks empty slots in cash)
+  if FULLY invested (÷actual count): 376.5  vs ÷10 260.3  -> cash drag = +116 NAV pts
+
+=== 5. LOCALIZE (per-period gold@ourpx vs avg_row, |Δ|>0.4pp) ===
+   [ 0] 2021-07-30 n_gold=10 priced_by_us=10 | ourpx=-8.55% avg_row=-9.09% Δ=+0.54pp
+   [ 6] 2022-01-31 n_gold=10 priced_by_us=9 | ourpx=-8.80% avg_row=-12.13% Δ=+3.33pp
+   [ 7] 2022-02-28 n_gold=10 priced_by_us=10 | ourpx=+5.34% avg_row=+7.30% Δ=-1.96pp
+   [ 9] 2022-04-29 n_gold=10 priced_by_us=9 | ourpx=-12.64% avg_row=-14.79% Δ=+2.15pp
+   [13] 2022-08-30 n_gold=10 priced_by_us=9 | ourpx=-7.77% avg_row=-6.49% Δ=-1.28pp
+   [19] 2023-02-28 n_gold=10 priced_by_us=9 | ourpx=+1.10% avg_row=+0.47% Δ=+0.63pp
+   [23] 2023-06-30 n_gold=10 priced_by_us=10 | ourpx=+9.51% avg_row=+11.08% Δ=-1.57pp
+   [25] 2023-08-31 n_gold=10 priced_by_us=10 | ourpx=+14.80% avg_row=+15.38% Δ=-0.58pp
+   [26] 2023-09-29 n_gold=9 priced_by_us=9 | ourpx=-1.64% avg_row=-5.61% Δ=+3.97pp
+   [29] 2023-12-29 n_gold=10 priced_by_us=10 | ourpx=+8.84% avg_row=+8.27% Δ=+0.57pp
+   [30] 2024-01-31 n_gold=9 priced_by_us=9 | ourpx=-5.36% avg_row=-5.89% Δ=+0.53pp
+
+=== PHASE B (PIT survivorship-free) summary ===
+/app/windfall/strategy/resolve.py:362: FutureWarning: The default fill_method='pad' in DataFrame.pct_change is deprecated and will be removed in a future version. Either fill in any non-leading NA values prior to calling pct_change or specify 'fill_method=None' to not fill NA values.
+  ret = close.pct_change()
+  PIT universe size=1646 | our-pick overlap vs gold=501/545=92% | OUR-picks NAV=312.0 (+212.0%)
+
+SUMMARY|548776|Test A (value/PE)|periods=59|overlapA=90%|priceMeanAbs=0.135|goldNAV=260.3|goldOurpx=280.4|ourNAV_A=320.0|ourNAV_B=312.0|overlapB=92%|unpriced=3|thin=8|caFlags=1
+  warnA: survivorship-free Trendlyne layer: 1385 names ever >Rs500cr in-window (live + delisted, blow-ups included); membership i
+  warnA: universe gated to point-in-time Rs500cr membership (survivorship-free).
+
+
+##############################################################################
+# TEST 548042 — Short-term breakout (pure technical)
+# filters: ['mcap > 1000', 'adtv_cr > 10', 'close > sma50', 'close > sma200', 'roc21 > 10', 'rsi14 > 60']
+# rank: roc21 desc | freq=weekly floor=1000.0 nhold=10
+# window: 2025-05-30 -> 2026-06-12 (54 periods); resolve warmup from 2024-04-05
+##############################################################################
+/app/windfall/strategy/resolve.py:362: FutureWarning: The default fill_method='pad' in DataFrame.pct_change is deprecated and will be removed in a future version. Either fill in any non-leading NA values prior to calling pct_change or specify 'fill_method=None' to not fill NA values.
+  ret = close.pct_change()
+
+=== 1. SELECTION (name-by-name vs Trendlyne, Phase A current-membership) ===
+periods=54 avg_overlap=6.9/10 total_matches=375/537=70%
+distinct TL-only names=54 slot-misses=162 | most common: [('14060423', 17), ('STLTECH', 16), ('PFOCUS', 7), ('BGRENERGY', 7), ('CIAN', 6), ('WAAREEINDO', 6), ('542012', 5), ('SEIL', 5), ('DEEDEV', 5), ('SIKA', 4)]
+distinct ours-only names=116 slot-extras=159 | most common: [('KMEW', 4), ('ORIENTTECH', 4), ('MTARTECH', 4), ('RPEL', 4), ('HITECH', 3), ('INDOTHAI', 3), ('LLOYDSENT', 3), ('CEMPRO', 3), ('AVANTEL', 2), ('KIRLOSBROS', 2)]
+  boundary (first 3 periods, rank #nhold-1..nhold+3):
+   2025-05-30: TL-only=[] ours-only=[]
+     our rank #9-13: ['LUMAXTECH=55.8', 'BANCOINDIA=55.5', 'MMTC=52.6', 'PGIL=51.8', 'ZENTEC=51.1']
+   2025-06-06: TL-only=['APS', 'SIKA'] ours-only=['AVANTEL', 'IFCI']
+     our rank #9-13: ['IFCI=65.6', 'AVANTEL=62.3', 'HLEGLAS=61.7', 'RPOWER=61.1', 'SUVEN=60.5']
+   2025-06-13: TL-only=['17160453', 'ORIANA', 'SIKA'] ours-only=['CARYSIL', 'FMGOETZE', 'SIRCA']
+     our rank #9-13: ['SIRCA=43.2', 'CARYSIL=43.1', 'APOLLO=42.2', 'PREMEXPLN=40.5', 'WOCKPHARMA=38.4']
+
+=== 2. PRICING (our adj price vs Trendlyne CSV price, per stock-period) ===
+stock-periods=498 mean|Δ|=0.004pp median=0.003pp p95=0.00pp max=0.27pp
+  within 0.5pp=100% within 1pp=100% | gold names unpriceable=7/224
+  CA-adj mismatches (ratio start->end jumped >5%): 0
+  worst 6 |Δ|: [('2025-09-12', 'MOSCHIP', 'tl=5.39', 'ours=5.7'), ('2025-09-05', 'MOSCHIP', 'tl=3.41', 'ours=3.2'), ('2025-09-19', 'MOSCHIP', 'tl=-10.99', 'ours=-11.1'), ('2025-06-20', 'FORCEMOT', 'tl=1.61', 'ours=1.7'), ('2025-10-17', 'SANDUMA', 'tl=-1.06', 'ours=-1.0'), ('2025-08-01', 'CUPID', 'tl=6.01', 'ours=6.0')]
+  gold names we cannot price at all (7): ['14060423', '17160453', '542012', 'AAYUSH', 'ABCGAS', 'CIAN', 'RDBRIL']
+
+=== 3. RETURN DECOMPOSITION (compounded NAV, ÷nhold fixed slots) ===
+  Trendlyne reported NAV                 : 124.9  (+24.9%)
+  gold picks @ Trendlyne prices (avg_row): 124.9  (+24.9%)
+  gold picks @ OUR prices (PRICING)      : 103.9  (+3.9%)  <- == above => prices reproduce TL
+  OUR picks  @ OUR prices (+ SELECTION)  : 97.8  (-2.2%)
+  (ca_uncertain slot-instances parked as cash in OUR-price recon: 0)
+
+=== 4. THIN PERIODS & CASH DRAG ===
+  gold pick-count distribution: {7: 1, 10: 53}
+  periods with <10 gold names: 1 (Trendlyne parks empty slots in cash)
+  if FULLY invested (÷actual count): 126.5  vs ÷10 124.9  -> cash drag = +2 NAV pts
+
+=== 5. LOCALIZE (per-period gold@ourpx vs avg_row, |Δ|>0.4pp) ===
+   [ 2] 2025-06-13 n_gold=10 priced_by_us=9 | ourpx=-0.42% avg_row=-1.62% Δ=+1.20pp
+   [ 6] 2025-07-11 n_gold=10 priced_by_us=9 | ourpx=-0.82% avg_row=-0.21% Δ=-0.61pp
+   [ 7] 2025-07-18 n_gold=10 priced_by_us=9 | ourpx=-0.73% avg_row=-1.68% Δ=+0.95pp
+   [11] 2025-08-14 n_gold=10 priced_by_us=9 | ourpx=+4.08% avg_row=+5.12% Δ=-1.04pp
+   [12] 2025-08-22 n_gold=10 priced_by_us=9 | ourpx=-0.52% avg_row=+0.30% Δ=-0.82pp
+   [13] 2025-08-29 n_gold=10 priced_by_us=9 | ourpx=-0.08% avg_row=+0.96% Δ=-1.04pp
+   [14] 2025-09-05 n_gold=10 priced_by_us=9 | ourpx=+2.61% avg_row=+3.67% Δ=-1.06pp
+   [15] 2025-09-12 n_gold=10 priced_by_us=9 | ourpx=+4.54% avg_row=+5.55% Δ=-1.01pp
+   [16] 2025-09-19 n_gold=10 priced_by_us=9 | ourpx=-1.97% avg_row=-0.92% Δ=-1.05pp
+   [17] 2025-09-26 n_gold=10 priced_by_us=8 | ourpx=+0.59% avg_row=+3.56% Δ=-2.97pp
+   [18] 2025-10-03 n_gold=10 priced_by_us=7 | ourpx=-5.36% avg_row=-1.55% Δ=-3.81pp
+   [19] 2025-10-10 n_gold=10 priced_by_us=7 | ourpx=+1.00% avg_row=+1.91% Δ=-0.91pp
+   [20] 2025-10-17 n_gold=10 priced_by_us=7 | ourpx=-0.13% avg_row=-0.64% Δ=+0.51pp
+   [21] 2025-10-24 n_gold=10 priced_by_us=9 | ourpx=-2.04% avg_row=-1.01% Δ=-1.03pp
+   [24] 2025-11-14 n_gold=10 priced_by_us=8 | ourpx=-2.67% avg_row=-0.00% Δ=-2.67pp
+   [25] 2025-11-21 n_gold=10 priced_by_us=8 | ourpx=-0.35% avg_row=+2.31% Δ=-2.66pp
+   [26] 2025-11-28 n_gold=10 priced_by_us=8 | ourpx=-0.49% avg_row=-2.85% Δ=+2.36pp
+   [32] 2026-01-09 n_gold=10 priced_by_us=9 | ourpx=-1.70% avg_row=+0.44% Δ=-2.14pp
+   [33] 2026-01-16 n_gold=10 priced_by_us=9 | ourpx=-3.91% avg_row=-5.92% Δ=+2.01pp
+   [43] 2026-03-27 n_gold=10 priced_by_us=9 | ourpx=+0.19% avg_row=+0.79% Δ=-0.60pp
+   [44] 2026-04-02 n_gold=10 priced_by_us=9 | ourpx=-0.64% avg_row=+0.39% Δ=-1.03pp
+   [45] 2026-04-10 n_gold=10 priced_by_us=9 | ourpx=+4.90% avg_row=+5.72% Δ=-0.82pp
+   [48] 2026-04-30 n_gold=10 priced_by_us=9 | ourpx=+3.02% avg_row=+5.78% Δ=-2.76pp
+   [49] 2026-05-08 n_gold=10 priced_by_us=9 | ourpx=-3.12% avg_row=-5.38% Δ=+2.26pp
+
+=== PHASE B (PIT survivorship-free) summary ===
+/app/windfall/strategy/resolve.py:362: FutureWarning: The default fill_method='pad' in DataFrame.pct_change is deprecated and will be removed in a future version. Either fill in any non-leading NA values prior to calling pct_change or specify 'fill_method=None' to not fill NA values.
+  ret = close.pct_change()
+  PIT universe size=1603 | our-pick overlap vs gold=425/537=79% | OUR-picks NAV=114.1 (+14.1%)
+
+SUMMARY|548042|Short-term breakout (pure technical)|periods=54|overlapA=70%|priceMeanAbs=0.004|goldNAV=124.9|goldOurpx=103.9|ourNAV_A=97.8|ourNAV_B=114.1|overlapB=79%|unpriced=7|thin=1|caFlags=0
+  warnA: survivorship-free Trendlyne layer: 1385 names ever >Rs500cr in-window (live + delisted, blow-ups included); membership i
+  warnA: universe gated to point-in-time Rs500cr membership (survivorship-free).
+
+
+##############################################################################
+# TEST 548040 — Pullback in uptrend (mean-reversion)
+# filters: ['mcap > 1000', 'adtv_cr > 10', 'tl_durability > 50', 'close > sma200', 'rsi14 > 40', 'rsi14 < 55']
+# rank: tl_momentum desc | freq=weekly floor=1000.0 nhold=10
+# window: 2025-05-30 -> 2026-06-12 (54 periods); resolve warmup from 2024-04-05
+##############################################################################
+/app/windfall/strategy/resolve.py:362: FutureWarning: The default fill_method='pad' in DataFrame.pct_change is deprecated and will be removed in a future version. Either fill in any non-leading NA values prior to calling pct_change or specify 'fill_method=None' to not fill NA values.
+  ret = close.pct_change()
+
+=== 1. SELECTION (name-by-name vs Trendlyne, Phase A current-membership) ===
+periods=54 avg_overlap=9.1/10 total_matches=493/540=91%
+distinct TL-only names=34 slot-misses=47 | most common: [('MANGCHEFER', 4), ('CIAN', 3), ('CAMLINFINE', 2), ('SIKA', 2), ('AXISCADES', 2), ('KRN', 2), ('ALPEXSOLAR', 2), ('IDFCFIRSTB', 2), ('IZMO', 2), ('IFBAGRO', 2)]
+distinct ours-only names=40 slot-extras=47 | most common: [('POCL', 4), ('KMEW', 4), ('SINDHUTRAD', 2), ('AGIIL', 1), ('LICHSGFIN', 1), ('WINDMACHIN', 1), ('PARAS', 1), ('GULFOILLUB', 1), ('SUPRIYA', 1), ('INDIAGLYCO', 1)]
+  boundary (first 3 periods, rank #nhold-1..nhold+3):
+   2025-05-30: TL-only=[] ours-only=[]
+     our rank #9-13: ['KPRMILL=61.5', 'GRMOVER=61.1', 'INDIASHLTR=61.0', 'NH=60.6', 'REDINGTON=60.4']
+   2025-06-06: TL-only=[] ours-only=[]
+     our rank #9-13: ['PRIVISCL=61.5', 'MANORAMA=61.5', 'KPRMILL=60.9', 'MARUTI=59.9', 'NH=59.2']
+   2025-06-13: TL-only=['TFCILTD'] ours-only=['AGIIL']
+     our rank #9-13: ['MAZDOCK=61.6', 'CENTUM=61.4', 'TFCILTD=61.3', 'GABRIEL=61.3', 'INDIGO=61.1']
+
+=== 2. PRICING (our adj price vs Trendlyne CSV price, per stock-period) ===
+stock-periods=533 mean|Δ|=0.004pp median=0.002pp p95=0.00pp max=0.17pp
+  within 0.5pp=100% within 1pp=100% | gold names unpriceable=4/268
+  CA-adj mismatches (ratio start->end jumped >5%): 0
+  worst 6 |Δ|: [('2025-11-14', 'FORCEMOT', 'tl=-4.07', 'ours=-4.2'), ('2026-01-23', 'FORCEMOT', 'tl=-2.97', 'ours=-2.8'), ('2025-08-22', 'EFCIL', 'tl=0.21', 'ours=0.4'), ('2025-09-05', 'FORCEMOT', 'tl=3.88', 'ours=3.8'), ('2025-09-19', 'FORCEMOT', 'tl=-6.43', 'ours=-6.5'), ('2025-08-01', 'FORCEMOT', 'tl=6.48', 'ours=6.6')]
+  gold names we cannot price at all (4): ['17160453', '542012', 'CIAN', 'RDBRIL']
+
+=== 3. RETURN DECOMPOSITION (compounded NAV, ÷nhold fixed slots) ===
+  Trendlyne reported NAV                 : 99.1  (-0.9%)
+  gold picks @ Trendlyne prices (avg_row): 99.1  (-0.9%)
+  gold picks @ OUR prices (PRICING)      : 103.0  (+3.0%)  <- == above => prices reproduce TL
+  OUR picks  @ OUR prices (+ SELECTION)  : 112.0  (+12.0%)
+  (ca_uncertain slot-instances parked as cash in OUR-price recon: 0)
+
+=== 4. THIN PERIODS & CASH DRAG ===
+  gold pick-count distribution: {10: 54}
+  periods with <10 gold names: 0 (Trendlyne parks empty slots in cash)
+  if FULLY invested (÷actual count): 99.1  vs ÷10 99.1  -> cash drag = +0 NAV pts
+
+=== 5. LOCALIZE (per-period gold@ourpx vs avg_row, |Δ|>0.4pp) ===
+   [ 8] 2025-07-25 n_gold=10 priced_by_us=9 | ourpx=-2.59% avg_row=-1.91% Δ=-0.68pp
+   [15] 2025-09-12 n_gold=10 priced_by_us=9 | ourpx=+0.84% avg_row=+0.35% Δ=+0.49pp
+   [21] 2025-10-24 n_gold=10 priced_by_us=9 | ourpx=+3.72% avg_row=+1.46% Δ=+2.26pp
+   [27] 2025-12-05 n_gold=10 priced_by_us=9 | ourpx=-0.45% avg_row=-1.90% Δ=+1.45pp
+   [28] 2025-12-12 n_gold=10 priced_by_us=9 | ourpx=-0.35% avg_row=+1.20% Δ=-1.55pp
+   [33] 2026-01-16 n_gold=10 priced_by_us=9 | ourpx=-4.39% avg_row=-5.78% Δ=+1.39pp
+   [34] 2026-01-23 n_gold=10 priced_by_us=9 | ourpx=-2.96% avg_row=-3.36% Δ=+0.40pp
+
+=== PHASE B (PIT survivorship-free) summary ===
+/app/windfall/strategy/resolve.py:362: FutureWarning: The default fill_method='pad' in DataFrame.pct_change is deprecated and will be removed in a future version. Either fill in any non-leading NA values prior to calling pct_change or specify 'fill_method=None' to not fill NA values.
+  ret = close.pct_change()
+  PIT universe size=1603 | our-pick overlap vs gold=496/540=92% | OUR-picks NAV=110.8 (+10.8%)
+
+SUMMARY|548040|Pullback in uptrend (mean-reversion)|periods=54|overlapA=91%|priceMeanAbs=0.004|goldNAV=99.1|goldOurpx=103.0|ourNAV_A=112.0|ourNAV_B=110.8|overlapB=92%|unpriced=4|thin=0|caFlags=0
+  warnA: survivorship-free Trendlyne layer: 1385 names ever >Rs500cr in-window (live + delisted, blow-ups included); membership i
+  warnA: universe gated to point-in-time Rs500cr membership (survivorship-free).
+
+
+##############################################################################
+# TEST 548017 — Trend/regime proxy
+# filters: ['tl_durability > 55', 'tl_valuation > 50', 'tl_momentum > 60', 'adtv_cr > 10', 'mcap > 1000', 'close > sma200']
+# rank: tl_momentum desc | freq=monthly floor=1000.0 nhold=10
+# window: 2021-07-30 -> 2026-06-12 (59 periods); resolve warmup from 2020-06-05
+##############################################################################
+/app/windfall/strategy/resolve.py:362: FutureWarning: The default fill_method='pad' in DataFrame.pct_change is deprecated and will be removed in a future version. Either fill in any non-leading NA values prior to calling pct_change or specify 'fill_method=None' to not fill NA values.
+  ret = close.pct_change()
+
+=== 1. SELECTION (name-by-name vs Trendlyne, Phase A current-membership) ===
+periods=59 avg_overlap=8.1/10 total_matches=477/547=87%
+distinct TL-only names=49 slot-misses=70 | most common: [('MIRZAINT', 5), ('JSLHISAR', 3), ('AMBIKCO', 3), ('UJJIVAN', 3), ('MANGCHEFER', 3), ('BCG', 2), ('TV18BRDCST', 2), ('UTTAMSUGAR', 2), ('GSPL', 2), ('JAIBALAJI', 2)]
+distinct ours-only names=62 slot-extras=73 | most common: [('TATASTEEL', 3), ('KARURVYSYA', 3), ('TIRUMALCHM', 2), ('UNIONBANK', 2), ('GUJALKALI', 2), ('LTF', 2), ('MAHSEAMLES', 2), ('GMRP&UI', 2), ('INDIANB', 2), ('RAIN', 1)]
+  boundary (first 3 periods, rank #nhold-1..nhold+3):
+   2021-07-30: TL-only=['JSLHISAR', 'SSWL', 'TNPETRO'] ours-only=['RAIN', 'TATASTEEL', 'TIRUMALCHM']
+     our rank #9-13: ['TIRUMALCHM=75.6', 'TATASTEEL=75.2', 'JINDALSAW=75.1', 'SAIL=74.7', 'GNA=74.2']
+   2021-08-31: TL-only=['BCG', 'JSLHISAR', 'NITINSPIN'] ours-only=['BANCOINDIA', 'TATASTEEL', 'USHAMART']
+     our rank #9-13: ['BANCOINDIA=68.1', 'TATASTEEL=67.6', 'JSL=67.0', 'POLYPLEX=66.6', 'GHCL=66.5']
+   2021-09-30: TL-only=['AMBIKCO', 'BCG'] ours-only=['FIEMIND', 'IGPL']
+     our rank #9-13: ['IGPL=71.1', 'FIEMIND=69.4', 'JSL=68.8', 'UFLEX=68.7', 'KPRMILL=68.5']
+
+=== 2. PRICING (our adj price vs Trendlyne CSV price, per stock-period) ===
+stock-periods=535 mean|Δ|=0.129pp median=0.003pp p95=0.35pp max=44.35pp
+  within 0.5pp=96% within 1pp=99% | gold names unpriceable=6/224
+  CA-adj mismatches (ratio start->end jumped >5%): 1
+    2023-09-29 GVKPIL       ratio 1.0->1.736 tl_chg=-39.8% our_chg=+4.6%
+  worst 6 |Δ|: [('2023-09-29', 'GVKPIL', 'tl=-39.75', 'ours=4.6'), ('2022-05-31', 'TIMETECHNO', 'tl=-2.3', 'ours=-0.3'), ('2022-10-31', 'POWERMECH', 'tl=29.79', 'ours=27.9'), ('2021-12-31', 'VTL', 'tl=2.55', 'ours=3.7'), ('2022-06-30', 'MAHSEAMLES', 'tl=16.66', 'ours=15.6'), ('2021-08-31', 'FIEMIND', 'tl=6.85', 'ours=5.8')]
+  gold names we cannot price at all (6): ['CIAN', 'DCMSRIND', 'GSPL', 'MIRZAINT', 'SREERAYALK', 'UGARSUGAR']
+
+=== 3. RETURN DECOMPOSITION (compounded NAV, ÷nhold fixed slots) ===
+  Trendlyne reported NAV                 : 227.0  (+127.0%)
+  gold picks @ Trendlyne prices (avg_row): 227.0  (+127.0%)
+  gold picks @ OUR prices (PRICING)      : 211.9  (+111.9%)  <- == above => prices reproduce TL
+  OUR picks  @ OUR prices (+ SELECTION)  : 233.1  (+133.1%)
+  (ca_uncertain slot-instances parked as cash in OUR-price recon: 4)
+
+=== 4. THIN PERIODS & CASH DRAG ===
+  gold pick-count distribution: {1: 1, 2: 1, 3: 2, 4: 2, 10: 53}
+  periods with <10 gold names: 6 (Trendlyne parks empty slots in cash)
+  if FULLY invested (÷actual count): 332.9  vs ÷10 227.0  -> cash drag = +106 NAV pts
+
+=== 5. LOCALIZE (per-period gold@ourpx vs avg_row, |Δ|>0.4pp) ===
+   [ 4] 2021-11-30 n_gold=10 priced_by_us=9 | ourpx=+9.07% avg_row=+13.83% Δ=-4.76pp
+   [ 5] 2021-12-31 n_gold=10 priced_by_us=9 | ourpx=+1.92% avg_row=+3.33% Δ=-1.41pp
+   [ 6] 2022-01-31 n_gold=10 priced_by_us=9 | ourpx=-6.15% avg_row=-5.36% Δ=-0.79pp
+   [ 7] 2022-02-28 n_gold=10 priced_by_us=9 | ourpx=+4.74% avg_row=+7.35% Δ=-2.61pp
+   [ 8] 2022-03-31 n_gold=10 priced_by_us=9 | ourpx=+3.58% avg_row=+6.75% Δ=-3.17pp
+   [ 9] 2022-04-29 n_gold=10 priced_by_us=9 | ourpx=-6.33% avg_row=-8.40% Δ=+2.07pp
+   [13] 2022-08-30 n_gold=10 priced_by_us=9 | ourpx=-5.86% avg_row=-4.38% Δ=-1.48pp
+   [19] 2023-02-28 n_gold=10 priced_by_us=9 | ourpx=+0.11% avg_row=-0.52% Δ=+0.63pp
+   [22] 2023-05-31 n_gold=10 priced_by_us=9 | ourpx=+4.89% avg_row=+4.36% Δ=+0.53pp
+   [23] 2023-06-30 n_gold=10 priced_by_us=9 | ourpx=+7.66% avg_row=+8.49% Δ=-0.83pp
+   [24] 2023-07-31 n_gold=10 priced_by_us=9 | ourpx=+8.46% avg_row=+9.38% Δ=-0.92pp
+   [26] 2023-09-29 n_gold=10 priced_by_us=10 | ourpx=-3.70% avg_row=-7.67% Δ=+3.97pp
+   [50] 2025-09-30 n_gold=10 priced_by_us=9 | ourpx=+6.41% avg_row=+5.68% Δ=+0.73pp
+
+=== PHASE B (PIT survivorship-free) summary ===
+/app/windfall/strategy/resolve.py:362: FutureWarning: The default fill_method='pad' in DataFrame.pct_change is deprecated and will be removed in a future version. Either fill in any non-leading NA values prior to calling pct_change or specify 'fill_method=None' to not fill NA values.
+  ret = close.pct_change()
+  PIT universe size=1646 | our-pick overlap vs gold=490/547=90% | OUR-picks NAV=224.0 (+124.0%)
+
+SUMMARY|548017|Trend/regime proxy|periods=59|overlapA=87%|priceMeanAbs=0.129|goldNAV=227.0|goldOurpx=211.9|ourNAV_A=233.1|ourNAV_B=224.0|overlapB=90%|unpriced=6|thin=6|caFlags=1
+  warnA: survivorship-free Trendlyne layer: 1385 names ever >Rs500cr in-window (live + delisted, blow-ups included); membership i
+  warnA: universe gated to point-in-time Rs500cr membership (survivorship-free).
+
+
+##############################################################################
+# TEST 548015 — Tighter momentum (>65)
+# filters: ['tl_durability > 55', 'tl_valuation > 50', 'tl_momentum > 65', 'adtv_cr > 10', 'mcap > 1000']
+# rank: tl_momentum desc | freq=monthly floor=1000.0 nhold=10
+# window: 2021-07-30 -> 2026-06-12 (57 periods); resolve warmup from 2020-06-05
+##############################################################################
+/app/windfall/strategy/resolve.py:362: FutureWarning: The default fill_method='pad' in DataFrame.pct_change is deprecated and will be removed in a future version. Either fill in any non-leading NA values prior to calling pct_change or specify 'fill_method=None' to not fill NA values.
+  ret = close.pct_change()
+
+=== 1. SELECTION (name-by-name vs Trendlyne, Phase A current-membership) ===
+periods=57 avg_overlap=7.6/10 total_matches=433/495=87%
+distinct TL-only names=42 slot-misses=62 | most common: [('MIRZAINT', 5), ('JSLHISAR', 3), ('AMBIKCO', 3), ('UJJIVAN', 3), ('BCG', 2), ('TV18BRDCST', 2), ('UTTAMSUGAR', 2), ('GSPL', 2), ('JAIBALAJI', 2), ('VASCONEQ', 2)]
+distinct ours-only names=54 slot-extras=63 | most common: [('TATASTEEL', 2), ('TIRUMALCHM', 2), ('UNIONBANK', 2), ('KARURVYSYA', 2), ('LTF', 2), ('MAHSEAMLES', 2), ('FORCEMOT', 2), ('AIIL', 2), ('GMRP&UI', 2), ('RAIN', 1)]
+  boundary (first 3 periods, rank #nhold-1..nhold+3):
+   2021-07-30: TL-only=['JSLHISAR', 'SSWL', 'TNPETRO'] ours-only=['RAIN', 'TATASTEEL', 'TIRUMALCHM']
+     our rank #9-13: ['TIRUMALCHM=75.6', 'TATASTEEL=75.2', 'JINDALSAW=75.1', 'SAIL=74.7', 'GNA=74.2']
+   2021-08-31: TL-only=['BCG', 'JSLHISAR', 'NITINSPIN'] ours-only=['BANCOINDIA', 'TATASTEEL', 'USHAMART']
+     our rank #9-13: ['BANCOINDIA=68.1', 'TATASTEEL=67.6', 'JSL=67.0', 'POLYPLEX=66.6', 'GHCL=66.5']
+   2021-09-30: TL-only=['AMBIKCO', 'BCG'] ours-only=['FIEMIND', 'IGPL']
+     our rank #9-13: ['IGPL=71.1', 'FIEMIND=69.4', 'JSL=68.8', 'UFLEX=68.7', 'KPRMILL=68.5']
+
+=== 2. PRICING (our adj price vs Trendlyne CSV price, per stock-period) ===
+stock-periods=483 mean|Δ|=0.138pp median=0.003pp p95=0.34pp max=44.35pp
+  within 0.5pp=96% within 1pp=99% | gold names unpriceable=6/215
+  CA-adj mismatches (ratio start->end jumped >5%): 1
+    2023-09-29 GVKPIL       ratio 1.0->1.736 tl_chg=-39.8% our_chg=+4.6%
+  worst 6 |Δ|: [('2023-09-29', 'GVKPIL', 'tl=-39.75', 'ours=4.6'), ('2022-05-31', 'TIMETECHNO', 'tl=-2.3', 'ours=-0.3'), ('2022-10-31', 'POWERMECH', 'tl=29.79', 'ours=27.9'), ('2021-12-31', 'VTL', 'tl=2.55', 'ours=3.7'), ('2022-06-30', 'MAHSEAMLES', 'tl=16.66', 'ours=15.6'), ('2021-08-31', 'FIEMIND', 'tl=6.85', 'ours=5.8')]
+  gold names we cannot price at all (6): ['CIAN', 'DCMSRIND', 'GSPL', 'MIRZAINT', 'SREERAYALK', 'UGARSUGAR']
+
+=== 3. RETURN DECOMPOSITION (compounded NAV, ÷nhold fixed slots) ===
+  Trendlyne reported NAV                 : 202.2  (+102.2%)
+  gold picks @ Trendlyne prices (avg_row): 202.2  (+102.2%)
+  gold picks @ OUR prices (PRICING)      : 188.0  (+88.0%)  <- == above => prices reproduce TL
+  OUR picks  @ OUR prices (+ SELECTION)  : 183.8  (+83.8%)
+  (ca_uncertain slot-instances parked as cash in OUR-price recon: 3)
+
+=== 4. THIN PERIODS & CASH DRAG ===
+  gold pick-count distribution: {1: 1, 2: 2, 3: 1, 4: 1, 5: 5, 7: 2, 8: 1, 9: 4, 10: 40}
+  periods with <10 gold names: 17 (Trendlyne parks empty slots in cash)
+  if FULLY invested (÷actual count): 366.3  vs ÷10 202.2  -> cash drag = +164 NAV pts
+
+=== 5. LOCALIZE (per-period gold@ourpx vs avg_row, |Δ|>0.4pp) ===
+   [ 4] 2021-11-30 n_gold=8 priced_by_us=7 | ourpx=+8.49% avg_row=+13.24% Δ=-4.75pp
+   [ 5] 2021-12-31 n_gold=10 priced_by_us=9 | ourpx=+1.92% avg_row=+3.33% Δ=-1.41pp
+   [ 6] 2022-01-31 n_gold=10 priced_by_us=9 | ourpx=-6.15% avg_row=-5.36% Δ=-0.79pp
+   [ 7] 2022-02-28 n_gold=5 priced_by_us=4 | ourpx=+4.57% avg_row=+7.30% Δ=-2.73pp
+   [ 8] 2022-03-31 n_gold=10 priced_by_us=9 | ourpx=+3.58% avg_row=+6.75% Δ=-3.17pp
+   [ 9] 2022-04-29 n_gold=10 priced_by_us=9 | ourpx=-6.33% avg_row=-8.40% Δ=+2.07pp
+   [13] 2022-08-30 n_gold=10 priced_by_us=9 | ourpx=-5.86% avg_row=-4.38% Δ=-1.48pp
+   [19] 2023-02-28 n_gold=5 priced_by_us=4 | ourpx=-0.38% avg_row=-1.01% Δ=+0.63pp
+   [22] 2023-05-31 n_gold=10 priced_by_us=9 | ourpx=+4.89% avg_row=+4.36% Δ=+0.53pp
+   [23] 2023-06-30 n_gold=10 priced_by_us=9 | ourpx=+7.66% avg_row=+8.49% Δ=-0.83pp
+   [24] 2023-07-31 n_gold=10 priced_by_us=9 | ourpx=+8.46% avg_row=+9.38% Δ=-0.92pp
+   [26] 2023-09-29 n_gold=10 priced_by_us=10 | ourpx=-3.70% avg_row=-7.67% Δ=+3.97pp
+   [48] 2025-09-30 n_gold=9 priced_by_us=8 | ourpx=+6.48% avg_row=+5.75% Δ=+0.73pp
+
+=== PHASE B (PIT survivorship-free) summary ===
+/app/windfall/strategy/resolve.py:362: FutureWarning: The default fill_method='pad' in DataFrame.pct_change is deprecated and will be removed in a future version. Either fill in any non-leading NA values prior to calling pct_change or specify 'fill_method=None' to not fill NA values.
+  ret = close.pct_change()
+  PIT universe size=1646 | our-pick overlap vs gold=444/495=90% | OUR-picks NAV=179.8 (+79.8%)
+
+SUMMARY|548015|Tighter momentum (>65)|periods=57|overlapA=87%|priceMeanAbs=0.138|goldNAV=202.2|goldOurpx=188.0|ourNAV_A=183.8|ourNAV_B=179.8|overlapB=90%|unpriced=6|thin=17|caFlags=1
+  warnA: survivorship-free Trendlyne layer: 1385 names ever >Rs500cr in-window (live + delisted, blow-ups included); membership i
+  warnA: universe gated to point-in-time Rs500cr membership (survivorship-free).
+
+
+##############################################################################
+# TEST 548014 — Tighter momentum (20% max weight = 5 slots)
+# filters: ['tl_durability > 55', 'tl_valuation > 50', 'tl_momentum > 65', 'adtv_cr > 10', 'mcap > 1000']
+# rank: tl_momentum desc | freq=monthly floor=1000.0 nhold=5
+# window: 2021-07-30 -> 2026-06-12 (57 periods); resolve warmup from 2020-06-05
+##############################################################################
+/app/windfall/strategy/resolve.py:362: FutureWarning: The default fill_method='pad' in DataFrame.pct_change is deprecated and will be removed in a future version. Either fill in any non-leading NA values prior to calling pct_change or specify 'fill_method=None' to not fill NA values.
+  ret = close.pct_change()
+
+=== 1. SELECTION (name-by-name vs Trendlyne, Phase A current-membership) ===
+periods=57 avg_overlap=4.1/5 total_matches=231/272=85%
+distinct TL-only names=33 slot-misses=41 | most common: [('BCG', 2), ('AMBIKCO', 2), ('TV18BRDCST', 2), ('MIRZAINT', 2), ('UJJIVAN', 2), ('PDMJEPAPER', 2), ('PGEL', 2), ('IFBAGRO', 2), ('SSWL', 1), ('NITINSPIN', 1)]
+distinct ours-only names=34 slot-extras=38 | most common: [('COSMOFIRST', 2), ('FORCEMOT', 2), ('GMRP&UI', 2), ('EDELWEISS', 2), ('APARINDS', 1), ('GHCL', 1), ('INDIANB', 1), ('CANBK', 1), ('NITINSPIN', 1), ('PRECWIRE', 1)]
+  boundary (first 3 periods, rank #nhold-1..nhold+3):
+   2021-07-30: TL-only=['SSWL'] ours-only=['COSMOFIRST']
+     our rank #4-8: ['JSL=77.4', 'COSMOFIRST=77.3', 'MANGLMCEM=76.2', 'NATIONALUM=76.1', 'RAIN=75.7']
+   2021-08-31: TL-only=['BCG', 'NITINSPIN'] ours-only=['APARINDS', 'COSMOFIRST']
+     our rank #4-8: ['APARINDS=69.9', 'COSMOFIRST=69.6', 'HINDALCO=69.0', 'OIL=68.6', 'USHAMART=68.5']
+   2021-09-30: TL-only=['BCG'] ours-only=['GHCL']
+     our rank #4-8: ['USHAMART=75.3', 'GHCL=75.2', 'INDIAGLYCO=73.5', 'RAIN=72.5', 'HINDALCO=71.4']
+
+=== 2. PRICING (our adj price vs Trendlyne CSV price, per stock-period) ===
+stock-periods=266 mean|Δ|=0.215pp median=0.003pp p95=0.36pp max=44.35pp
+  within 0.5pp=96% within 1pp=98% | gold names unpriceable=4/154
+  CA-adj mismatches (ratio start->end jumped >5%): 1
+    2023-09-29 GVKPIL       ratio 1.0->1.736 tl_chg=-39.8% our_chg=+4.6%
+  worst 6 |Δ|: [('2023-09-29', 'GVKPIL', 'tl=-39.75', 'ours=4.6'), ('2022-05-31', 'TIMETECHNO', 'tl=-2.3', 'ours=-0.3'), ('2021-12-31', 'VTL', 'tl=2.55', 'ours=3.7'), ('2022-06-30', 'MAHSEAMLES', 'tl=16.66', 'ours=15.6'), ('2021-08-31', 'FIEMIND', 'tl=6.85', 'ours=5.8'), ('2022-08-30', 'ANDHRAPAP', 'tl=-9.18', 'ours=-10.0')]
+  gold names we cannot price at all (4): ['CIAN', 'GSPL', 'MIRZAINT', 'SREERAYALK']
+
+=== 3. RETURN DECOMPOSITION (compounded NAV, ÷nhold fixed slots) ===
+  Trendlyne reported NAV                 : 196.1  (+96.1%)
+  gold picks @ Trendlyne prices (avg_row): 196.1  (+96.1%)
+  gold picks @ OUR prices (PRICING)      : 209.5  (+109.5%)  <- == above => prices reproduce TL
+  OUR picks  @ OUR prices (+ SELECTION)  : 118.7  (+18.7%)
+  (ca_uncertain slot-instances parked as cash in OUR-price recon: 3)
+
+=== 4. THIN PERIODS & CASH DRAG ===
+  gold pick-count distribution: {1: 1, 2: 2, 3: 1, 4: 1, 5: 52}
+  periods with <5 gold names: 5 (Trendlyne parks empty slots in cash)
+  if FULLY invested (÷actual count): 266.0  vs ÷5 196.1  -> cash drag = +70 NAV pts
+
+=== 5. LOCALIZE (per-period gold@ourpx vs avg_row, |Δ|>0.4pp) ===
+   [ 6] 2022-01-31 n_gold=5 priced_by_us=4 | ourpx=-6.36% avg_row=-4.76% Δ=-1.60pp
+   [ 7] 2022-02-28 n_gold=5 priced_by_us=4 | ourpx=+9.15% avg_row=+14.61% Δ=-5.46pp
+   [ 9] 2022-04-29 n_gold=5 priced_by_us=4 | ourpx=-7.80% avg_row=-12.12% Δ=+4.32pp
+   [10] 2022-05-31 n_gold=5 priced_by_us=5 | ourpx=-3.56% avg_row=-4.10% Δ=+0.54pp
+   [13] 2022-08-30 n_gold=5 priced_by_us=4 | ourpx=-8.37% avg_row=-5.34% Δ=-3.03pp
+   [19] 2023-02-28 n_gold=5 priced_by_us=4 | ourpx=-0.77% avg_row=-2.02% Δ=+1.25pp
+   [26] 2023-09-29 n_gold=5 priced_by_us=5 | ourpx=-4.88% avg_row=-12.83% Δ=+7.95pp
+   [48] 2025-09-30 n_gold=5 priced_by_us=4 | ourpx=+7.32% avg_row=+5.86% Δ=+1.46pp
+
+=== PHASE B (PIT survivorship-free) summary ===
+/app/windfall/strategy/resolve.py:362: FutureWarning: The default fill_method='pad' in DataFrame.pct_change is deprecated and will be removed in a future version. Either fill in any non-leading NA values prior to calling pct_change or specify 'fill_method=None' to not fill NA values.
+  ret = close.pct_change()
+  PIT universe size=1646 | our-pick overlap vs gold=238/272=88% | OUR-picks NAV=125.9 (+25.9%)
+
+SUMMARY|548014|Tighter momentum (20% max weight = 5 slots)|periods=57|overlapA=85%|priceMeanAbs=0.215|goldNAV=196.1|goldOurpx=209.5|ourNAV_A=118.7|ourNAV_B=125.9|overlapB=88%|unpriced=4|thin=5|caFlags=1
+  warnA: survivorship-free Trendlyne layer: 1385 names ever >Rs500cr in-window (live + delisted, blow-ups included); membership i
+  warnA: universe gated to point-in-time Rs500cr membership (survivorship-free).
+
+
+##############################################################################
+# TEST 547990 — Windfall v2.2 (monthly)
+# filters: ['mcap > 500', 'mcap < 50000', 'tl_durability > 50', 'rsi14 > 50', 'close > sma50', 'close > sma200', 'tl_pledge < 20', 'adtv_cr > 10', 'tl_pe < 100', 'tl_momentum > 60']
+# rank: tl_momentum desc | freq=monthly floor=500.0 nhold=10
+# window: 2025-06-30 -> 2026-06-12 (12 periods); resolve warmup from 2024-05-06
+##############################################################################
+/app/windfall/strategy/resolve.py:362: FutureWarning: The default fill_method='pad' in DataFrame.pct_change is deprecated and will be removed in a future version. Either fill in any non-leading NA values prior to calling pct_change or specify 'fill_method=None' to not fill NA values.
+  ret = close.pct_change()
+
+=== 1. SELECTION (name-by-name vs Trendlyne, Phase A current-membership) ===
+periods=12 avg_overlap=8.2/10 total_matches=99/120=82%
+distinct TL-only names=20 slot-misses=21 | most common: [('DEEDEV', 2), ('AXISCADES', 1), ('MANGCHEFER', 1), ('ADVAIT', 1), ('TIMEX', 1), ('IZMO', 1), ('TVSELECT', 1), ('PROZONER', 1), ('RAMAPHO', 1), ('WAAREEINDO', 1)]
+distinct ours-only names=19 slot-extras=21 | most common: [('POCL', 2), ('CHENNPETRO', 2), ('INDIAGLYCO', 1), ('LAURUSLABS', 1), ('NAVA', 1), ('SHRIPISTON', 1), ('SINDHUTRAD', 1), ('CARTRADE', 1), ('SJS', 1), ('KERNEX', 1)]
+  boundary (first 3 periods, rank #nhold-1..nhold+3):
+   2025-06-30: TL-only=['AXISCADES'] ours-only=['INDIAGLYCO']
+     our rank #9-13: ['TFCILTD=71.6', 'INDIAGLYCO=71.0', 'KRISHANA=70.4', 'GALLANTT=70.0', 'DEEPAKFERT=69.9']
+   2025-07-31: TL-only=['ADVAIT', 'MANGCHEFER'] ours-only=['LAURUSLABS', 'POCL']
+     our rank #9-13: ['VIMTALABS=71.4', 'LAURUSLABS=71.3', 'SMLMAH=71.1', 'GABRIEL=70.8', 'PUNJABCHEM=70.7']
+   2025-08-29: TL-only=['TIMEX'] ours-only=['NAVA']
+     our rank #9-13: ['RISHABH=72.6', 'NAVA=71.3', 'SMLMAH=71.3', 'JMFINANCIL=71.1', 'HBLENGINE=70.9']
+
+=== 2. PRICING (our adj price vs Trendlyne CSV price, per stock-period) ===
+stock-periods=117 mean|Δ|=0.004pp median=0.002pp p95=0.00pp max=0.15pp
+  within 0.5pp=100% within 1pp=100% | gold names unpriceable=2/88
+  CA-adj mismatches (ratio start->end jumped >5%): 0
+  worst 6 |Δ|: [('2025-06-30', 'FORCEMOT', 'tl=5.54', 'ours=5.4'), ('2025-06-30', 'GRMOVER', 'tl=2.42', 'ours=2.4'), ('2026-03-30', 'APARINDS', 'tl=24.8', 'ours=24.8'), ('2025-10-31', 'IFBAGRO', 'tl=2.54', 'ours=2.5'), ('2026-05-29', 'SAKAR', 'tl=3.47', 'ours=3.5'), ('2026-01-30', 'GMDCLTD', 'tl=-1.45', 'ours=-1.4')]
+  gold names we cannot price at all (2): ['OMAXAUTO', 'RAMAPHO']
+
+=== 3. RETURN DECOMPOSITION (compounded NAV, ÷nhold fixed slots) ===
+  Trendlyne reported NAV                 : 82.3  (-17.7%)
+  gold picks @ Trendlyne prices (avg_row): 82.3  (-17.7%)
+  gold picks @ OUR prices (PRICING)      : 85.2  (-14.8%)  <- == above => prices reproduce TL
+  OUR picks  @ OUR prices (+ SELECTION)  : 78.3  (-21.7%)
+  (ca_uncertain slot-instances parked as cash in OUR-price recon: 0)
+
+=== 4. THIN PERIODS & CASH DRAG ===
+  gold pick-count distribution: {10: 12}
+  periods with <10 gold names: 0 (Trendlyne parks empty slots in cash)
+  if FULLY invested (÷actual count): 82.3  vs ÷10 82.3  -> cash drag = -0 NAV pts
+
+=== 5. LOCALIZE (per-period gold@ourpx vs avg_row, |Δ|>0.4pp) ===
+   [ 1] 2025-07-31 n_gold=10 priced_by_us=9 | ourpx=-4.94% avg_row=-7.11% Δ=+2.17pp
+   [ 4] 2025-10-31 n_gold=10 priced_by_us=9 | ourpx=-9.37% avg_row=-9.80% Δ=+0.43pp
+   [11] 2026-05-29 n_gold=10 priced_by_us=9 | ourpx=+0.84% avg_row=+0.07% Δ=+0.77pp
+
+=== PHASE B (PIT survivorship-free) summary ===
+/app/windfall/strategy/resolve.py:362: FutureWarning: The default fill_method='pad' in DataFrame.pct_change is deprecated and will be removed in a future version. Either fill in any non-leading NA values prior to calling pct_change or specify 'fill_method=None' to not fill NA values.
+  ret = close.pct_change()
+  PIT universe size=1704 | our-pick overlap vs gold=102/120=85% | OUR-picks NAV=81.1 (-18.9%)
+
+SUMMARY|547990|Windfall v2.2 (monthly)|periods=12|overlapA=82%|priceMeanAbs=0.004|goldNAV=82.3|goldOurpx=85.2|ourNAV_A=78.3|ourNAV_B=81.1|overlapB=85%|unpriced=2|thin=0|caFlags=0
+  warnA: survivorship-free Trendlyne layer: 1597 names ever >Rs500cr in-window (live + delisted, blow-ups included); membership i
+  warnA: universe gated to point-in-time Rs500cr membership (survivorship-free).
+
+
+##############################################################################
+# TEST 547989 — Windfall v2.2 (weekly)
+# filters: ['mcap > 500', 'mcap < 50000', 'tl_durability > 50', 'rsi14 > 50', 'close > sma50', 'close > sma200', 'tl_pledge < 20', 'adtv_cr > 10', 'tl_pe < 100', 'tl_momentum > 60']
+# rank: tl_momentum desc | freq=weekly floor=500.0 nhold=10
+# window: 2025-05-30 -> 2026-06-12 (54 periods); resolve warmup from 2024-04-05
+##############################################################################
+/app/windfall/strategy/resolve.py:362: FutureWarning: The default fill_method='pad' in DataFrame.pct_change is deprecated and will be removed in a future version. Either fill in any non-leading NA values prior to calling pct_change or specify 'fill_method=None' to not fill NA values.
+  ret = close.pct_change()
+
+=== 1. SELECTION (name-by-name vs Trendlyne, Phase A current-membership) ===
+periods=54 avg_overlap=8.3/10 total_matches=450/540=83%
+distinct TL-only names=42 slot-misses=90 | most common: [('AXISCADES', 7), ('WAAREEINDO', 6), ('DEEDEV', 6), ('CAMLINFINE', 5), ('TIMEX', 5), ('STLTECH', 4), ('IZMO', 3), ('TVSELECT', 3), ('RAMAPHO', 3), ('IFBAGRO', 3)]
+distinct ours-only names=51 slot-extras=89 | most common: [('POCL', 9), ('KMEW', 8), ('AGIIL', 7), ('CARTRADE', 5), ('CHENNPETRO', 4), ('TMB', 3), ('DATAPATTNS', 3), ('AIIL', 2), ('NH', 2), ('SOLEX', 2)]
+  boundary (first 3 periods, rank #nhold-1..nhold+3):
+   2025-05-30: TL-only=['AXISCADES', 'CAMLINFINE'] ours-only=['AIIL', 'BLUEJET']
+     our rank #9-13: ['BLUEJET=70.8', 'AIIL=70.0', 'SDBL=69.8', 'GABRIEL=69.4', 'AARTIPHARM=69.2']
+   2025-06-06: TL-only=['AXISCADES', 'CAMLINFINE'] ours-only=['BSE', 'CEMPRO']
+     our rank #9-13: ['AIIL=71.7', 'CEMPRO=71.2', 'NDRAUTO=70.2', 'AARTIPHARM=69.9', 'TFCILTD=68.8']
+   2025-06-13: TL-only=['AXISCADES', 'CAMLINFINE', 'MAHSCOOTER', 'SHANKARA'] ours-only=['GRMOVER', 'NH', 'REDINGTON', 'VISHNU']
+     our rank #9-13: ['GRMOVER=69.4', 'NH=68.8', 'GRSE=68.7', 'INDIASHLTR=67.8', 'STYRENIX=67.6']
+
+=== 2. PRICING (our adj price vs Trendlyne CSV price, per stock-period) ===
+stock-periods=534 mean|Δ|=0.004pp median=0.003pp p95=0.00pp max=0.20pp
+  within 0.5pp=100% within 1pp=100% | gold names unpriceable=3/152
+  CA-adj mismatches (ratio start->end jumped >5%): 0
+  worst 6 |Δ|: [('2026-02-06', 'FORCEMOT', 'tl=11.27', 'ours=11.5'), ('2025-06-13', 'FORCEMOT', 'tl=6.94', 'ours=6.8'), ('2025-08-22', 'FORCEMOT', 'tl=-3.58', 'ours=-3.6'), ('2025-08-08', 'FORCEMOT', 'tl=10.56', 'ours=10.5'), ('2025-06-20', 'FORCEMOT', 'tl=1.61', 'ours=1.7'), ('2025-07-25', 'FORCEMOT', 'tl=-6.44', 'ours=-6.5')]
+  gold names we cannot price at all (3): ['OMAXAUTO', 'RAMAPHO', 'SHANKARA']
+
+=== 3. RETURN DECOMPOSITION (compounded NAV, ÷nhold fixed slots) ===
+  Trendlyne reported NAV                 : 117.4  (+17.4%)
+  gold picks @ Trendlyne prices (avg_row): 117.4  (+17.4%)
+  gold picks @ OUR prices (PRICING)      : 119.7  (+19.7%)  <- == above => prices reproduce TL
+  OUR picks  @ OUR prices (+ SELECTION)  : 108.4  (+8.4%)
+  (ca_uncertain slot-instances parked as cash in OUR-price recon: 0)
+
+=== 4. THIN PERIODS & CASH DRAG ===
+  gold pick-count distribution: {10: 54}
+  periods with <10 gold names: 0 (Trendlyne parks empty slots in cash)
+  if FULLY invested (÷actual count): 117.4  vs ÷10 117.4  -> cash drag = +0 NAV pts
+
+=== 5. LOCALIZE (per-period gold@ourpx vs avg_row, |Δ|>0.4pp) ===
+   [21] 2025-10-24 n_gold=10 priced_by_us=9 | ourpx=+2.72% avg_row=+2.28% Δ=+0.44pp
+   [22] 2025-10-31 n_gold=10 priced_by_us=9 | ourpx=-1.10% avg_row=+0.15% Δ=-1.25pp
+   [23] 2025-11-07 n_gold=10 priced_by_us=9 | ourpx=-2.45% avg_row=-3.22% Δ=+0.77pp
+   [49] 2026-05-08 n_gold=10 priced_by_us=9 | ourpx=-1.84% avg_row=-3.11% Δ=+1.27pp
+   [52] 2026-05-29 n_gold=10 priced_by_us=9 | ourpx=-0.63% avg_row=-1.08% Δ=+0.45pp
+
+=== PHASE B (PIT survivorship-free) summary ===
+/app/windfall/strategy/resolve.py:362: FutureWarning: The default fill_method='pad' in DataFrame.pct_change is deprecated and will be removed in a future version. Either fill in any non-leading NA values prior to calling pct_change or specify 'fill_method=None' to not fill NA values.
+  ret = close.pct_change()
+  PIT universe size=1705 | our-pick overlap vs gold=463/540=86% | OUR-picks NAV=115.4 (+15.4%)
+
+SUMMARY|547989|Windfall v2.2 (weekly)|periods=54|overlapA=83%|priceMeanAbs=0.004|goldNAV=117.4|goldOurpx=119.7|ourNAV_A=108.4|ourNAV_B=115.4|overlapB=86%|unpriced=3|thin=0|caFlags=0
+  warnA: survivorship-free Trendlyne layer: 1597 names ever >Rs500cr in-window (live + delisted, blow-ups included); membership i
+  warnA: universe gated to point-in-time Rs500cr membership (survivorship-free).
+
+
