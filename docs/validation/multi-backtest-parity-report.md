@@ -4,6 +4,20 @@
 (parametrised; supersedes the hardcoded `parity.py`/`deep_testA.py`). Source plan:
 `docs/validation/multi-backtest-parity-plan.md`.
 
+## Fixes applied 2026-06-23 (post-report)
+
+| item | what shipped | evidence |
+|---|---|---|
+| **#68** warmup | `run_backtest` warms long indicators before the requested start (mirrors signals_live) | sma200 short-window: empty 9mo → trades from start; pad-0 byte-identical; 19 engine tests pass. Deployed (`db94e18`). |
+| **#75** empty-book | backtest warns when a rebalance has zero eligible names (factor-horizon cash) | v2.2-quarterly-2013 warns "41/53 rebalances had NO eligible names". Deployed (`2c3a6bf`). |
+| **#76** membership | re-ran `rebuild_pit_mcap_ca.py` — `pit_mcap` was stale at 2026-05-13 for ~50 non-delisted names (prices fresh to 06-12) | STLTECH (₹20k cr, missed 16×) + DEEDEV back in `pit_universe`; 548042 misses 162→128, NOT_IN_UNIVERSE 121→73 |
+| **#72** mcap holes | same rebuild filled the `pit_mcap` date holes | 548042 `NO_DATA:mcap` 32→3; 548040 10→1 |
+
+**Still open** (need external input): **#74** `adtv_cr` calc alignment — now the next binding gap (recovered
+names surface `NO_DATA:adtv_cr`); needs Trendlyne's exact ADTV window/definition. **#73** un-ingested
+recent IPOs (`OLAELEC`=0 rows) + numeric-token gold rows — needs an in-browser Trendlyne harvest.
+Backup before the rebuild: `backend/data/trendlyne.duckdb.bak-20260623-parity`.
+
 **What this is:** all 9 replicable Trendlyne backtests run through our engine at Trendlyne's exact
 rebalance dates, decomposed into PRICING (do our adjusted prices reproduce Trendlyne's returns?) and
 SELECTION (does our filter+rank pick the same names?). Phase A freezes the universe to current
