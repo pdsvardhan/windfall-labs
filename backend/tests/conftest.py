@@ -1,10 +1,25 @@
 """Test fixtures: an isolated DuckDB seeded with deterministic synthetic price data.
 
 Env vars are set BEFORE importing windfall so the package points at a throwaway DB.
+
+The legacy `store` (windfall.duckdb) is redirected to a throwaway dir and seeded synthetically. The
+read-only Trendlyne/Bhavcopy stores, however, back integration tests (iter32/33/34) that assert
+structural, refresh-stable properties of the REAL data layer — NSE-only gate, NAVA<->NBVENTURES alias,
+curated factor resolution, point-in-time survivorship-free mcap — which cannot be meaningfully
+synthesised (a synthetic NSE gate / alias check is tautological). So we point those two read-only
+stores at the real DBs when they exist (server / CI-with-data); in a bare environment the files are
+absent and the tests skip as before. Read-only DuckDB connections are shared, so this never conflicts
+with a running windfall-api holding the same files open.
 """
 import os
 import tempfile
 from pathlib import Path
+
+# Capture the real data dir (container env) BEFORE redirecting WINDFALL_DATA_DIR to a throwaway dir.
+_real_dir = Path(os.environ.get("WINDFALL_DATA_DIR", "/app/data"))
+for _ev, _fn in (("WINDFALL_TRENDLYNE_DB", "trendlyne.duckdb"), ("WINDFALL_BHAVCOPY_DB", "bhavcopy.duckdb")):
+    if _ev not in os.environ and (_real_dir / _fn).exists():
+        os.environ[_ev] = str(_real_dir / _fn)
 
 _TMP = Path(tempfile.mkdtemp(prefix="windfall_test_"))
 os.environ["WINDFALL_DATA_DIR"] = str(_TMP)
