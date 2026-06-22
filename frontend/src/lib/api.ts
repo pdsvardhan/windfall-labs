@@ -1,6 +1,7 @@
 import type {
-  BacktestResult, BacktestRow, Coverage, DataStatus, FundamentalsStatus, PaperPosition,
-  ScoreRow, SignalRun, Strategy, WalkForwardReport,
+  BacktestResult, BacktestResultFull, BacktestRow, CostSensitivity, Coverage, DataStatus,
+  FundamentalsStatus, PaperPosition, Readiness, ScoreRow, SignalRun, Strategy, SweepResult,
+  WalkForwardReport,
 } from "./types";
 
 // Same-origin by default: calls go to /api/* on whatever host serves the cockpit, and Next.js
@@ -38,21 +39,26 @@ export const api = {
   saveStrategy: (name: string, config: unknown, id?: string) =>
     post<Strategy>("/api/strategies", { name, config, id }),
   deleteStrategy: (id: string) => del<unknown>(`/api/strategies/${id}`),
+  readiness: (config: unknown) => post<Readiness>("/api/strategies/readiness", { config }),
 
   runBacktest: (config: unknown, strategy_id?: string | null, save = true) =>
-    post<BacktestResult>("/api/backtests", { config, strategy_id, save }),
+    post<BacktestResultFull>("/api/backtests", { config, strategy_id, save }),
   listBacktests: (strategy_id?: string) =>
     get<BacktestRow[]>(`/api/backtests${strategy_id ? `?strategy_id=${strategy_id}` : ""}`),
   getBacktest: (id: string) => get<BacktestResult>(`/api/backtests/${id}`),
+  costSensitivity: (config: unknown, multipliers = [0, 1, 2]) =>
+    post<CostSensitivity>("/api/backtests/cost-sensitivity", { config, multipliers }),
 
   sweep: (config: unknown, grid: unknown, metric = "sharpe") =>
-    post<unknown>("/api/sweep", { config, grid, metric }),
-  walkForward: (
-    config: unknown, grid: unknown, metric = "sharpe", is_years = 3, oos_years = 1,
-  ) => post<WalkForwardReport>("/api/walkforward", { config, grid, metric, is_years, oos_years }),
+    post<SweepResult>("/api/sweep", { config, grid, metric }),
+  walkForward: (config: unknown, grid: unknown, metric = "sharpe", is_years = 3, oos_years = 1) =>
+    post<WalkForwardReport>("/api/walkforward", { config, grid, metric, is_years, oos_years }),
 
   runSignals: (config: unknown, strategy_id?: string | null, save = false) =>
     post<SignalRun>("/api/signals", { config, strategy_id, save }),
+  // signals CSV export is a non-JSON download; the page builds the URL via POST + blob.
+  exportSignalsUrl: () => `${API_BASE}/api/signals/export`,
+  surveillance: () => get<unknown[]>("/api/surveillance"),
 
   paperPositions: (strategy_id?: string, status?: string) =>
     get<PaperPosition[]>(

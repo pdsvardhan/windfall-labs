@@ -1,137 +1,80 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { api } from "@/lib/api";
+import type { BacktestResultFull, Strategy, StrategyConfig } from "@/lib/types";
+import { Card } from "@/components/ui";
+import { BacktestReport } from "@/components/BacktestReport";
 
-const TEMPLATE = {
-  name: "my_strategy",
-  universe: { index: "niftytotalmarket", point_in_time: false, filters: ["adtv_cr >= 10"] },
-  entry_filters: ["close > sma50", "close > sma200", "roc21 > 10", "rsi14 > 60"],
-  rank_by: "roc21",
-  rank_order: "desc",
-  n_holdings: 10,
-  weighting: "equal",
-  invest_fully: false,
-  rebalance: "weekly",
-  entry_fill: "next_open",
-  sector_cap: 2,
-  stop_loss: { type: "atr", mult: 2.0, atr_period: 14 },
-  take_profit: { type: "r_multiple", r: 2.0 },
-  max_hold_days: 60,
-  regime_filter: { enabled: false, ma_period: 200, mode: "binary", below_exposure: 0.0 },
-  costs_bps: { brokerage: 3, stt: 10, slippage: 15 },
-  capital: 1000000,
-  start: "2018-01-01",
-  end: "2026-06-12",
-  benchmark: "NIFTY500",
-};
-
-export default function StrategyEditor() {
-  const params = useParams();
+export default function StrategyResult() {
+  const id = String(useParams().id);
   const router = useRouter();
-  const id = String(params.id);
-  const isNew = id === "new";
-
-  const [name, setName] = useState(isNew ? "my_strategy" : "");
-  const [text, setText] = useState(JSON.stringify(TEMPLATE, null, 2));
-  const [sid, setSid] = useState<string | null>(isNew ? null : id);
-  const [msg, setMsg] = useState<string | null>(null);
-  const [busy, setBusy] = useState<string | null>(null);
+  const [s, setS] = useState<Strategy | null>(null);
+  const [res, setRes] = useState<BacktestResultFull | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!isNew) {
-      api.getStrategy(id)
-        .then((s) => { setName(s.name); setText(JSON.stringify(s.config, null, 2)); setSid(s.id); })
-        .catch((e) => setMsg(`load error: ${e.message}`));
-    }
-  }, [id, isNew]);
+    api.getStrategy(id).then(setS).catch((e) => setErr(e.message));
+    api.listBacktests(id).then((rows) => {
+      if (rows[0]) api.getBacktest(rows[0].id).then((r) => setRes(r as BacktestResultFull)).catch(() => {});
+    }).catch(() => {});
+  }, [id]);
 
-  function parse(): any | null {
-    try { return JSON.parse(text); }
-    catch (e) { setMsg(`Invalid JSON: ${(e as Error).message}`); return null; }
+  async function run() {
+    if (!s) return;
+    setBusy(true); setErr(null);
+    try { setRes(await api.runBacktest(s.config, id, true)); }
+    catch (e) { setErr(`backtest failed: ${(e as Error).message}`); }
+    finally { setBusy(false); }
   }
+  async function remove() { await api.deleteStrategy(id); router.push("/strategies"); }
 
-  async function save(): Promise<string | null> {
-    const cfg = parse(); if (!cfg) return null;
-    setBusy("save");
-    try {
-      const s = await api.saveStrategy(name, cfg, sid ?? undefined);
-      setSid(s.id); setMsg("Saved ✓");
-      if (isNew) router.replace(`/strategies/${s.id}`);
-      return s.id;
-    } catch (e) { setMsg(`save failed: ${(e as Error).message}`); return null; }
-    finally { setBusy(null); }
-  }
-
-  async function runBacktest() {
-    const cfg = parse(); if (!cfg) return;
-    const savedId = sid ?? (await save());
-    setBusy("backtest");
-    try {
-      const res = await api.runBacktest(cfg, savedId, true);
-      if (res.backtest_id) router.push(`/backtests/${res.backtest_id}`);
-      else setMsg("backtest ran but was not saved");
-    } catch (e) { setMsg(`backtest failed: ${(e as Error).message}`); }
-    finally { setBusy(null); }
-  }
-
-  async function genSignals() {
-    const cfg = parse(); if (!cfg) return;
-    const savedId = sid ?? (await save());
-    setBusy("signals");
-    try {
-      const r = await api.runSignals(cfg, savedId, true);
-      setMsg(`Generated ${r.signals.length} signals as of ${r.as_of} — see Live Signals`);
-    } catch (e) { setMsg(`signals failed: ${(e as Error).message}`); }
-    finally { setBusy(null); }
-  }
+  if (err && !s) return <div className="mt-8 text-loss text-sm">{err}</div>;
+  if (!s) return <div className="mt-8 text-muted text-sm">Loading…</div>;
+  const cfg = s.config as unknown as StrategyConfig;
 
   return (
-    <div className="max-w-4xl space-y-4">
-      <h1 className="text-2xl font-semibold">{isNew ? "New strategy" : `Edit · ${name}`}</h1>
-      <p className="text-muted text-sm">
-        Declarative config. Filters reference indicators like <span className="mono">close</span>,{" "}
-        <span className="mono">sma50</span>, <span className="mono">roc21</span>,{" "}
-        <span className="mono">rsi14</span>, <span className="mono">adtv_cr</span>,{" "}
-        <span className="mono">rel_strength63</span>. Each filter is ANDed (use safe comparisons only).
-      </p>
-      <p className="text-muted text-xs">
-        Universe: <span className="mono">nifty500</span> or <span className="mono">niftytotalmarket</span> (~750).
-        {" "}<span className="mono">regime_filter</span> scales to cash below the index MA;{" "}
-        <span className="mono">invest_fully</span> removes idle-cash drag.
-      </p>
-      <p className="text-muted text-xs">
-        Fundamentals (Trendlyne snapshot): <span className="mono">durability</span>,{" "}
-        <span className="mono">valuation</span>, <span className="mono">pe</span>,{" "}
-        <span className="mono">pe_to_sector</span>, <span className="mono">roe</span>,{" "}
-        <span className="mono">piotroski</span>, <span className="mono">promoter_pledge</span>,{" "}
-        <span className="mono">mcap_cr</span>, <span className="mono">np_qtr_yoy</span>. Snapshot-only —
-        use for live signals; <span className="mono">exclude_sectors</span> drops e.g. banks.
-      </p>
-
-      <div className="flex items-center gap-3">
-        <label className="text-sm text-muted">Name</label>
-        <input className="bg-card border border-border rounded px-3 py-1.5 text-sm mono flex-1"
-          value={name} onChange={(e) => setName(e.target.value)} />
+    <div>
+      <div className="flex items-end justify-between mt-6 mb-4 animate-rise">
+        <div>
+          <div className="flex items-center gap-3">
+            <Link href="/strategies" className="wf-card wf-card-lift flex items-center justify-center" style={{ width: 38, height: 38, borderRadius: "50%", fontSize: 17 }}>←</Link>
+            <span className="text-[13px] text-faint font-bold uppercase tracking-wide">Strategy result</span>
+            {res && <span className="text-[11px] font-extrabold px-2.5 py-1 rounded-full" style={{ background: "#b9d24a", color: "#3a4512" }}>BACKTESTED</span>}
+          </div>
+          <h1 className="text-[34px] font-extrabold tracking-tight mt-2">{s.name}</h1>
+          {res && (
+            <div className="inline-flex flex-wrap items-center gap-x-2.5 gap-y-1 mt-2 text-[13px] font-semibold font-mono px-3 py-1.5 rounded-lg" style={{ background: "#f1ecfb", color: "#4b3b86" }}>
+              <span>{res.period.start} → {res.period.end}</span><span className="opacity-40">·</span>
+              <span>{res.period.years}y</span><span className="opacity-40">·</span>
+              <span>{cfg.rebalance}</span><span className="opacity-40">·</span>
+              <span>top {cfg.n_holdings}</span><span className="opacity-40">·</span>
+              <span>sort {cfg.rank_by} {cfg.rank_order === "desc" ? "↓" : "↑"}</span>
+            </div>
+          )}
+        </div>
+        <div className="flex gap-2">
+          <button className="btn btn-soft" disabled={busy} onClick={run}>{busy ? "running…" : res ? "↻ Re-run" : "Run backtest"}</button>
+          <Link href={`/strategies/${id}/edit`} className="btn btn-soft">Edit config</Link>
+          <Link href={`/signals?strategy=${id}`} className="btn btn-ink">Use for signals →</Link>
+          <button className="btn btn-ghost" style={{ color: "#c23e74" }} onClick={remove}>Delete</button>
+        </div>
       </div>
 
-      <textarea
-        className="w-full h-[460px] bg-card border border-border rounded-lg p-4 text-sm mono leading-relaxed"
-        value={text} onChange={(e) => setText(e.target.value)} spellCheck={false}
-      />
+      {err && <Card className="px-4 py-3 mb-4" style={{ background: "#fdeaf1" }}><span className="text-loss text-[13px]">{err}</span></Card>}
 
-      {msg && <div className="card px-4 py-2 text-sm">{msg}</div>}
-
-      <div className="flex gap-2">
-        <button className="btn" onClick={save} disabled={!!busy}>{busy === "save" ? "saving…" : "Save"}</button>
-        <button className="btn btn-accent" onClick={runBacktest} disabled={!!busy}>
-          {busy === "backtest" ? "running…" : "Run backtest →"}
-        </button>
-        <button className="btn" onClick={genSignals} disabled={!!busy}>
-          {busy === "signals" ? "…" : "Generate signals"}
-        </button>
-      </div>
+      {res ? (
+        <BacktestReport res={res} config={cfg} />
+      ) : (
+        <Card className="px-5 py-10 text-center">
+          <div className="text-[15px] font-bold">No result yet</div>
+          <p className="text-muted text-[13px] mt-1.5 mb-4">Run the backtest to produce this strategy's result.</p>
+          <button className="btn btn-acc mx-auto" disabled={busy} onClick={run}>{busy ? "running…" : "Run backtest →"}</button>
+        </Card>
+      )}
     </div>
   );
 }

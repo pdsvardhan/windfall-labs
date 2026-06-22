@@ -16,7 +16,6 @@ from .. import signals as ind
 from ..data import fundamentals as fund
 from ..data import store
 from ..data import trendlyne_store as ts
-from ..scores import own_dvm as own
 from ..data.universe import benchmark_ticker
 from .safe_eval import SafeEvalError, feature_names, safe_eval
 from .schema import StrategyConfig
@@ -26,18 +25,19 @@ _BASE = {"close", "open", "high", "low", "volume", "adj_close", "price"}
 _SPECIAL = {"adtv_cr", "macd", "macd_signal", "macd_hist", "peg"}
 # Fundamental features from the Trendlyne snapshot (point-in-time; NaN before the snapshot date).
 _FUND = set(fund.NUMERIC_FIELDS) | {"pe_to_sector"}
-# Our own reproducible scores (scores/own_dvm.py). momentum_own is price-only (full history);
-# durability_own / valuation_own derive from fundamentals (snapshot-gated).
-_OWN = {"momentum_own", "durability_own", "valuation_own"}
-# Fundamentals that now gain real history from the screener store: durability inputs + computed
-# valuation pe/pb (in SCREENER_HISTORY_FIELDS), plus the own-scores built on them. 120d-lagged
-# point-in-time over ~2006->present, not snapshot-gated.
-_HIST_FUND = set(fund.SCREENER_HISTORY_FIELDS) | {"durability_own", "valuation_own"}
+# Raw fundamentals that gain real history from the screener store (roe/roa/opm/np_qtr_yoy + computed
+# valuation pe/pb): 120d-lagged point-in-time over ~2006->present, not snapshot-gated.
+_HIST_FUND = set(fund.SCREENER_HISTORY_FIELDS)
 # Trendlyne full-history features (data_source="trendlyne"): the platform's own daily DVM scores
 # and valuation multiples (point-in-time by construction), plus result-lag-gated raw fundamentals.
 _TL_DAILY = {"tl_durability", "tl_valuation", "tl_momentum", "tl_pe", "tl_peg", "tl_pbv"}
-_TL_LAGGED = {"tl_roe", "tl_roce", "tl_de", "tl_opm", "tl_eps"}
-_TL_FEATURES = _TL_DAILY | _TL_LAGGED
+_TL_LAGGED = {"tl_roe", "tl_roce", "tl_de", "tl_opm", "tl_eps",
+              # iter-32 curated factor library (result-lag-gated annual/quarterly, no look-ahead)
+              "tl_roic", "tl_eyield", "tl_ps", "tl_current_ratio", "tl_quick_ratio",
+              "tl_int_cover", "tl_cfo", "tl_piotroski", "tl_np_growth", "tl_rev_growth"}
+_TL_SHARE = {"tl_pledge", "tl_fii", "tl_dii"}   # quarterly shareholding %, result-lag-gated
+_TL_MCAP = {"mcap"}                              # point-in-time survivorship-free market cap (Rs cr)
+_TL_FEATURES = _TL_DAILY | _TL_LAGGED | _TL_SHARE | _TL_MCAP
 
 
 @dataclass
@@ -107,18 +107,19 @@ def resolve(cfg: StrategyConfig) -> ResolvedStrategy:
         if not ts.available():
             raise ValueError("data_source='trendlyne' but trendlyne.duckdb is not present.")
         end = cfg.end or str(pd.Timestamp.today().date())
+        live = cfg.end is None  # live signals: extend prices with the latest Bhavcopy EOD we hold
         tickers = ts.universe_over_window(cfg.start, end)
         if not tickers:
             raise ValueError("Empty survivorship-free universe for this window.")
-        close = ts.adjusted_close_panel(tickers, cfg.start, cfg.end, "close")
+        close = ts.adjusted_close_panel(tickers, cfg.start, cfg.end, "close", extend_live=live)
         if close.empty:
             raise ValueError("No Trendlyne price data for the resolved universe.")
         tickers = list(close.columns)
-        open_ = ts.adjusted_close_panel(tickers, cfg.start, cfg.end, "open").reindex(
+        open_ = ts.adjusted_close_panel(tickers, cfg.start, cfg.end, "open", extend_live=live).reindex(
             index=close.index, columns=tickers)
-        high = ts.adjusted_close_panel(tickers, cfg.start, cfg.end, "high").reindex(
+        high = ts.adjusted_close_panel(tickers, cfg.start, cfg.end, "high", extend_live=live).reindex(
             index=close.index, columns=tickers)
-        low = ts.adjusted_close_panel(tickers, cfg.start, cfg.end, "low").reindex(
+        low = ts.adjusted_close_panel(tickers, cfg.start, cfg.end, "low", extend_live=live).reindex(
             index=close.index, columns=tickers)
         tv = ts.traded_value_panel(tickers, cfg.start, cfg.end).reindex(
             index=close.index, columns=tickers)
@@ -189,7 +190,11 @@ def resolve(cfg: StrategyConfig) -> ResolvedStrategy:
                 df = ts.dvm_panel(name, tickers).reindex(index=close.index, columns=tickers).ffill()
             elif name in ("tl_pe", "tl_peg", "tl_pbv"):
                 df = ts.valuation_panel(name, tickers).reindex(index=close.index, columns=tickers).ffill()
-            else:  # result-lag-gated raw annual fundamentals (no look-ahead per adr-016)
+            elif name in _TL_MCAP:  # point-in-time survivorship-free market cap (Rs cr)
+                df = ts.mcap_panel(tickers, close.index).reindex(index=close.index, columns=tickers)
+            elif name in _TL_SHARE:  # quarterly shareholding %, result-lag-gated (no look-ahead)
+                df = ts.shareholding_panel(name, tickers, close.index).reindex(columns=tickers)
+            else:  # result-lag-gated raw annual/quarterly fundamentals (no look-ahead per adr-016)
                 df = ts.raw_fundamental_panel(name, tickers, close.index).reindex(columns=tickers)
         elif name == "macd":
             df = ind.macd(close)[0]
@@ -205,15 +210,6 @@ def resolve(cfg: StrategyConfig) -> ResolvedStrategy:
             # forward (NaN before — same gating as the other snapshot-only fundamentals).
             pe_, g = feat("pe"), feat("eps_growth")
             df = pe_.where(pe_ > 0) / g.where(g > 0)
-        elif name == "momentum_own":
-            df = own.momentum_own(feat("roc63"), feat("roc126"), feat("roc252"),
-                                  feat("rsi14"), feat("rel_strength126"))
-        elif name == "durability_own":
-            df = own.durability_own(feat("roe"), feat("roa"), feat("piotroski"),
-                                    feat("opm"), feat("np_qtr_yoy"), feat("promoter_pledge"),
-                                    feat("eps_growth"))
-        elif name == "valuation_own":
-            df = own.valuation_own(feat("pe"), feat("pb"), feat("pe_to_sector"), feat("peg"))
         elif name == "pe":
             # Historical PE = price / EPS (loss-makers eps<=0 -> NaN). Today's price x the most-recent
             # KNOWN (120d-lagged) annual EPS, so no look-ahead. Snapshot governs the present.
@@ -279,7 +275,7 @@ def resolve(cfg: StrategyConfig) -> ResolvedStrategy:
     def eval_expr(expr: str) -> pd.DataFrame | None:
         ns: dict[str, pd.DataFrame] = {}
         for tok in feature_names(expr):
-            if not (tok in _BASE or tok in _SPECIAL or tok in _FUND or tok in _OWN
+            if not (tok in _BASE or tok in _SPECIAL or tok in _FUND
                     or tok in _TL_FEATURES or _PARAM.match(tok)):
                 warnings.append(f"unknown feature '{tok}' in '{expr}' — filter skipped")
                 return None
@@ -324,8 +320,7 @@ def resolve(cfg: StrategyConfig) -> ResolvedStrategy:
     blend_exprs = [rf.factor for rf in cfg.rank_blend]
     all_exprs = (list(cfg.universe.filters) + list(cfg.entry_filters) + blend_exprs
                  + ([cfg.rank_by] if not cfg.rank_blend else []))
-    used_fund = {t for e in all_exprs for t in feature_names(e)
-                 if t in _FUND or t in ("durability_own", "valuation_own")}
+    used_fund = {t for e in all_exprs for t in feature_names(e) if t in _FUND}
     if used_fund:
         sccov = fund.screener_coverage()
         hist_used = sorted(t for t in used_fund if t in _HIST_FUND)
@@ -334,8 +329,8 @@ def resolve(cfg: StrategyConfig) -> ResolvedStrategy:
             warnings.append(
                 f"fundamentals {hist_used} are screener-history-backed "
                 f"({sccov['tickers']} names from {sccov['history_from']}, {fund.PIT_LAG_DAYS}d-lagged); "
-                f"the live snapshot governs the present, and piotroski/pledge/sector-PE and "
-                f"eps_growth (so valuation_own's PEG component) remain snapshot-only.")
+                f"the live snapshot governs the present, while piotroski/pledge/sector-PE and "
+                f"eps_growth remain snapshot-only.")
         snaps = fund.snapshots()
         if snap_used and snaps:
             warnings.append(

@@ -266,8 +266,17 @@ def screener_history_panel(field: str, dates: pd.DatetimeIndex, tickers: list[st
         return None
     # known-from date = fiscal period end + publication lag (the anti-look-ahead control)
     df["known"] = pd.to_datetime(df["period_end"]) + pd.Timedelta(days=lag_days)
-    wide = df.pivot_table(index="known", columns="ticker", values="val", aggfunc="last")
-    wide = wide.reindex(columns=tickers)
+    # SYMBOL NORMALIZATION (iter-30 bugfix): the screener store keys tickers as "<NSE>.NS" (e.g.
+    # "ABB.NS"), but the Trendlyne layer — and every caller in the trendlyne path — asks with the
+    # bare NSE symbol ("ABB"). Without stripping ".NS" on both sides the reindex matched ZERO names,
+    # so the raw fundamentals (roe/roa/opm/np_qtr_yoy and historical pe-pb) came back all-NaN and
+    # every fundamental backtest made 0 trades. Pivot on the bare symbol, reindex by the bare form of
+    # the requested tickers, then relabel the columns back to the caller's exact spelling.
+    df["sym"] = df["ticker"].str.upper().str.replace(r"\.NS$", "", regex=True)
+    wide = df.pivot_table(index="known", columns="sym", values="val", aggfunc="last")
+    base = [t.upper()[:-3] if t.upper().endswith(".NS") else t.upper() for t in tickers]
+    wide = wide.reindex(columns=base)
+    wide.columns = tickers  # return under the caller's ticker spelling
     idx = pd.DatetimeIndex(dates)
     full = wide.reindex(wide.index.union(idx)).sort_index().ffill()
     return full.reindex(idx)

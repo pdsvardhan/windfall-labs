@@ -35,6 +35,32 @@ def available() -> bool:
 
 
 @functools.lru_cache(maxsize=1)
+def coverage(floor_cr: float = MCAP_FLOOR_CR) -> dict:
+    """Survivorship-free Trendlyne-layer coverage for the Reference page — the data that backtests
+    ACTUALLY run on, not the legacy yfinance store (whose 755/1505 counts confused the owner).
+    `universe_ever` = every name that cleared the ₹500cr floor at any point (live + delisted);
+    `universe_now` = names clearing it in the latest fortnight; `price_tickers` = adjusted-OHLCV pks."""
+    if not available():
+        return {"available": False}
+    con = _con()
+    ever = con.execute(
+        "SELECT COUNT(DISTINCT symbol) FROM universe_membership WHERE mcap_cr > ?", [floor_cr]).fetchone()[0]
+    last = con.execute("SELECT MAX(date) FROM universe_membership").fetchone()[0]
+    now = con.execute(
+        "SELECT COUNT(DISTINCT symbol) FROM universe_membership "
+        "WHERE mcap_cr > ? AND date >= CAST(? AS DATE) - 14", [floor_cr, str(last)]).fetchone()[0]
+    px_n, px_min, px_max = con.execute(
+        "SELECT COUNT(DISTINCT pk), MIN(date), MAX(date) FROM ohlcv").fetchone()
+    dead = con.execute("SELECT COUNT(*) FROM delistings").fetchone()[0]
+    return {"available": True,
+            "universe_ever": int(ever or 0), "universe_now": int(now or 0),
+            "price_tickers": int(px_n or 0), "delisted": int(dead or 0),
+            "date_min": str(px_min) if px_min else None,
+            "date_max": str(px_max) if px_max else None,
+            "floor_cr": floor_cr}
+
+
+@functools.lru_cache(maxsize=1)
 def _con() -> duckdb.DuckDBPyConnection:
     """Process-wide read-only connection; bhavcopy attached read-only for dead-name raw prices."""
     con = duckdb.connect(str(TRENDLYNE_DB), read_only=True)
@@ -58,12 +84,16 @@ def symbol_pk_map() -> dict[str, int]:
     return {s: pk for s, pk in rows}
 
 
-def adjusted_close_panel(symbols, start=None, end=None, field: str = "close") -> pd.DataFrame:
+def adjusted_close_panel(symbols, start=None, end=None, field: str = "close",
+                         extend_live: bool = False) -> pd.DataFrame:
     """Wide date x symbol panel of split/bonus-ADJUSTED prices.
 
     Live names use Trendlyne's adjusted `ohlcv`; delisted names use raw Bhavcopy x the derived
     `ca_factor.adj_factor` so their returns are split-clean and tradeable. ca_uncertain dead names
     (a large unexplained gap we could not confirm as a CA) are EXCLUDED rather than mis-adjusted.
+
+    `extend_live` (iter-31): for live signals (end=None) only, append the most recent Bhavcopy EOD
+    beyond the last Trendlyne bar so signals reflect the latest close we hold — read-only, no write.
     """
     syms = [s.upper() for s in symbols]
     pkmap = symbol_pk_map()
@@ -84,6 +114,21 @@ def adjusted_close_panel(symbols, start=None, end=None, field: str = "close") ->
         if not df.empty:
             df["symbol"] = df["pk"].map(pk2sym)
             parts.append(df[["date", "symbol", "v"]])
+        if extend_live:
+            # Extend live names with Bhavcopy EOD beyond the last Trendlyne bar (back-adjusted series'
+            # tail = raw price, so no split adjustment needed for the recent window).
+            last_tl = con.execute(
+                f"SELECT MAX(date) FROM ohlcv WHERE pk IN ({','.join(['?'] * len(pks))})", pks).fetchone()[0]
+            fcol = {"close": "close", "open": "open", "high": "high", "low": "low"}.get(field, "close")
+            syms_live = list(live.keys())
+            if last_tl is not None and syms_live:
+                ext = con.execute(
+                    f"SELECT upper(regexp_replace(ticker,'\\.NS$','')) symbol, date, {fcol} v "
+                    f"FROM bc.bhavcopy_prices WHERE series='EQ' AND {fcol}>0 AND date > ? "
+                    f"AND upper(regexp_replace(ticker,'\\.NS$','')) IN ({','.join(['?'] * len(syms_live))})",
+                    [last_tl] + syms_live).fetchdf()
+                if not ext.empty:
+                    parts.append(ext[["date", "symbol", "v"]])
 
     dead = [s for s in syms if s not in pkmap]
     if dead:
@@ -236,14 +281,38 @@ def dvm_panel(score: str, symbols) -> pd.DataFrame:
 
 
 def valuation_panel(metric: str, symbols) -> pd.DataFrame:
-    """Trendlyne daily valuation multiple: PE_TTM / PEG_TTM / PBV_A. Published daily -> point-in-time."""
-    return _pk_panel("valuation_ratios", "metric", _VAL[metric], symbols)
+    """Trendlyne daily valuation multiple: PE_TTM / PEG_TTM / PBV_A. Published daily -> point-in-time.
+
+    PE_TTM and PEG_TTM are NEGATIVE for loss-makers and explode near zero earnings (caveat #7). A
+    negative PE is NOT 'cheap', so we mask PE/PEG <= 0 -> NaN: a `tl_pe < N` filter then EXCLUDES
+    loss-makers (instead of admitting every negative), and an ascending 'prefer-low PE' rank no
+    longer ranks loss-makers as the cheapest. PBV is left as-is (negative book is rare and real)."""
+    df = _pk_panel("valuation_ratios", "metric", _VAL[metric], symbols)
+    if not df.empty and _VAL[metric] in ("PE_TTM", "PEG_TTM"):
+        df = df.where(df > 0)
+    return df
 
 
 # Raw earnings-derived fundamentals that DO need an announcement-date lag (result_lag, adr-016).
+# All have the long (pk, metric, date, value) shape and a quarterly/annual period_end that joins
+# result_lag, so raw_fundamental_panel handles every one identically (iter-32 widened the set).
 _RAW_FUND = {"tl_roe": ("ratios_annual", "ROE_A"), "tl_roce": ("ratios_annual", "ROCE_A"),
              "tl_de": ("ratios_annual", "DEBT_CE_A"), "tl_opm": ("ratios_annual", "OPM_A"),
-             "tl_eps": ("pnl_annual", "EPS_A")}
+             "tl_eps": ("pnl_annual", "EPS_A"),
+             # iter-32 curated factor library:
+             "tl_roic": ("ratios_annual", "ROIC_A"), "tl_eyield": ("ratios_annual", "EYield_A"),
+             "tl_ps": ("ratios_annual", "PriceToSales_A"),
+             "tl_current_ratio": ("ratios_annual", "CRATIO_A"),
+             "tl_quick_ratio": ("ratios_annual", "QuickRatio_A"),
+             "tl_int_cover": ("ratios_annual", "InterestCoveragePostTax_A"),
+             "tl_cfo": ("cashflow", "CFO_A"),
+             "tl_piotroski": ("growth_quality", "PITROSKI_F"),
+             "tl_np_growth": ("growth_quality", "NP_TTM_GROWTH"),
+             "tl_rev_growth": ("growth_quality", "SR_TTM_GROWTH")}
+
+# Unit fix: EYield_A is stored as a FRACTION (0.03 = 3%); scale to a percentage so `tl_eyield > 4`
+# means ">4%" (Trendlyne's "Earnings Yield %" convention). Other ratios are already %/ratio-scaled.
+_FUND_SCALE = {"tl_eyield": 100.0}
 
 
 def raw_fundamental_panel(metric: str, symbols, dates) -> pd.DataFrame:
@@ -272,7 +341,51 @@ def raw_fundamental_panel(metric: str, symbols, dates) -> pd.DataFrame:
     idx = pd.DatetimeIndex(sorted(pd.to_datetime(dates).unique()))
     wide = df.pivot_table(index="avail", columns="symbol", values="value").sort_index()
     wide = wide.reindex(wide.index.union(idx)).ffill().reindex(idx)
-    return wide
+    return wide * _FUND_SCALE.get(metric, 1.0)
+
+
+def mcap_panel(symbols, dates) -> pd.DataFrame:
+    """Point-in-time market cap (Rs cr), SURVIVORSHIP-FREE: from universe_membership.mcap_cr (the same
+    PIT series that feeds the >500cr universe floor, live + delisted). Exposed as a feature so a
+    backtest can reproduce Trendlyne 'Market Capitalization' bands (e.g. mcap > 1000, mcap < 50000)
+    over history, not just the snapshot value. Forward-filled (<=2 wks) within each name's window."""
+    syms = [s.upper() for s in symbols]
+    df = _con().execute(
+        "SELECT symbol, date, mcap_cr FROM universe_membership WHERE symbol IN ("
+        + ",".join(["?"] * len(syms)) + ")", syms).fetchdf()
+    idx = pd.DatetimeIndex(sorted(pd.to_datetime(dates).unique()))
+    if df.empty:
+        return pd.DataFrame(index=idx)
+    df["date"] = pd.to_datetime(df["date"])
+    wide = df.pivot_table(index="date", columns="symbol", values="mcap_cr").sort_index()
+    return wide.reindex(wide.index.union(idx)).ffill(limit=10).reindex(idx)
+
+
+_SHARE_CAT = {"tl_pledge": "Pledged", "tl_fii": "FII", "tl_dii": "DII"}
+
+
+def shareholding_panel(metric: str, symbols, dates) -> pd.DataFrame:
+    """Quarterly shareholding % (promoter pledge / FII / DII) from shareholding_summary, readable only
+    on/after the real result-announcement date (result_lag join) -> no look-ahead. FFilled to `dates`."""
+    cat = _SHARE_CAT[metric]
+    syms = [s.upper() for s in symbols]
+    pkmap = symbol_pk_map()
+    live = {pk: s for s, pk in ((s, pkmap[s]) for s in syms if s in pkmap)}
+    if not live:
+        return pd.DataFrame()
+    pks = list(live.keys())
+    df = _con().execute(f"""
+        SELECT sh.pk, r.available_from AS avail, sh.pct AS value
+        FROM shareholding_summary sh JOIN result_lag r ON sh.pk=r.pk AND sh.date=r.period_end
+        WHERE sh.category=? AND sh.pk IN ({",".join(["?"]*len(pks))})""",
+        [cat] + pks).fetchdf()
+    if df.empty:
+        return pd.DataFrame()
+    df["symbol"] = df["pk"].map(live)
+    df["avail"] = pd.to_datetime(df["avail"])
+    idx = pd.DatetimeIndex(sorted(pd.to_datetime(dates).unique()))
+    wide = df.pivot_table(index="avail", columns="symbol", values="value").sort_index()
+    return wide.reindex(wide.index.union(idx)).ffill().reindex(idx)
 
 
 _BENCH_PK = {"NIFTY50": 1887, "NIFTY500": 1893, "NIFTYNEXT50": 1888,

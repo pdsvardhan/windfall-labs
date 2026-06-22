@@ -32,3 +32,4 @@ Thumbs.db
 backend/data/trendlyne_data/
 backend/data/trendlyne_data_v2/
 backend/data/*.csv
+backend/data/*.log

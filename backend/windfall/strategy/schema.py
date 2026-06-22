@@ -8,7 +8,7 @@ import hashlib
 import json
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class Universe(BaseModel):
@@ -24,11 +24,27 @@ class StopLoss(BaseModel):
     mult: float | None = None   # for atr/trailing: ATR multiple, e.g. 2.0
     atr_period: int = 14
 
+    @model_validator(mode="after")
+    def _validate(self):
+        if self.type == "pct" and self.value is not None and not 0 < self.value < 1:
+            raise ValueError("stop-loss percent must be between 0 and 1 (e.g. 0.15 for 15%)")
+        if self.type in ("atr", "trailing") and self.mult is not None and self.mult <= 0:
+            raise ValueError("stop-loss ATR multiple must be greater than 0")
+        return self
+
 
 class TakeProfit(BaseModel):
     type: Literal["none", "pct", "r_multiple"] = "none"
     value: float | None = None  # for pct: fraction, e.g. 0.30
     r: float | None = None      # for r_multiple: e.g. 3.0
+
+    @model_validator(mode="after")
+    def _validate(self):
+        if self.type == "pct" and self.value is not None and self.value <= 0:
+            raise ValueError("take-profit percent must be greater than 0")
+        if self.type == "r_multiple" and self.r is not None and self.r <= 0:
+            raise ValueError("take-profit R-multiple must be greater than 0")
+        return self
 
 
 class Costs(BaseModel):
@@ -93,6 +109,24 @@ class StrategyConfig(BaseModel):
     start: str = "2015-01-01"
     end: str | None = None
     benchmark: str = "NIFTY500"
+
+    @model_validator(mode="after")
+    def _validate(self):
+        # Server-side guardrails (iter-31): reject configs that would silently produce garbage
+        # backtests/signals. Enforced here so EVERY endpoint that builds a StrategyConfig is covered.
+        if self.capital < 1000:
+            raise ValueError("capital must be at least ₹1,000")
+        if self.end and self.start and self.end <= self.start:  # ISO dates compare lexically
+            raise ValueError("end date must be after start date")
+        if self.n_holdings < 1:
+            raise ValueError("n_holdings must be at least 1")
+        if self.max_hold_days is not None and self.max_hold_days < 1:
+            raise ValueError("max_hold_days must be at least 1")
+        if self.max_weight_per_stock is not None and not 0 < self.max_weight_per_stock <= 1:
+            raise ValueError("max_weight_per_stock must be between 0 and 1 (a fraction, e.g. 0.2)")
+        if self.sector_cap is not None and self.sector_cap < 1:
+            raise ValueError("sector_cap must be at least 1")
+        return self
 
     def hash(self) -> str:
         return config_hash(self)

@@ -72,7 +72,10 @@ def generate_signals(config) -> dict:
         stop, target, _risk = _stop_target(cfg, entry, atr_v)
         ext = entry / float(sma50.get(ticker, entry)) - 1.0 if sma50.get(ticker) else 0.0
         r = float(rsi14.get(ticker, float("nan")))
-        zone = "buy-now" if (ext <= 0.20 and (math.isnan(r) or r <= 68)) else "buy-on-dip"
+        # No discretionary dip overlay (iter-31): entries are taken at the next open, exactly as the
+        # strategy is backtested, so live matches the backtest. ext_above_50dma is still reported as a
+        # "don't-chase" heads-up, but it's not an instruction to wait.
+        zone = "at next open"
         sigs.append({
             "ticker": ticker, "action": "hold" if ticker in prev_set else "buy",
             "rank_value": round(rank, 4), "weight": round(weight, 4),

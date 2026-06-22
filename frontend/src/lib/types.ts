@@ -150,11 +150,23 @@ export interface FundamentalsStatus {
   fields: string[];
 }
 
+export interface TrendlyneCoverage {
+  available: boolean;
+  universe_ever?: number;
+  universe_now?: number;
+  price_tickers?: number;
+  delisted?: number;
+  date_min?: string | null;
+  date_max?: string | null;
+  floor_cr?: number;
+}
+
 export interface DataStatus {
   coverage: Coverage;
   n_universe: number;
   fundamentals?: FundamentalsCoverage;
   feasibility: FeasibilityRow[];
+  trendlyne?: TrendlyneCoverage;
 }
 
 export interface WalkForwardReport {
@@ -172,4 +184,64 @@ export interface WalkForwardReport {
   degradation: number;
   oos_to_is_ratio: number | null;
   verdict: string;
+}
+
+// ── strategy config (the recipe the builder edits) ──────────────────────────
+export interface StrategyConfig {
+  name: string;
+  data_source: "windfall" | "trendlyne";
+  universe: { index: string; point_in_time?: boolean; filters: string[]; exclude_sectors?: string[] };
+  entry_filters: string[];
+  rank_by: string;
+  rank_order: "desc" | "asc";
+  rank_blend?: { factor: string; weight: number; order: "desc" | "asc" }[];
+  n_holdings: number;
+  weighting: "equal" | "inverse_vol";
+  invest_fully: boolean;
+  max_weight_per_stock?: number | null;
+  rebalance: "daily" | "weekly" | "fortnightly" | "monthly" | "quarterly";
+  entry_fill: "next_open" | "close";
+  sector_cap?: number | null;
+  stop_loss: { type: "none" | "pct" | "atr" | "trailing"; value?: number | null; mult?: number | null; atr_period?: number };
+  take_profit: { type: "none" | "pct" | "r_multiple"; value?: number | null; r?: number | null };
+  max_hold_days?: number | null;
+  max_position_adtv_pct?: number;
+  regime_filter: { enabled: boolean; benchmark?: string | null; ma_period: number; mode: "binary" | "scale"; below_exposure: number };
+  costs_bps: { brokerage: number; stt: number; slippage: number };
+  capital: number;
+  start: string;
+  end: string | null;
+  benchmark: string;
+}
+
+export interface Readiness {
+  verdict: string;
+  backtestable_from: string | null;
+  summary: string;
+  unknown_features?: string[];
+  features?: { name: string; kind: string; coverage_from: string | null; source: string | null }[];
+}
+
+export interface BacktestResultFull extends BacktestResult {
+  readiness?: Readiness;
+}
+
+export interface CostSensitivity {
+  name: string;
+  base_costs_bps: { brokerage: number; stt: number; slippage: number };
+  multipliers: number[];
+  runs: { cost_multiplier: number; summary: Partial<Summary> }[];
+}
+
+export interface SweepRow {
+  overrides: Record<string, unknown>;
+  value: number;
+  summary?: Summary;
+  error?: string;
+}
+export interface SweepResult {
+  metric: string;
+  maximize: boolean;
+  n_variants: number;
+  ranked: SweepRow[];
 }

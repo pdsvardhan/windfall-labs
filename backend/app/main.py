@@ -9,23 +9,30 @@ import os
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from windfall import store_meta
 from windfall.data import fundamentals as fund
 from windfall.data import store
 from windfall.data import surveillance
+from windfall.data import trendlyne_store as ts
 from windfall.jsonsafe import clean
 from windfall.data.pipeline import incremental_update
 from windfall.engine.backtest import run_backtest
 from windfall.paper import commit_signal, list_positions, mark_to_market, scoreboard
-from windfall.scores.validate import validate_own_dvm
 from windfall.scripts_validation import run_validation
 from windfall.signals_live import generate_signals
 from windfall.signals_live.generate import signals_to_csv
 from windfall.strategy.readiness import data_readiness
 from windfall.strategy.schema import StrategyConfig
 from windfall.walkforward import sweep, walk_forward
+
+def _cfg_error(exc: Exception) -> str:
+    """Flatten a pydantic ValidationError to a short human message (else the raw error)."""
+    if isinstance(exc, ValidationError):
+        return "; ".join(e.get("msg", "").replace("Value error, ", "") for e in exc.errors()) or str(exc)
+    return str(exc)
+
 
 app = FastAPI(title="Windfall Labs API", version="0.1.0")
 
@@ -104,18 +111,15 @@ def data_status():
     cov = store.coverage_summary()
     fcov = fund.coverage()
     return {"coverage": cov, "n_universe": len(store.universe_tickers("niftytotalmarket")),
-            "fundamentals": fcov, "feasibility": _feasibility(cov, fcov)}
+            "fundamentals": fcov, "feasibility": _feasibility(cov, fcov),
+            # The survivorship-free Trendlyne layer is what backtests actually use; surface its real
+            # counts so the Reference page stops reporting the legacy yfinance store (755/1505).
+            "trendlyne": ts.coverage() if ts.available() else {"available": False}}
 
 
 @app.get("/api/fundamentals/status")
 def fundamentals_status():
     return {"coverage": fund.coverage(), "snapshots": fund.snapshots(), "fields": fund.NUMERIC_FIELDS}
-
-
-@app.get("/api/scores/own-validate")
-def scores_own_validate(snapshot_date: str | None = None):
-    """Rank-correlate our own D/V/M against Trendlyne's scores on the snapshot (verify/tune loop)."""
-    return validate_own_dvm(snapshot_date)
 
 
 @app.post("/api/data/refresh")
@@ -176,8 +180,14 @@ def strategies_create(body: StrategyIn):
 
 @app.post("/api/strategies/readiness")
 def strategies_readiness(body: BacktestIn):
-    """Tell the owner whether a strategy can be backtested (and from when) before they run it."""
-    return data_readiness(body.config)
+    """Tell the owner whether a strategy can be backtested (and from when) before they run it.
+    On an invalid config, fail soft with an 'invalid' verdict the builder can render inline."""
+    try:
+        return data_readiness(body.config)
+    except ValidationError as exc:
+        return {"verdict": "invalid", "backtestable_from": None,
+                "summary": "Fix before running — " + _cfg_error(exc),
+                "unknown_features": [], "features": []}
 
 
 @app.get("/api/strategies/{sid}")
@@ -200,7 +210,7 @@ def backtests_run(body: BacktestIn):
     try:
         res = run_backtest(body.config)
     except Exception as exc:  # noqa: BLE001
-        raise HTTPException(400, f"backtest failed: {exc}")
+        raise HTTPException(400, f"backtest failed: {_cfg_error(exc)}")
     d = clean(res.model_dump())
     d["readiness"] = data_readiness(body.config)  # so the UI can flag live-only / partial runs
     if body.save:
@@ -230,20 +240,19 @@ _COST_METRICS = ("cagr", "total_return", "sharpe", "sortino", "max_drawdown",
 def backtests_cost_sensitivity(body: CostSensitivityIn):
     """Run one strategy at several cost multipliers (default 0x/1x/2x) so realism-vs-optimism is
     explicit: how much net CAGR / Sharpe / return the modelled costs + turnover give back."""
-    base = StrategyConfig(**body.config)  # validate + resolve cost defaults
-    c = base.costs_bps
+    try:
+        base = StrategyConfig(**body.config)  # validate
+    except ValidationError as exc:
+        raise HTTPException(400, f"invalid config: {_cfg_error(exc)}")
     runs = []
     for m in body.multipliers:
-        scaled = {"brokerage": c.brokerage * m, "stt": c.stt * m, "slippage": c.slippage * m}
         try:
-            res = run_backtest({**body.config, "costs_bps": scaled})
+            res = run_backtest(body.config, cost_mult=m)  # engine scales the NSE delivery costs
         except Exception as exc:  # noqa: BLE001
-            raise HTTPException(400, f"cost-sensitivity run (x{m}) failed: {exc}")
+            raise HTTPException(400, f"cost-sensitivity run (x{m}) failed: {_cfg_error(exc)}")
         s = res.summary.model_dump()
-        runs.append({"cost_multiplier": m, "costs_bps": scaled,
-                     "summary": {k: s.get(k) for k in _COST_METRICS}})
-    return clean({"name": base.name, "base_costs_bps": c.model_dump(),
-                  "multipliers": body.multipliers, "runs": runs})
+        runs.append({"cost_multiplier": m, "summary": {k: s.get(k) for k in _COST_METRICS}})
+    return clean({"name": base.name, "multipliers": body.multipliers, "runs": runs})
 
 
 @app.post("/api/backtests/compare")
@@ -262,19 +271,28 @@ def backtests_compare(body: CompareIn):
 # ── sweep / walk-forward ─────────────────────────────────────────────────────
 @app.post("/api/sweep")
 def sweep_run(body: SweepIn):
-    return clean(sweep(body.config, body.grid, metric=body.metric))
+    try:
+        return clean(sweep(body.config, body.grid, metric=body.metric))
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(400, f"sweep failed: {_cfg_error(exc)}")
 
 
 @app.post("/api/walkforward")
 def walkforward_run(body: WalkForwardIn):
-    return clean(walk_forward(body.config, body.grid, metric=body.metric,
-                              is_years=body.is_years, oos_years=body.oos_years))
+    try:
+        return clean(walk_forward(body.config, body.grid, metric=body.metric,
+                                  is_years=body.is_years, oos_years=body.oos_years))
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(400, f"walk-forward failed: {_cfg_error(exc)}")
 
 
 # ── signals ──────────────────────────────────────────────────────────────────
 @app.post("/api/signals")
 def signals_run(body: SignalsIn):
-    out = surveillance.annotate_signals(clean(generate_signals(body.config)))
+    try:
+        out = surveillance.annotate_signals(clean(generate_signals(body.config)))
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(400, f"signals failed: {_cfg_error(exc)}")
     if body.save:
         out["signal_run_id"] = store_meta.save_signal_run(
             body.strategy_id, out.get("as_of"), out.get("signals", []))

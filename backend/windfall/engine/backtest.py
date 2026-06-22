@@ -17,6 +17,15 @@ from ..strategy.schema import StrategyConfig
 from . import metrics
 from .results import BacktestResult, Trade
 
+# ── NSE equity-delivery cost model (Zerodha-class, ₹0 brokerage) ──────────────────────────────────
+# Verified against the Zerodha/Groww brokerage calculators (iter-31). Side-aware fractions of
+# turnover; DP is a FLAT per-sell fee (per scrip) — so it bites small capital hardest. No slippage:
+# it's an assumption, not a fee — stress it via the cost-sensitivity multiplier instead.
+_STT, _STAMP, _EXCH, _SEBI, _GST = 0.001, 0.00015, 0.0000297, 0.000001, 0.18
+NSE_BUY_RATE = _STT + _STAMP + _EXCH + _SEBI + _GST * (_EXCH + _SEBI)   # ≈ 0.0011862  (11.9 bps)
+NSE_SELL_RATE = _STT + _EXCH + _SEBI + _GST * (_EXCH + _SEBI)           # ≈ 0.0010362  (10.4 bps)
+DP_FLAT = 15.93   # ₹/sell per scrip (Zerodha ₹13.5 + 18% GST)
+
 
 @dataclass
 class _Pos:
@@ -91,7 +100,7 @@ def _stop_target(cfg: StrategyConfig, entry: float, atr_v: float | None):
     return stop, target, risk
 
 
-def run_backtest(config) -> BacktestResult:
+def run_backtest(config, cost_mult: float = 1.0) -> BacktestResult:
     cfg = config if isinstance(config, StrategyConfig) else StrategyConfig(**config)
     rs = resolve(cfg)
 
@@ -112,8 +121,11 @@ def run_backtest(config) -> BacktestResult:
     ADTV = arr(rs.adtv_value)
 
     sim = _Sim(cfg=cfg, rs=rs, cash=cfg.capital)
-    sim.cost_rate = (cfg.costs_bps.brokerage + cfg.costs_bps.stt + cfg.costs_bps.slippage) / 1e4
-    cr = sim.cost_rate
+    # side-aware delivery costs, scaled by cost_mult (the cost-sensitivity card passes 0x/1x/2x)
+    buy_rate = NSE_BUY_RATE * cost_mult
+    sell_rate = NSE_SELL_RATE * cost_mult
+    dp_flat = DP_FLAT * cost_mult
+    sim.cost_rate = buy_rate
     rebal = _rebalance_dates(dates, cfg.rebalance)
 
     # Regime overlay: index value vs its moving average, aligned to the trading calendar.
@@ -145,11 +157,11 @@ def run_backtest(config) -> BacktestResult:
 
     def close_pos(j: int, price: float, i: int, reason: str):
         pos = sim.positions.pop(j)
-        proceeds = pos.shares * price * (1 - cr)
+        proceeds = pos.shares * price * (1 - sell_rate) - dp_flat
         sim.cash += proceeds
         sim.traded_notional += pos.shares * price
-        net_entry = pos.entry * (1 + cr)
-        net_exit = price * (1 - cr)
+        net_entry = pos.entry * (1 + buy_rate)
+        net_exit = price * (1 - sell_rate) - (dp_flat / pos.shares if pos.shares else 0.0)
         ret_pct = net_exit / net_entry - 1.0 if net_entry > 0 else 0.0
         rmult = ((price - pos.entry) / pos.risk) if (pos.risk and pos.risk > 0) else None
         hold_days = int((dates[i] - dates[pos.entry_i]).days)
@@ -168,12 +180,12 @@ def run_backtest(config) -> BacktestResult:
         adtv_v = ADTV[i, j] if ADTV is not None else float("nan")
         if not math.isnan(adtv_v) and adtv_v > 0:
             target_notional = min(target_notional, cfg.max_position_adtv_pct * adtv_v)
-        shares = math.floor(target_notional / (price * (1 + cr)))
-        max_aff = math.floor(sim.cash / (price * (1 + cr)))
+        shares = math.floor(target_notional / (price * (1 + buy_rate)))
+        max_aff = math.floor(sim.cash / (price * (1 + buy_rate)))
         shares = min(shares, max_aff)
         if shares <= 0:
             return
-        sim.cash -= shares * price * (1 + cr)
+        sim.cash -= shares * price * (1 + buy_rate)
         sim.traded_notional += shares * price
         atr_v = ATR[i, j] if ATR is not None else None
         stop, target, risk = _stop_target(cfg, price, atr_v)

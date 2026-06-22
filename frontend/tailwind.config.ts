@@ -1,24 +1,60 @@
 import type { Config } from "tailwindcss";
 
-// Palette mirrors the Ottomate UI master plan (terminal-dark cockpit).
+// "Pastel Pop" cockpit — lavender canvas, ink type, pastel cards, lime accent. Mirrors the
+// Windfall App design concept (Plus Jakarta Sans + JetBrains Mono).
 const config: Config = {
   content: ["./src/**/*.{ts,tsx}"],
   theme: {
     extend: {
       colors: {
-        bg: "#0B0E14",
-        card: "#11161F",
-        border: "#1F2630",
-        fg: "#E6EDF3",
-        muted: "#8B949E",
-        gain: "#2EA043",
-        loss: "#F85149",
-        accent: "#388BFD",
-        warn: "#D29922",
+        bg: "#ece9f6",
+        bg2: "#e7edf6",
+        ink: "#16151c",
+        card: "#ffffff",
+        muted: "#6b6979",
+        faint: "#9694a4",
+        line: "#f0eef6",
+        // pastel surfaces
+        limeY: "#f5e049",
+        lime: "#b9d24a",
+        acc: "#c4e05a", // primary lime accent
+        pink: "#f7b9dd",
+        sky: "#a9c9f2",
+        lilac: "#c4b6f7",
+        grape: "#7c5cd6",
+        orange: "#f4855f",
+        // ink-on-pastel label tones
+        onLime: "#5b6b1f",
+        onPink: "#8c4a72",
+        onSky: "#345a87",
+        onYellow: "#7d7220",
+        onGrape: "#ddd6f5",
+        // semantic
+        gain: "#1f7a4d",
+        loss: "#e0518a",
+        warn: "#b88a1a",
+        // legacy aliases kept so any stray class still resolves
+        fg: "#16151c",
+        accent: "#c4e05a",
+        border: "#e6e2f0",
       },
       fontFamily: {
-        sans: ["Inter", "system-ui", "sans-serif"],
-        mono: ["JetBrains Mono", "ui-monospace", "SFMono-Regular", "monospace"],
+        sans: ["var(--font-jakarta)", "Plus Jakarta Sans", "system-ui", "sans-serif"],
+        mono: ["var(--font-mono)", "JetBrains Mono", "ui-monospace", "monospace"],
+      },
+      borderRadius: { xl2: "22px", xl3: "26px" },
+      keyframes: {
+        wfRise: { from: { opacity: "0", transform: "translateY(18px)" }, to: { opacity: "1", transform: "none" } },
+        wfPop: { from: { opacity: "0", transform: "scale(.92)" }, to: { opacity: "1", transform: "scale(1)" } },
+        wfFade: { from: { opacity: "0" }, to: { opacity: "1" } },
+        wfFloat: { "0%,100%": { transform: "translateY(0) rotate(0)" }, "50%": { transform: "translateY(-14px) rotate(4deg)" } },
+        wfPulse: { "0%,100%": { opacity: ".55", transform: "scale(1)" }, "50%": { opacity: "1", transform: "scale(1.25)" } },
+      },
+      animation: {
+        rise: "wfRise .5s both",
+        pop: "wfPop .5s both",
+        fade: "wfFade .6s both",
+        float: "wfFloat 9s ease-in-out infinite",
       },
     },
   },
