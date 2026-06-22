@@ -84,6 +84,17 @@ def symbol_pk_map() -> dict[str, int]:
     return {s: pk for s, pk in rows}
 
 
+@functools.lru_cache(maxsize=1)
+def _nse_symbols() -> frozenset[str]:
+    """Symbols with real NSE-traded presence (Bhavcopy EQ series). The investable universe is gated to
+    this set so BSE-only / non-NSE names — which Trendlyne still scores and prices on BSE — can NEVER
+    be selected, regardless of whether a strategy sets a liquidity filter. NSE-only by construction,
+    not by user discipline (adr-024). A name we have no NSE price/turnover for is not NSE-tradeable."""
+    return frozenset(r[0] for r in _con().execute(
+        "SELECT DISTINCT upper(regexp_replace(ticker,'\\.NS$','')) FROM bc.bhavcopy_prices WHERE series='EQ'"
+    ).fetchall())
+
+
 def adjusted_close_panel(symbols, start=None, end=None, field: str = "close",
                          extend_live: bool = False) -> pd.DataFrame:
     """Wide date x symbol panel of split/bonus-ADJUSTED prices.
@@ -175,7 +186,7 @@ def pit_universe(asof_date, floor_cr: float = MCAP_FLOOR_CR) -> list[str]:
           WHERE date BETWEEN CAST(? AS DATE) - 14 AND CAST(? AS DATE)
           GROUP BY symbol)
         WHERE m > ?""", [str(asof_date), str(asof_date), floor_cr]).fetchall()
-    return sorted(r[0] for r in rows)
+    return sorted(r[0] for r in rows if r[0] in _nse_symbols())  # NSE-only gate (adr-024)
 
 
 def membership_panel(symbols, dates, floor_cr: float = MCAP_FLOOR_CR) -> pd.DataFrame:
@@ -196,7 +207,11 @@ def membership_panel(symbols, dates, floor_cr: float = MCAP_FLOOR_CR) -> pd.Data
     # Bridge small daily gaps (≈2 trading weeks) but DO NOT forward-fill past a name's last
     # observation — a delisted name must drop out of the universe, not look perpetually eligible.
     wide = wide.reindex(wide.index.union(idx)).ffill(limit=10).reindex(idx)
-    return (wide > floor_cr).reindex(columns=syms).fillna(False)
+    out = (wide > floor_cr).reindex(columns=syms).fillna(False)
+    bad = [s for s in out.columns if s not in _nse_symbols()]  # NSE-only gate (adr-024)
+    if bad:
+        out[bad] = False
+    return out
 
 
 def delistings() -> pd.DataFrame:
@@ -227,7 +242,7 @@ def universe_over_window(start, end, floor_cr: float = MCAP_FLOOR_CR) -> list[st
         WHERE date >= CAST(? AS DATE) AND date <= CAST(? AS DATE) AND mcap_cr > ?
         GROUP BY symbol HAVING max(mcap_cr) > ?""",
         [str(start), str(end), floor_cr, floor_cr]).fetchall()
-    return sorted(r[0] for r in rows)
+    return sorted(r[0] for r in rows if r[0] in _nse_symbols())  # NSE-only gate (adr-024)
 
 
 def traded_value_panel(symbols, start=None, end=None) -> pd.DataFrame:
