@@ -202,3 +202,32 @@ decisions:
       - curated
       - cat:reliability
     body_path: docs/decisions/adr-022-windfall-live-price-splice.md
+  - id: adr-023-windfall-factor-library
+    project_slug: windfall-labs
+    title: Curated Trendlyne factor library + point-in-time market-cap filter +
+      negative-PE guard
+    status: accepted
+    date: 2026-06-22T00:00:00.000Z
+    tags:
+      - curated
+      - cat:product
+    body_path: docs/decisions/adr-023-windfall-factor-library.md
+  - id: adr-024-windfall-nse-only-gate
+    project_slug: windfall-labs
+    title: NSE-only universe gate — exclude BSE-only names Trendlyne prices on BSE
+    status: accepted
+    date: 2026-06-22T00:00:00.000Z
+    tags:
+      - curated
+      - cat:reliability
+    body_path: docs/decisions/adr-024-windfall-nse-only-gate.md
+  - id: adr-025-windfall-rename-aliases
+    project_slug: windfall-labs
+    title: ISIN-based ticker-rename resolution — renamed names no longer fail the
+      liquidity filter
+    status: accepted
+    date: 2026-06-22T00:00:00.000Z
+    tags:
+      - curated
+      - cat:reliability
+    body_path: docs/decisions/adr-025-windfall-rename-aliases.md
