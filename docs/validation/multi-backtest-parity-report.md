@@ -14,10 +14,13 @@ membership (matches Trendlyne's survivorship basis); Phase B re-runs survivorshi
 ## Headline verdict
 
 **The engine reproduces Trendlyne across every style tested — DVM, value, pure-technical,
-mean-reversion, and the full 10-filter v2.2 compound screen.** After fixing one harness bug (warmup,
-below), selection overlap is **70–91%** and per-stock pricing reconciles to a **median 0.003pp**
-(96–100% of stock-periods within 0.5pp). The residual gaps are fully explained by three known,
-bounded data-coverage limits — not by engine logic errors.
+mean-reversion, and the full 10-filter v2.2 compound screen — WHEN the strategy's required data exists
+over the window.** On the 9 in-horizon tests, after fixing one harness bug (warmup, below), selection
+overlap is **70–91%** and per-stock pricing reconciles to a **median 0.003pp** (96–100% of
+stock-periods within 0.5pp). The 4 out-of-horizon / no-floor tests (547991/992/994/995) drop to
+16–42% overlap — but for documented data-availability reasons (factor horizon, microcap coverage), not
+engine logic. Net: **two confirmed engine-transparency findings (both "silent empty book" family),
+three unverified leads still owed, and a set of now-quantified inherent data limits.**
 
 ### The one material finding this session: warmup, not the engine
 
@@ -50,6 +53,22 @@ Fixing the warmup to 420 calendar days:
 > `cfg.start` by the longest indicator window (≥250 trading days) before `resolve()`, then trim the
 > result back to the user's requested `start` for reporting.
 
+### Second finding: silent empty book on missing-factor horizon (same family)
+
+The 4 out-of-horizon tests exposed a sibling of the warmup bug. When a **filter** references a
+point-in-time factor that has **no data in a period** (`tl_pledge` before 2023, `tl_durability/
+valuation/momentum` before our 2016 DVM history), `resolve()` produces NaN → `entry_mask.fillna(False)`
+→ **every name excluded → empty book → silent cash**, with no warning. On 547992 this empties the book
+for ~10 of 13 years; the user just sees a flat/cash early curve and a −32% result against a +948% gold,
+with nothing telling them *why*.
+
+> 🟠 **Engine transparency follow-up (todo filed):** when a filter's referenced factor is entirely
+> absent for a rebalance period — or when the book is empty/near-empty for N consecutive early periods —
+> the backtest should emit a WARNING (e.g. "`tl_pledge` has no data before 2023-01; book is cash for 7
+> periods"). This is correctness-adjacent: the *behavior* (can't assert a filter without its data) is
+> defensible, but the *silence* reproduces the gaslighting pattern this whole system exists to remove.
+> Distinct from I-warmup (rolling-feature NaN) but the same fix surface — both are "silent starvation."
+
 ---
 
 ## Per-test results (final: 420d warmup + ca_uncertain parked as cash)
@@ -69,6 +88,15 @@ Returns are total return over the window; `gold@ourpx` = Trendlyne's own picks p
 | 547990 | v2.2 monthly | 10-filter compound / M | 12 | 82% / 85% | 0.002pp | −18% | −15% | −22% | −19% |
 | 547989 | v2.2 weekly | 10-filter compound / W | 54 | 83% / 86% | 0.003pp | +17% | +20% | +8% | +15% |
 
+### Out-of-horizon / no-floor tests (run for completeness, low overlap by data design)
+
+| id | strategy | window | overlap A | unpriceable | gold | ours (A) | why low |
+|---|---|---|---|---|---|---|---|
+| 547991 | v2.2 monthly | 2021–26 | 41% | 21 | +65% | −15% | `tl_pledge<20` NaN pre-2023 → empty book ~2021-23 |
+| 547992 | v2.2 quarterly | **2013–26** | 16% | 11 | **+948%** | −32% | DVM NaN pre-2016 + pledge pre-2023 → empty book ~2013-23; **the +948% origin run is NOT reproducible by our engine** |
+| 547994 | DVM clone weekly | 2025–26 | 42% | 72 | +74% | +31% | no mcap floor → 72 sub-₹500cr names we don't carry |
+| 547995 | DVM clone monthly | 2021–26 | 34% | **217** | +281% | +254% | no floor → 217 unpriceable microcaps; the large-caps we DO carry track gold (NAV close) but names differ |
+
 **Methodology check (passed on every test):** `gold @ Trendlyne-prices` (compounded `Avg Change %`
 row) equals Trendlyne's reported NAV exactly — confirming Trendlyne's NAV is a fixed-slot
 (÷N-holdings, empty slots = cash), equal-weight, compounded-rebalanced book, which is what our engine
@@ -76,76 +104,90 @@ models (`invest_fully=False`).
 
 ---
 
-## Cross-test issues — ranked
+## Selection gap — VERIFIED root cause (per-miss classifier, `gap_analysis.py`)
 
-### I1 — Survivors-only / merged / delisted names (the dominant selection + pricing gap)
-Names that **merged or delisted inside the window** are absent from our current-membership factor
-layer, so Trendlyne (current constituents) picks them and we cannot. Recurring offenders, confirmed
-across tests: **IDFC, UJJIVAN, JSLHISAR, TATASTLBSL, GSPL, RELINFRA, FEDERALBNK** (mergers/reorgs) and
-**MIRZAINT, AMBIKCO, BCG, UTTAMSUGAR, TV18BRDCST** (delisted/distressed microcaps). These account for
-most of the 10–13% selection miss on the DVM screens and the bulk of the unpriceable-name pricing
-drift (the `gold@ourpx` < `gold` gap on 548012/15/17). **Unavoidable on a survivorship-free layer** —
-this is the honest cost of not carrying every dead microcap, and it is bounded (≤6 unpriceable
-names/test, all named in each report block).
+> **Correction of an earlier draft.** A first pass bucketed selection misses into assumed categories
+> ("survivors-only / microcap / boundary") *without verifying each name*. That was inference dressed as
+> finding. `gap_analysis.py` now classifies every (period, missed gold-pick) from our own data, using
+> `entry_mask` as the truth for eligibility and recomputing each filter feature only to EXPLAIN a
+> rejection. Results below replace the assumptions — and they change the conclusion.
 
-### I2 — `ca_uncertain` corporate-action mismatch (GVKPIL)
-One name (**GVKPIL**, 2023-09) has an unconfirmable corporate action: Trendlyne shows −39.8%, our
-adjusted series +4.6% (price ratio jumps 1.0→1.74). It is already on the `ca_uncertain` list and is
-now **parked as cash** in the reconstruction (matching `parity.py`), so it no longer distorts headline
-NAV — but it is the single largest per-stock pricing flag (44pp) wherever it appears. Bounded and
-documented; no action beyond keeping it parked.
+For every name Trendlyne picked that we did not, across all 13 tests:
 
-### I3 — Concentration amplifies everything (548014, 5 slots @ 20%)
-With `nhold=5`, every selection-boundary difference and every coverage gap is **2× as costly**: the
-same 85% overlap that costs ~17pp at 10 holdings costs ~77pp here (ours +19% vs gold +96%), and the
-single GVKPIL month moved the book 8.9pp before parking. **Not an engine defect — a structural
-property of concentrated books.** Practical guidance: trust parity numbers most at ≥10 holdings;
-treat ≤5-holding configs as inherently high-variance vs any external benchmark.
+| cause | share of misses | fixable | what it is |
+|---|---|---|---|
+| **NOT_IN_UNIVERSE** | 37–75% | partly | name absent from our resolved tickers — decomposes 3 ways (below) |
+| **NO_DATA: mcap / adtv** | 4–29% | **yes** | we carry the prices, but `mcap`/`adtv` panel is NaN that date → filter drops it |
+| **RANKED_OUT** | 0–25% | no | eligible, ranked just outside top-N — irreducible boundary churn |
+| **FAILED: adtv_cr** | 1–10% | **yes** | our liquidity calc reads low vs Trendlyne at the threshold |
+| **FAILED: indicators** | **0%** | — | `roc21`/`rsi14`/`sma50/200`/`tl_durability/valuation/momentum` **never wrongly excluded a single pick** |
 
-### I4 — Breakout screen (548042) lowest overlap at 70%
-Two drivers, both bounded: (a) **gold rows with numeric ticker tokens** — Trendlyne emits an internal
-numeric id (e.g. `14060423`, `17160453`) when the NSE symbol field is blank, though the ISIN
-(`INE317W01030`) is present; these can't be joined by symbol and one of them (`14060423`, +10%/week ×17
-periods) is a name our breakout screen should have matched. (b) Genuine **boundary churn** — a
-`roc21>10 & rsi14>60` momentum-burst screen has many near-tied candidates, so small ranking
-differences swap names. 548040 (mean-reversion, same indicator family) at **91%** proves the technical
-indicators themselves (`sma50/200`, `rsi14`, `roc21`) map correctly. **Harness improvement:** join gold
-rows by ISIN, not symbol, to recover the numeric-token names (would lift 548042 measurably).
+**Headline: the price-derived indicators and DVM factors are verified correct — zero false-exclusions
+across 13 tests.** Any earlier suspicion about `roc21`/`rsi14` definitions (548042's 70%) is disproven:
+548042's misses are 75% NOT_IN_UNIVERSE + 20% NO_DATA:mcap, **0% indicator failures**.
 
-### I5 — Recent-IPO factor coverage (v2.2 window)
-In the 2025-26 v2.2 windows, several TL-only names are **2024-25 listings** (WAAREEINDO, DEEDEV,
-AXISCADES) — likely thin/absent DVM-factor history for very recent IPOs. Worth a spot-check of
-factor-history completeness for names listed <18 months. Minor (≤7 slot-misses).
+### NOT_IN_UNIVERSE decomposes into three very different things
 
-### I6 — Weekly rebalance churn (expected)
-547989 (v2.2 weekly) shows more boundary swaps than 547990 (monthly) — 90 vs 21 slot-misses — but
-still 83% overlap. Expected: higher rebalance frequency = more chances for a marginal name to cross
-the boundary. Not an issue, a property.
+1. **Membership-snapshot staleness — FIXABLE, the biggest lever, probable production bug.**
+   `pit_universe(latest)` requires a name to be present on the *exact* max membership date (2026-06-22).
+   **57 names that last updated mid-May — including STLTECH (₹20,440 cr large-cap, missed 16× in 548042)
+   and DEEDEV (₹3,299 cr) — are silently dropped from the "current" universe.** They are NOT delisted;
+   the membership feed just didn't refresh them. If live signals use the same `pit_universe(latest)`,
+   those 57 current names are missing from the tradeable universe in production too. → **todo PARITY-1.**
+2. **Genuinely un-ingested names — FIXABLE coverage.** OLAELEC = **0 rows** (Ola Electric, IPO Aug-2024,
+   never ingested); other 2024-25 listings (KRN, ALPEXSOLAR); and numeric-token gold rows
+   (`14060423`/`17160453`/`542012` — ISIN present, NSE symbol blank → un-joinable by symbol). →
+   **todos PARITY-4 (ingest IPOs + ISIN-join).**
+3. **True survivors — INHERENT.** IDFC, UJJIVAN, JSLHISAR, TATASTLBSL, GSPL, GVKPIL — merged/delisted,
+   genuinely un-pickable from current membership. The only inherent bucket.
+
+### The other verified, fixable levers
+- **NO_DATA: mcap / adtv (4–29%)** — names we price but whose `pit_mcap`/`adtv` panel is NaN that date,
+  so `mcap>X` / `adtv>X` drops them. Backfill `pit_mcap`. → **todo PARITY-2.**
+- **FAILED: adtv_cr (1–10%)** — the *only* recurring threshold failure, always just under 10 and on the
+  same names (WHEELS 9.86, MONARCH 9.69, SESHAPAPER 9.88) with one real outlier (FMGOETZE **5.63**, a
+  44% gap — not rounding). Our `adtv_cr` = 20-day rolling mean traded-value / 1e7; align window/method
+  to Trendlyne's ADTV. → **todo PARITY-3.**
+
+### Still genuinely inherent / irreducible
+- **Survivors** (above) and **RANKED_OUT** boundary churn (worse at weekly: 547989 90 swaps vs 547990
+  21, and at `nhold=5`/548014 where each swap is 20% of the book).
+- **`ca_uncertain` CA mismatch** (GVKPIL; new candidates over deep history: BSOFT 2016, VERTOZ 2023,
+  DHANI 2018, TATAMETALI 2016) — parked as cash, bounded.
+- **v2.2 13-year quarterly (+948%) is not reproducible by our engine** — needs DVM≥2016 + pledge≥2023;
+  pre-data periods are cash (todo for the *silent* version of this: I-horizon).
 
 ---
 
-## Two-axis fidelity summary
+## Conclusion
 
-- **PRICING:** essentially solved. Median per-stock |Δ| = 0.003pp; the recent-window screens
-  (technical, v2.2) reconcile at **0.004pp mean** with zero CA flags. The only pricing drift is from
-  un-carried delisted names (I1) and one parked CA name (I2) — both named and bounded.
-- **SELECTION:** strong and consistent — **70–91%** name-for-name across five distinct styles, with
-  every shortfall attributable to I1/I3/I4/I5 rather than filter or ranking logic. 548040's 91% and
-  548776's 90% bracket the engine's true selection fidelity once warmup is correct.
+**Within its data horizon the engine reproduces Trendlyne faithfully, and its computation is sound — the
+indicators, DVM factors, ranking, and pricing all check out (0% indicator false-exclusions; 0.003pp
+median pricing).** The gap to Trendlyne is almost entirely **data coverage / freshness**, and most of it
+is fixable:
 
-**Conclusion:** the engine is a faithful Trendlyne reproduction across styles. One confirmed
-production bug to fix — the `run_backtest` long-indicator warmup gap (I-warmup), which distorts any
-short-window backtest using `sma200`/`roc125`/regime; everything else is bounded data-coverage that's
-already surfaced honestly per run.
+| lever | impact | todo |
+|---|---|---|
+| Universe membership staleness (57 current names incl. STLTECH) | **high** | PARITY-1 |
+| `pit_mcap`/`adtv` NaN holes (4–29% of misses) | med | PARITY-2 |
+| `adtv_cr` calc alignment | med | PARITY-3 |
+| Ingest recent IPOs + ISIN-join numeric tokens | med | PARITY-4 |
+| `run_backtest` long-indicator warmup | **bug** | #68 |
+| Silent empty-book on missing-factor horizon | transparency | I-horizon |
+
+Inherent and not closable: true survivors (merged/delisted), `ca_uncertain` CA names, and the
+pre-DVM/pre-pledge history of deep-backtest strategies. **Indicator/ranking logic needs no change.**
 
 ---
 
 ## Reproduce
 
 ```bash
-# stage gold CSVs -> /tmp/parity_gold/gold_<id>.csv ; harness -> container
-docker exec -e PYTHONPATH=/app windfall-api python /tmp/parity_multi.py all     # all 9
-docker exec -e PYTHONPATH=/app windfall-api python /tmp/parity_multi.py 548040  # one test
+# stage 13 gold CSVs -> /tmp/parity_gold/gold_<id>.csv ; harnesses -> container
+docker exec -e PYTHONPATH=/app windfall-api python /tmp/parity_multi.py all      # 5-section recon, all 13
+docker exec -e PYTHONPATH=/app windfall-api python /tmp/gap_analysis.py          # per-miss root-cause, all 13
+docker exec -e PYTHONPATH=/app windfall-api python /tmp/gap_analysis.py 548042   # one test
 ```
-Per-test config lives in `TEST_TABLE` inside `parity_multi.py`. Raw run output:
-`_spike/results/parity_all.txt`.
+Per-test config lives in `TEST_TABLE` (shared by both harnesses). `parity_multi.py` = pricing/return
+decomposition; `gap_analysis.py` = verified per-miss selection root cause. Raw outputs:
+`parity_all_run-2026-06-22.txt`, `gap_all.txt`.
