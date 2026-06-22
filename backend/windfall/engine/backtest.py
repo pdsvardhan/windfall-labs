@@ -287,6 +287,12 @@ def run_backtest(config, cost_mult: float = 1.0) -> BacktestResult:
         return chosen, weights
 
     n = len(dates)
+    # track rebalances that found zero eligible names -> book sits in cash. A run that is mostly empty
+    # is almost always a data-coverage problem (a filter's factor has no data over part of the window,
+    # e.g. tl_pledge before 2023 / DVM before 2016), not a real flat strategy. Surfaced as a warning so
+    # it can't be mistaken for a genuine result (anti-gaslight: no silent empty book).
+    n_rebals = empty_rebals = 0
+    first_empty = last_empty = None
     for i in range(i0, n):  # skip warmup bars: features are warm by i0, the book starts flat there
         # 1) execute scheduled rebalance orders at today's open
         if pending is not None and pending["exec_i"] == i:
@@ -322,6 +328,12 @@ def run_backtest(config, cost_mult: float = 1.0) -> BacktestResult:
         # 4) rebalance decision (data up to & incl today)
         if dates[i] in rebal:
             chosen, weights = desired_set(i)
+            n_rebals += 1
+            if not chosen:                       # zero eligible names -> book parked in cash
+                empty_rebals += 1
+                if first_empty is None:
+                    first_empty = dates[i]
+                last_empty = dates[i]
             if cfg.entry_fill == "close":
                 for j in list(sim.positions):
                     if j not in chosen:
@@ -344,6 +356,13 @@ def run_backtest(config, cost_mult: float = 1.0) -> BacktestResult:
     avg_nav = float(nav.mean()) or cfg.capital
     annual_turnover = (sim.traded_notional / (2 * avg_nav)) / years if avg_nav else 0.0
     exposure = float(np.mean(exposure_vals)) if exposure_vals else 0.0
+
+    if empty_rebals and n_rebals:
+        rs.warnings.append(
+            f"{empty_rebals}/{n_rebals} rebalances had NO eligible names — the book was in cash on "
+            f"those dates ({str(first_empty.date())} … {str(last_empty.date())}). This usually means a "
+            f"filter references a factor with no data over part of the window (e.g. tl_pledge before "
+            f"2023, DVM before 2016); the return for those periods is cash, not the strategy.")
 
     bench = rs.benchmark.reindex(nav.index).ffill()
     summary = metrics.compute_summary(nav, sim.trades, bench, years, annual_turnover, exposure)
