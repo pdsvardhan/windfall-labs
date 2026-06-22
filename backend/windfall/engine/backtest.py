@@ -7,6 +7,7 @@ deducted on every entry and exit, and turnover is reported.
 from __future__ import annotations
 
 import math
+import re
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -100,11 +101,46 @@ def _stop_target(cfg: StrategyConfig, entry: float, atr_v: float | None):
     return stop, target, risk
 
 
+def _warmup_calendar_days(cfg: StrategyConfig) -> int:
+    """Calendar-day lead needed so the longest ROLLING feature is warm at the requested start.
+
+    Scans every filter/rank expression (+ the regime MA) for windowed indicators
+    (sma/ema/roc/rsi/atr/adx/adtv/vol_avg/dist_high/rel_strength + N) and returns ~2x the largest N
+    in calendar days. Point-in-time factors (tl_*, fundamentals) need no warmup, so a pure-DVM
+    strategy returns 0 and is untouched. Mirrors the lead signals_live already applies — without it,
+    a short-window backtest of an sma200/roc125 strategy has NaN features -> empty early book.
+    """
+    exprs = list(cfg.entry_filters) + [cfg.rank_by] + [f.factor for f in cfg.rank_blend]
+    max_n = 0
+    for e in exprs:
+        for _, n in re.findall(r"\b(sma|ema|roc|rsi|atr|adx|adtv|vol_avg|dist_high|rel_strength)(\d+)\b", e or ""):
+            max_n = max(max_n, int(n))
+    if cfg.regime_filter.enabled:
+        max_n = max(max_n, cfg.regime_filter.ma_period)
+    return (max_n * 2 + 30) if max_n else 0
+
+
 def run_backtest(config, cost_mult: float = 1.0) -> BacktestResult:
     cfg = config if isinstance(config, StrategyConfig) else StrategyConfig(**config)
-    rs = resolve(cfg)
+
+    # Warm rolling features before the requested start: resolve over a padded window, then trade only
+    # from `requested_start` (warmup bars warm sma200/roc125/regime but never trade). Without this,
+    # entry_mask.fillna(False) makes every unwarmed name ineligible -> the first ~200 trading days of
+    # any long-MA backtest are a silently empty/thin book. (signals_live already pads; this matches it.)
+    # `cfg` stays the USER's config (identity/hash/reporting); only resolve sees the padded start.
+    requested_start = cfg.start
+    pad = _warmup_calendar_days(cfg)
+    resolve_cfg = cfg
+    if pad and requested_start:
+        warm_start = str((pd.Timestamp(requested_start) - pd.Timedelta(days=pad)).date())
+        if warm_start < requested_start:
+            resolve_cfg = cfg.model_copy(update={"start": warm_start})
+    rs = resolve(resolve_cfg)
 
     dates = rs.close_adj.index
+    # index of the first trading day on/after the user's requested start; warmup bars are < i0
+    i0 = int(dates.searchsorted(pd.Timestamp(requested_start))) if requested_start else 0
+    i0 = min(i0, len(dates))
     tickers = list(rs.close_adj.columns)
     col = {t: j for j, t in enumerate(tickers)}
     sectors = [rs.sectors.get(t, "Unknown") for t in tickers]
@@ -251,7 +287,7 @@ def run_backtest(config, cost_mult: float = 1.0) -> BacktestResult:
         return chosen, weights
 
     n = len(dates)
-    for i in range(n):
+    for i in range(i0, n):  # skip warmup bars: features are warm by i0, the book starts flat there
         # 1) execute scheduled rebalance orders at today's open
         if pending is not None and pending["exec_i"] == i:
             desired = pending["desired"]
@@ -303,7 +339,8 @@ def run_backtest(config, cost_mult: float = 1.0) -> BacktestResult:
         close_pos(j, Cmark[last_i, j], last_i, "end")
 
     nav = pd.Series(nav_vals, index=pd.DatetimeIndex(nav_dates))
-    years = max((dates[-1] - dates[0]).days / 365.25, 1e-6)
+    start_i = i0 if i0 < n else 0                 # traded window starts at i0 (post-warmup)
+    years = max((dates[-1] - dates[start_i]).days / 365.25, 1e-6)
     avg_nav = float(nav.mean()) or cfg.capital
     annual_turnover = (sim.traded_notional / (2 * avg_nav)) / years if avg_nav else 0.0
     exposure = float(np.mean(exposure_vals)) if exposure_vals else 0.0
@@ -319,8 +356,8 @@ def run_backtest(config, cost_mult: float = 1.0) -> BacktestResult:
 
     return BacktestResult(
         config_hash=cfg.hash(), name=cfg.name,
-        period={"start": str(dates[0].date()), "end": str(dates[-1].date()),
-                "years": round(years, 2), "n_days": int(n)},
+        period={"start": str(dates[start_i].date()), "end": str(dates[-1].date()),
+                "years": round(years, 2), "n_days": int(n - start_i)},
         summary=summary,
         equity_curve=[[str(d.date()), round(float(v), 2)]
                       for d, v in nav.items() if math.isfinite(v)],
