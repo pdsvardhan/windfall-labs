@@ -114,3 +114,48 @@
 1. User verifies live cockpit (http://192.168.1.10:8500) → run verifier, merge iter-16 → master, mark #16 done.
 2. #30 — reproduce a known Trendlyne backtest on the survivorship-free layer (success criterion #1).
 3. #31 — swing strategy suite on the survivorship-free engine.
+
+## Session 2026-06-23 — multi-backtest parity validation + engine/data fixes + CI green
+
+**Stage:** Stage 4 — cross-style Trendlyne-parity validation, then 5 engine/data fixes + 3 CI/test fixes.
+
+**Parity validation (to-do #66, done):** ran all 13 downloaded Trendlyne backtests through a new
+parametrised harness (`docs/validation/parity_multi.py`) + a per-miss root-cause classifier
+(`gap_analysis.py`). Report: `docs/validation/multi-backtest-parity-report.md`. Result: engine
+reproduces Trendlyne across DVM / value / technical / mean-reversion / v2.2 — **70–91% selection
+overlap, median 0.003pp pricing, 0% indicator false-exclusions** (the indicators + DVM factors are
+verified correct). The gap to Trendlyne is data coverage/freshness, not logic. **Process note:** a first
+pass bucketed misses into assumed categories; user pushed back; the classifier overturned the
+"roc21/rsi14 definition mismatch" hypothesis (it was wrong) and surfaced the membership-staleness bug.
+
+**Fixes shipped + deployed (master):**
+- **#68 warmup** (`engine/backtest.py`, db94e18): pad cfg.start by the longest rolling window before
+  resolve, trade from the requested start. Was: sma200 strategies had a silently empty ~9-month early
+  book. Verified (28→124 trades on a short sma200 window; pad-0 byte-identical; 19 engine tests).
+- **#75 empty-book warning** (2c3a6bf): backtest warns "N/M rebalances had NO eligible names" when a
+  filter's factor has no data in-window (e.g. v2.2-quarterly-2013 is cash ~10/13yr).
+- **#76 + #72** (pit_mcap rebuild): `pit_mcap` was stale at 2026-05-13 for ~50 non-delisted names
+  (prices fresh to 06-12). Re-ran `rebuild_pit_mcap_ca.py` (API stopped, DB backed up). STLTECH
+  (₹20k cr, missed 16×) + DEEDEV recovered; 548042 misses 162→128, NOT_IN_UNIVERSE 121→73,
+  NO_DATA:mcap 32→3.
+- **#74 adtv_cr** (resolved, no change): screen filter = `AvgTradedValueCr > 10` (value ₹cr = our
+  adtv_cr). Calibrated our window vs 705 v2.2 gold picks — 20d already = 96% agreement (15d peak 97%,
+  30d worse 92%). Residual ~4% is NSE-only-vs-Consolidated bias, accepted (NSE-only universe).
+
+**CI fixes (suite now 113 passed / 0 skipped / 0 failed):**
+- **#38** (2e1888b): repointed stale readiness tests off removed factors durability_own/valuation_own
+  (adr-019) to roe/pe; dropped removed costs_bps assertions (cost output simplified iter-30/31).
+- **#48** (a8d4063): conftest now points read-only WINDFALL_TRENDLYNE_DB/BHAVCOPY_DB at the real DBs
+  when present, so the iter32/33/34 integration tests run instead of skipping (12 ex-no-ops now green).
+- **#32:** deleted 7 junk strategies (EdgeTest, Test Strategy Alpha, 5× *_copy). Left `sas` +
+  `momentum_survivorship_free` (real configs, not *_copy).
+
+**Open follow-ups filed as to-dos:** **#73** (un-ingested IPOs OLAELEC + numeric-token/ISIN gold rows →
+needs in-browser harvest; harvester half-built next session) · standing offer to cron the pit_mcap
+rebuild so membership staleness can't silently recur.
+
+**Next session pick-up:**
+1. **#73** — finish the targeted browser harvester (model on `trendlyne_harvester_ohlcv.js` + dvm + leg1)
+   for OLAELEC + the numeric-token/ISIN names; user runs it, returns CSVs, ingest (ohlcv + dvm + shares).
+2. Decide whether to cron `rebuild_pit_mcap_ca.py` (membership freshness).
+3. DB backup `backend/data/trendlyne.duckdb.bak-20260623-parity` retained as rollback — delete after #73.
