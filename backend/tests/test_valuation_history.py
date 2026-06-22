@@ -98,11 +98,12 @@ def test_pb_equals_pe_times_roe_panel(seed_screener):
 
 
 # ── readiness honesty ────────────────────────────────────────────────────────
-def test_readiness_valuation_own_history_backed(seed_screener):
+def test_readiness_valuation_rank_is_history_backed(seed_screener):
     seed_screener([{"ticker": "AAA.NS", "period_end": "2018-03-31", "eps": 5.0, "roe": 20.0}])
     from windfall.strategy.readiness import data_readiness
     cfg = {"name": "v", "universe": {"index": "nifty500", "filters": []},
-           "rank_blend": [{"factor": "valuation_own", "weight": 1.0}],
+           # valuation_own removed (adr-019); pe is the history-backed valuation fundamental it used
+           "rank_blend": [{"factor": "pe", "weight": 1.0}],
            "start": "2018-06-01", "end": "2019-06-01"}
     r = data_readiness(cfg)
     assert r["screener_history"]["available"]

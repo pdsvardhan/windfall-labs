@@ -38,12 +38,12 @@ def test_cost_sensitivity_monotonic_and_scaled():
     out = backtests_cost_sensitivity(CostSensitivityIn(config=BASE))
     runs = out["runs"]
     assert [r["cost_multiplier"] for r in runs] == [0.0, 1.0, 2.0]
-    # net total return can only fall (or tie) as modelled costs scale up
+    # net total return can only fall (or tie) as modelled costs scale up — this monotonic relationship
+    # IS the cost-scaling check (0x keeps the most return, 2x the least). The output was simplified
+    # (iter-30/31) to {cost_multiplier, summary}; per-run costs_bps/base_costs_bps were removed because
+    # the engine's real cost model is the NSE delivery rates x cost_mult, not cfg.costs_bps.
     trs = [r["summary"]["total_return"] for r in runs]
     assert trs[0] >= trs[1] - 1e-9 >= trs[2] - 2e-9
-    # costs are scaled off the resolved base, not zeroed/duplicated
-    assert runs[0]["costs_bps"] == {"brokerage": 0.0, "stt": 0.0, "slippage": 0.0}
-    assert runs[2]["costs_bps"]["stt"] == 2 * out["base_costs_bps"]["stt"]
     assert all(k in runs[0]["summary"] for k in ("cagr", "sharpe", "annual_turnover"))
 
 

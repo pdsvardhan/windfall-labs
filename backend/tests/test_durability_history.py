@@ -112,7 +112,8 @@ def test_readiness_durability_rank_is_history_backed(seed_screener):
                     "np_yoy": 5.0, "net_profit_owner": 50.0, "total_assets": 500.0}])
     from windfall.strategy.readiness import data_readiness
     cfg = {"name": "d", "universe": {"index": "nifty500", "filters": []},
-           "rank_blend": [{"factor": "durability_own", "weight": 1.0}],
+           # durability_own removed (adr-019); roe is the history-backed durability input it was built on
+           "rank_blend": [{"factor": "roe", "weight": 1.0}],
            "start": "2018-06-01", "end": "2019-06-01"}
     r = data_readiness(cfg)
     assert r["screener_history"]["available"]
