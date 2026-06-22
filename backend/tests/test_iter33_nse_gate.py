@@ -29,10 +29,10 @@ def test_bse_only_name_never_eligible():
     """A BSE-only name (Trendlyne-priced, zero NSE turnover) must be excluded from the universe and
     return all-False membership even if explicitly requested."""
     nse = ts._nse_symbols()
-    # find a real BSE-only name currently in the data (eligible-but-not-NSE before the gate)
-    uni = [r[0] for r in ts._con().execute("SELECT DISTINCT symbol FROM universe_membership").fetchall()]
-    bse_only = next((s for s in uni if s not in nse), None)
-    assert bse_only is not None, "expected at least one BSE-only name in the raw membership table"
+    # a BSE-only / non-NSE name known to our symbol map (no NSE-traded presence). Since iter-35's
+    # pit_mcap rebuild also drops these at the data level, fall back to a synthetic symbol if none
+    # remain in membership — the gate must still return all-False for it.
+    bse_only = next((s for s in ts.symbol_pk_map() if s not in nse), "ZZ_SYNTHETIC_NON_NSE")
     assert bse_only not in ts.universe_over_window("2010-01-01", "2026-12-31")
     mp = ts.membership_panel([bse_only], pd.bdate_range("2022-01-01", "2024-12-31"))
     assert not bool(mp.values.any())

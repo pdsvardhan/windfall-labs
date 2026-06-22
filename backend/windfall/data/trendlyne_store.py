@@ -95,6 +95,40 @@ def _nse_symbols() -> frozenset[str]:
     ).fetchall())
 
 
+@functools.lru_cache(maxsize=1)
+def _ticker_aliases() -> dict:
+    """NSE symbol -> frozenset of ALL tickers that ever shared its ISIN (ticker renames; e.g. NAVA
+    was NBVENTURES until 2022). Bhavcopy keeps a company's pre-rename history under its OLD ticker,
+    so symbol-keyed lookups (turnover, dead-name prices, pit-mcap) miss it — making renamed names
+    spuriously fail the liquidity filter and lose price history in their pre-rename window (adr-025).
+    ISIN is the stable company id, so all tickers under one ISIN are the same company."""
+    rows = _con().execute(
+        "SELECT isin, upper(regexp_replace(ticker,'\\.NS$','')) FROM bc.bhavcopy_prices "
+        "WHERE series='EQ' AND isin IS NOT NULL AND isin<>'' GROUP BY 1,2").fetchall()
+    by_isin: dict = {}
+    for isin, sym in rows:
+        by_isin.setdefault(isin, set()).add(sym)
+    # ACCUMULATE across every ISIN a symbol touches (a name can have >1 ISIN after a face-value change,
+    # e.g. NAVA has INE725A01022 [shared with NBVENTURES] AND a later INE725A01030) — don't overwrite.
+    out: dict = {}
+    for syms in by_isin.values():
+        for s in syms:
+            out.setdefault(s, set()).update(syms)
+    return {s: frozenset(v) for s, v in out.items()}
+
+
+def _alias_to_canonical(symbols) -> dict:
+    """{every historical ticker -> the requested (current) symbol}, so Bhavcopy rows found under an
+    old ticker can be relabelled to the symbol the caller asked for."""
+    al = _ticker_aliases()
+    m: dict = {}
+    for s in symbols:
+        s = s.upper()
+        for a in al.get(s, frozenset({s})):
+            m[a] = s
+    return m
+
+
 def adjusted_close_panel(symbols, start=None, end=None, field: str = "close",
                          extend_live: bool = False) -> pd.DataFrame:
     """Wide date x symbol panel of split/bonus-ADJUSTED prices.
@@ -152,9 +186,11 @@ def adjusted_close_panel(symbols, start=None, end=None, field: str = "close",
             "SELECT DISTINCT symbol FROM delistings WHERE symbol IN ("
             + ",".join(["?"] * len(dead)) + ")", dead).fetchall()]
         if ok_dead:
+            a2c = _alias_to_canonical(ok_dead)   # incl pre-rename tickers of renamed-then-dead names (adr-025)
+            dtick = list(a2c.keys())
             cond = ("WHERE b.series='EQ' AND b.close>0 AND upper(regexp_replace(b.ticker,'\\.NS$',''))"
-                    " IN (" + ",".join(["?"] * len(ok_dead)) + ")")
-            params = ok_dead[:]
+                    " IN (" + ",".join(["?"] * len(dtick)) + ")")
+            params = dtick[:]
             if start:
                 cond += " AND b.date >= ?"; params.append(start)
             if end:
@@ -168,6 +204,7 @@ def adjusted_close_panel(symbols, start=None, end=None, field: str = "close",
                                      AND f.from_date<=b.date ORDER BY f.from_date DESC LIMIT 1), 1.0) adj
                   FROM bc.bhavcopy_prices b {cond})""", params).fetchdf()
             if not df.empty:
+                df["symbol"] = df["symbol"].map(a2c)   # relabel old tickers to the delisted name
                 parts.append(df[["date", "symbol", "v"]])
 
     if not parts:
@@ -247,11 +284,14 @@ def universe_over_window(start, end, floor_cr: float = MCAP_FLOOR_CR) -> list[st
 
 def traded_value_panel(symbols, start=None, end=None) -> pd.DataFrame:
     """Daily rupee turnover (raw NSE Bhavcopy `turnover`) for ADTV / liquidity sizing — wide
-    date x symbol. Uses real traded value (split-invariant), live and dead names alike."""
-    syms = [s.upper() for s in symbols]
+    date x symbol. Resolves ticker renames via ISIN (adr-025) so a company's pre-rename turnover
+    (e.g. NAVA's years as NBVENTURES) is counted under its current symbol — otherwise renamed names
+    spuriously fail the liquidity filter in their pre-rename window."""
+    a2c = _alias_to_canonical([s.upper() for s in symbols])   # historical ticker -> requested symbol
+    tickers = list(a2c.keys())
     cond = ("WHERE series='EQ' AND turnover>0 AND upper(regexp_replace(ticker,'\\.NS$','')) IN ("
-            + ",".join(["?"] * len(syms)) + ")")
-    params = syms[:]
+            + ",".join(["?"] * len(tickers)) + ")")
+    params = tickers[:]
     if start:
         cond += " AND date >= ?"; params.append(start)
     if end:
@@ -261,6 +301,7 @@ def traded_value_panel(symbols, start=None, end=None) -> pd.DataFrame:
         f"FROM bc.bhavcopy_prices {cond}", params).fetchdf()
     if df.empty:
         return pd.DataFrame()
+    df["symbol"] = df["symbol"].map(a2c)   # relabel old tickers to the current symbol
     df["date"] = pd.to_datetime(df["date"])
     return df.pivot_table(index="date", columns="symbol", values="v").sort_index()
 

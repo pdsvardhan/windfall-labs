@@ -26,9 +26,18 @@ con.execute("""CREATE TABLE pit_shares AS
   SELECT * FROM qtr WHERE shares_cr>0
   UNION SELECT * FROM ann WHERE shares_cr>0""")
 
+# Join Bhavcopy via ISIN (not the current symbol) so renamed companies get their FULL pre-rename
+# price history -> correct point-in-time mcap & membership in the pre-rename window (adr-025).
+# (e.g. NAVA's mcap pre-2022 comes from its NBVENTURES rows, same ISIN.)
+con.execute("""CREATE TEMP VIEW tl_isin AS
+  SELECT DISTINCT m.pk, bi.isin
+  FROM tl_sym m JOIN (
+    SELECT DISTINCT upper(regexp_replace(ticker,'\\.NS$','')) sym, isin
+    FROM bc.bhavcopy_prices WHERE series='EQ' AND isin IS NOT NULL AND isin<>''
+  ) bi ON bi.sym=m.sym""")
 con.execute("""CREATE TEMP VIEW bc_px AS
-  SELECT m.pk, b.date, b.close raw_close
-  FROM bc.bhavcopy_prices b JOIN tl_sym m ON upper(regexp_replace(b.ticker,'\\.NS$',''))=m.sym
+  SELECT t.pk, b.date, b.close raw_close
+  FROM bc.bhavcopy_prices b JOIN tl_isin t ON b.isin=t.isin
   WHERE b.series='EQ' AND b.close>0""")
 
 con.execute("""CREATE TABLE pit_mcap AS
