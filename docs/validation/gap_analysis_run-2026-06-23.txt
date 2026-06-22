@@ -1,0 +1,168 @@
+
+============================================================================
+TEST 548012  filters=['tl_durability > 55', 'tl_valuation > 50', 'tl_momentum > 60', 'adtv_cr > 10']
+  rank=tl_momentum desc nhold=10 | gold misses analysed: 73
+     45 (62%)  NOT_IN_UNIVERSE
+     16 (22%)  RANKED_OUT
+      7 (10%)  NO_DATA:adtv_cr
+      5 ( 7%)  FAILED:adtv_cr > 10
+   NOT_IN_UNIVERSE names (top): [('MIRZAINT', 5), ('JSLHISAR', 3), ('AMBIKCO', 3), ('UJJIVAN', 3), ('MANGCHEFER', 3), ('TV18BRDCST', 2), ('UTTAMSUGAR', 2), ('GSPL', 2), ('JAIBALAJI', 2), ('VASCONEQ', 2), ('PDMJEPAPER', 2), ('IFBAGRO', 2)]
+   NO_DATA breakdown: {'NO_DATA:adtv_cr': 7}
+   FAILED FAILED:adtv_cr > 10: 5 misses | our_val vs thresh e.g. WHEELS=9.86(<>10.0), FMGOETZE=5.63(<>10.0), MONARCH=9.69(<>10.0), JINDRILL=8.55(<>10.0), SESHAPAPER=9.88(<>10.0)
+
+============================================================================
+TEST 548776  filters=['tl_durability > 55', 'tl_valuation > 50', 'tl_momentum > 60', 'adtv_cr > 10', 'tl_pe > 0']
+  rank=tl_pe asc nhold=10 | gold misses analysed: 56
+     35 (62%)  NOT_IN_UNIVERSE
+     14 (25%)  RANKED_OUT
+      4 ( 7%)  FAILED:adtv_cr > 10
+      3 ( 5%)  NO_DATA:adtv_cr
+   NOT_IN_UNIVERSE names (top): [('IDFC', 5), ('JSLHISAR', 4), ('UJJIVAN', 3), ('RELINFRA', 3), ('GSPL', 2), ('GVKPIL', 2), ('PDMJEPAPER', 2), ('IBULLSLTD', 2), ('TATASTLBSL', 1), ('3IINFOLTD', 1), ('AMBIKCO', 1), ('TV18BRDCST', 1)]
+   NO_DATA breakdown: {'NO_DATA:adtv_cr': 3}
+   FAILED FAILED:adtv_cr > 10: 4 misses | our_val vs thresh e.g. WHEELS=9.86(<>10.0), FMGOETZE=5.63(<>10.0), MONARCH=9.69(<>10.0), RAMKY=9.76(<>10.0)
+
+============================================================================
+TEST 548042  filters=['mcap > 1000', 'adtv_cr > 10', 'close > sma50', 'close > sma200', 'roc21 > 10', 'rsi14 > 60']
+  rank=roc21 desc nhold=10 | gold misses analysed: 162
+    121 (75%)  NOT_IN_UNIVERSE
+     32 (20%)  NO_DATA:mcap
+      4 ( 2%)  NO_DATA:close
+      3 ( 2%)  FAILED:mcap > 1000
+      2 ( 1%)  FAILED:adtv_cr > 10
+   NOT_IN_UNIVERSE names (top): [('14060423', 17), ('STLTECH', 16), ('PFOCUS', 7), ('BGRENERGY', 7), ('CIAN', 6), ('542012', 5), ('DEEDEV', 5), ('IBULLSLTD', 4), ('INDOTECH', 4), ('SIGMAADV', 4), ('OLAELEC', 3), ('TVSELECT', 3)]
+   NO_DATA breakdown: {'NO_DATA:mcap': 32, 'NO_DATA:close': 4}
+   FAILED FAILED:mcap > 1000: 3 misses | our_val vs thresh e.g. WALCHANNAG=902.48(<>1000.0), VENUSREM=972.12(<>1000.0), PROZONER=997.2(<>1000.0)
+   FAILED FAILED:adtv_cr > 10: 2 misses | our_val vs thresh e.g. WHEELS=9.48(<>10.0), SAKAR=9.78(<>10.0)
+
+============================================================================
+TEST 548040  filters=['mcap > 1000', 'adtv_cr > 10', 'tl_durability > 50', 'close > sma200', 'rsi14 > 40', 'rsi14 < 55']
+  rank=tl_momentum desc nhold=10 | gold misses analysed: 47
+     22 (47%)  NOT_IN_UNIVERSE
+     11 (23%)  RANKED_OUT
+     10 (21%)  NO_DATA:mcap
+      2 ( 4%)  FAILED:adtv_cr > 10
+      1 ( 2%)  NO_DATA:adtv_cr
+      1 ( 2%)  NO_DATA:close
+   NOT_IN_UNIVERSE names (top): [('MANGCHEFER', 4), ('CIAN', 3), ('KRN', 2), ('ALPEXSOLAR', 2), ('IFBAGRO', 2), ('17160453', 1), ('VASCONEQ', 1), ('ASMTEC', 1), ('542012', 1), ('RDBRIL', 1), ('BIRET', 1), ('QPOWER', 1)]
+   NO_DATA breakdown: {'NO_DATA:mcap': 10, 'NO_DATA:adtv_cr': 1, 'NO_DATA:close': 1}
+   FAILED FAILED:adtv_cr > 10: 2 misses | our_val vs thresh e.g. GMBREW=9.84(<>10.0), LUMAXIND=9.84(<>10.0)
+
+============================================================================
+TEST 548017  filters=['tl_durability > 55', 'tl_valuation > 50', 'tl_momentum > 60', 'adtv_cr > 10', 'mcap > 1000', 'close > sma200']
+  rank=tl_momentum desc nhold=10 | gold misses analysed: 70
+     45 (64%)  NOT_IN_UNIVERSE
+      8 (11%)  RANKED_OUT
+      7 (10%)  NO_DATA:adtv_cr
+      5 ( 7%)  FAILED:adtv_cr > 10
+      3 ( 4%)  NO_DATA:mcap
+      2 ( 3%)  NO_DATA:close
+   NOT_IN_UNIVERSE names (top): [('MIRZAINT', 5), ('JSLHISAR', 3), ('AMBIKCO', 3), ('UJJIVAN', 3), ('MANGCHEFER', 3), ('TV18BRDCST', 2), ('UTTAMSUGAR', 2), ('GSPL', 2), ('JAIBALAJI', 2), ('VASCONEQ', 2), ('PDMJEPAPER', 2), ('IFBAGRO', 2)]
+   NO_DATA breakdown: {'NO_DATA:mcap': 3, 'NO_DATA:adtv_cr': 7, 'NO_DATA:close': 2}
+   FAILED FAILED:adtv_cr > 10: 5 misses | our_val vs thresh e.g. WHEELS=9.86(<>10.0), FMGOETZE=5.63(<>10.0), MONARCH=9.69(<>10.0), JINDRILL=8.55(<>10.0), SESHAPAPER=9.88(<>10.0)
+
+============================================================================
+TEST 548015  filters=['tl_durability > 55', 'tl_valuation > 50', 'tl_momentum > 65', 'adtv_cr > 10', 'mcap > 1000']
+  rank=tl_momentum desc nhold=10 | gold misses analysed: 62
+     42 (68%)  NOT_IN_UNIVERSE
+      7 (11%)  NO_DATA:adtv_cr
+      6 (10%)  RANKED_OUT
+      4 ( 6%)  FAILED:adtv_cr > 10
+      3 ( 5%)  NO_DATA:mcap
+   NOT_IN_UNIVERSE names (top): [('MIRZAINT', 5), ('JSLHISAR', 3), ('AMBIKCO', 3), ('UJJIVAN', 3), ('TV18BRDCST', 2), ('UTTAMSUGAR', 2), ('GSPL', 2), ('JAIBALAJI', 2), ('VASCONEQ', 2), ('PDMJEPAPER', 2), ('MANGCHEFER', 2), ('IFBAGRO', 2)]
+   NO_DATA breakdown: {'NO_DATA:mcap': 3, 'NO_DATA:adtv_cr': 7}
+   FAILED FAILED:adtv_cr > 10: 4 misses | our_val vs thresh e.g. WHEELS=9.86(<>10.0), MONARCH=9.69(<>10.0), JINDRILL=8.55(<>10.0), SESHAPAPER=9.88(<>10.0)
+
+============================================================================
+TEST 548014  filters=['tl_durability > 55', 'tl_valuation > 50', 'tl_momentum > 65', 'adtv_cr > 10', 'mcap > 1000']
+  rank=tl_momentum desc nhold=5 | gold misses analysed: 41
+     24 (59%)  NOT_IN_UNIVERSE
+      7 (17%)  NO_DATA:adtv_cr
+      6 (15%)  RANKED_OUT
+      3 ( 7%)  FAILED:adtv_cr > 10
+      1 ( 2%)  NO_DATA:mcap
+   NOT_IN_UNIVERSE names (top): [('AMBIKCO', 2), ('TV18BRDCST', 2), ('MIRZAINT', 2), ('UJJIVAN', 2), ('PDMJEPAPER', 2), ('IFBAGRO', 2), ('JSLHISAR', 1), ('UTTAMSUGAR', 1), ('SREERAYALK', 1), ('GSPL', 1), ('JAIBALAJI', 1), ('VASCONEQ', 1)]
+   NO_DATA breakdown: {'NO_DATA:mcap': 1, 'NO_DATA:adtv_cr': 7}
+   FAILED FAILED:adtv_cr > 10: 3 misses | our_val vs thresh e.g. WHEELS=9.86(<>10.0), MONARCH=9.69(<>10.0), SESHAPAPER=9.88(<>10.0)
+
+============================================================================
+TEST 547990  filters=['mcap > 500', 'mcap < 50000', 'tl_durability > 50', 'rsi14 > 50', 'close > sma50', 'close > sma200', 'tl_pledge < 20', 'adtv_cr > 10', 'tl_pe < 100', 'tl_momentum > 60']
+  rank=tl_momentum desc nhold=10 | gold misses analysed: 21
+      8 (38%)  NOT_IN_UNIVERSE
+      6 (29%)  NO_DATA:mcap
+      4 (19%)  RANKED_OUT
+      2 (10%)  FAILED:adtv_cr > 10
+      1 ( 5%)  FAILED:tl_pe < 100
+   NOT_IN_UNIVERSE names (top): [('DEEDEV', 2), ('MANGCHEFER', 1), ('IFBAGRO', 1), ('RAMAPHO', 1), ('BHAGYANGR', 1), ('OMAXAUTO', 1), ('SIGMAADV', 1)]
+   NO_DATA breakdown: {'NO_DATA:mcap': 6}
+   FAILED FAILED:adtv_cr > 10: 2 misses | our_val vs thresh e.g. WHEELS=9.86(<>10.0), VSTTILLERS=9.55(<>10.0)
+   FAILED FAILED:tl_pe < 100: 1 misses | our_val vs thresh e.g. TVSELECT=2485.32(<>100.0)
+
+============================================================================
+TEST 547989  filters=['mcap > 500', 'mcap < 50000', 'tl_durability > 50', 'rsi14 > 50', 'close > sma50', 'close > sma200', 'tl_pledge < 20', 'adtv_cr > 10', 'tl_pe < 100', 'tl_momentum > 60']
+  rank=tl_momentum desc nhold=10 | gold misses analysed: 90
+     33 (37%)  NOT_IN_UNIVERSE
+     26 (29%)  NO_DATA:mcap
+     15 (17%)  RANKED_OUT
+      5 ( 6%)  FAILED:adtv_cr > 10
+      4 ( 4%)  NO_DATA:tl_pe
+      4 ( 4%)  FAILED:tl_pe < 100
+      2 ( 2%)  NO_DATA:close
+      1 ( 1%)  NO_DATA:adtv_cr
+   NOT_IN_UNIVERSE names (top): [('DEEDEV', 6), ('STLTECH', 4), ('RAMAPHO', 3), ('IFBAGRO', 3), ('RMDRIP', 3), ('BHAGYANGR', 3), ('MANGCHEFER', 2), ('ALPEXSOLAR', 2), ('OMAXAUTO', 2), ('SIGMAADV', 2), ('SHANKARA', 1), ('TANFACIND', 1)]
+   NO_DATA breakdown: {'NO_DATA:tl_pe': 4, 'NO_DATA:mcap': 26, 'NO_DATA:close': 2, 'NO_DATA:adtv_cr': 1}
+   FAILED FAILED:adtv_cr > 10: 5 misses | our_val vs thresh e.g. SOUTHWEST=9.25(<>10.0), GMBREW=9.84(<>10.0), WHEELS=9.48(<>10.0), SAKAR=9.78(<>10.0), VENUSREM=9.85(<>10.0)
+   FAILED FAILED:tl_pe < 100: 4 misses | our_val vs thresh e.g. TVSELECT=2485.32(<>100.0), TVSELECT=2485.32(<>100.0), PROZONER=108.91(<>100.0), TVSELECT=2485.32(<>100.0)
+
+============================================================================
+TEST 547991  filters=['mcap > 500', 'mcap < 50000', 'tl_durability > 50', 'rsi14 > 50', 'close > sma50', 'close > sma200', 'tl_pledge < 20', 'adtv_cr > 10', 'tl_pe < 100', 'tl_momentum > 60']
+  rank=tl_momentum desc nhold=10 | gold misses analysed: 348
+    242 (70%)  NO_DATA:tl_pledge
+     42 (12%)  NOT_IN_UNIVERSE
+     39 (11%)  NO_DATA:mcap
+     13 ( 4%)  RANKED_OUT
+      6 ( 2%)  FAILED:adtv_cr > 10
+      3 ( 1%)  NO_DATA:close
+      1 ( 0%)  FAILED:mcap > 500
+      1 ( 0%)  FAILED:mcap < 50000
+      1 ( 0%)  FAILED:tl_pe < 100
+   NOT_IN_UNIVERSE names (top): [('TV18BRDCST', 2), ('MIRZAINT', 2), ('VINYLINDIA', 2), ('VERTOZ', 2), ('SAKUMA', 2), ('DEEDEV', 2), ('APCL', 1), ('KHAICHEM', 1), ('ORIENTBELL', 1), ('SHANKARA', 1), ('SREERAYALK', 1), ('RUBYMILLS', 1)]
+   NO_DATA breakdown: {'NO_DATA:tl_pledge': 242, 'NO_DATA:mcap': 39, 'NO_DATA:close': 3}
+   FAILED FAILED:adtv_cr > 10: 6 misses | our_val vs thresh e.g. WHEELS=9.86(<>10.0), VSTTILLERS=9.55(<>10.0), ASALCBR=9.25(<>10.0), ASALCBR=9.81(<>10.0), SWELECTES=9.47(<>10.0), KDDL=9.98(<>10.0)
+   FAILED FAILED:mcap > 500: 1 misses | our_val vs thresh e.g. WEBELSOLAR=497.2(<>500.0)
+   FAILED FAILED:mcap < 50000: 1 misses | our_val vs thresh e.g. VBL=51343.43(<>50000.0)
+   FAILED FAILED:tl_pe < 100: 1 misses | our_val vs thresh e.g. TVSELECT=2485.32(<>100.0)
+
+============================================================================
+TEST 547992  filters=['mcap > 500', 'mcap < 50000', 'tl_durability > 50', 'rsi14 > 50', 'close > sma50', 'close > sma200', 'tl_pledge < 20', 'adtv_cr > 10', 'tl_pe < 100', 'tl_momentum > 60']
+  rank=tl_momentum desc nhold=10 | gold misses analysed: 423
+    136 (32%)  NO_DATA:tl_pledge
+    115 (27%)  NO_DATA:mcap
+    101 (24%)  NO_DATA:close
+     50 (12%)  NOT_IN_UNIVERSE
+     12 ( 3%)  NO_DATA:tl_durability
+      3 ( 1%)  FAILED:adtv_cr > 10
+      2 ( 0%)  FAILED:mcap < 50000
+      1 ( 0%)  FAILED:rsi14 > 50
+      1 ( 0%)  FAILED:mcap > 500
+      1 ( 0%)  FAILED:tl_pe < 100
+      1 ( 0%)  RANKED_OUT
+   NOT_IN_UNIVERSE names (top): [('MINDTREE', 3), ('HEXAWARE', 3), ('DHANI', 3), ('RCOM', 2), ('EROSMEDIA', 2), ('BHARATFIN', 2), ('RAJESHEXPO', 2), ('TV18BRDCST', 2), ('UGARSUGAR', 2), ('GSKCONS', 2), ('STLTECH', 1), ('HCL-INSYS', 1)]
+   NO_DATA breakdown: {'NO_DATA:mcap': 115, 'NO_DATA:tl_durability': 12, 'NO_DATA:close': 101, 'NO_DATA:tl_pledge': 136}
+   FAILED FAILED:adtv_cr > 10: 3 misses | our_val vs thresh e.g. WHEELS=9.86(<>10.0), VSTTILLERS=9.55(<>10.0), ASALCBR=9.25(<>10.0)
+   FAILED FAILED:mcap < 50000: 2 misses | our_val vs thresh e.g. VBL=51343.43(<>50000.0), BPCL=80329.72(<>50000.0)
+   FAILED FAILED:rsi14 > 50: 1 misses | our_val vs thresh e.g. PAGEIND=49.87(<>50.0)
+   FAILED FAILED:mcap > 500: 1 misses | our_val vs thresh e.g. APOLLOPIPE=493.62(<>500.0)
+   FAILED FAILED:tl_pe < 100: 1 misses | our_val vs thresh e.g. TVSELECT=2485.32(<>100.0)
+
+============================================================================
+TEST 547994  filters=['tl_durability > 55', 'tl_valuation > 50', 'tl_momentum > 60']
+  rank=tl_momentum desc nhold=10 | gold misses analysed: 316
+    316 (100%)  NOT_IN_UNIVERSE
+   NOT_IN_UNIVERSE names (top): [('BRAHMINFRA', 23), ('GARNET', 14), ('BHAGYANGR', 12), ('IFBAGRO', 11), ('STELLANT', 11), ('KESORAMIND', 10), ('SKPMIL', 8), ('RRFIN', 8), ('530805', 8), ('KANSHST', 7), ('YUVRAAJHPL', 7), ('CIAN', 6)]
+
+============================================================================
+TEST 547995  filters=['tl_durability > 55', 'tl_valuation > 50', 'tl_momentum > 60']
+  rank=tl_momentum desc nhold=10 | gold misses analysed: 387
+    385 (99%)  NOT_IN_UNIVERSE
+      2 ( 1%)  RANKED_OUT
+   NOT_IN_UNIVERSE names (top): [('GAYATRI', 6), ('HAZOOR', 5), ('CIAN', 5), ('AJANTSOY', 4), ('SUNLOC', 4), ('PRITHVISOF', 4), ('ELIXIR', 4), ('RODIUM', 4), ('BHAGYANGR', 4), ('SURYALA', 3), ('MANAKSTEEL', 3), ('RSDFIN', 3)]
