@@ -281,14 +281,38 @@ def dvm_panel(score: str, symbols) -> pd.DataFrame:
 
 
 def valuation_panel(metric: str, symbols) -> pd.DataFrame:
-    """Trendlyne daily valuation multiple: PE_TTM / PEG_TTM / PBV_A. Published daily -> point-in-time."""
-    return _pk_panel("valuation_ratios", "metric", _VAL[metric], symbols)
+    """Trendlyne daily valuation multiple: PE_TTM / PEG_TTM / PBV_A. Published daily -> point-in-time.
+
+    PE_TTM and PEG_TTM are NEGATIVE for loss-makers and explode near zero earnings (caveat #7). A
+    negative PE is NOT 'cheap', so we mask PE/PEG <= 0 -> NaN: a `tl_pe < N` filter then EXCLUDES
+    loss-makers (instead of admitting every negative), and an ascending 'prefer-low PE' rank no
+    longer ranks loss-makers as the cheapest. PBV is left as-is (negative book is rare and real)."""
+    df = _pk_panel("valuation_ratios", "metric", _VAL[metric], symbols)
+    if not df.empty and _VAL[metric] in ("PE_TTM", "PEG_TTM"):
+        df = df.where(df > 0)
+    return df
 
 
 # Raw earnings-derived fundamentals that DO need an announcement-date lag (result_lag, adr-016).
+# All have the long (pk, metric, date, value) shape and a quarterly/annual period_end that joins
+# result_lag, so raw_fundamental_panel handles every one identically (iter-32 widened the set).
 _RAW_FUND = {"tl_roe": ("ratios_annual", "ROE_A"), "tl_roce": ("ratios_annual", "ROCE_A"),
              "tl_de": ("ratios_annual", "DEBT_CE_A"), "tl_opm": ("ratios_annual", "OPM_A"),
-             "tl_eps": ("pnl_annual", "EPS_A")}
+             "tl_eps": ("pnl_annual", "EPS_A"),
+             # iter-32 curated factor library:
+             "tl_roic": ("ratios_annual", "ROIC_A"), "tl_eyield": ("ratios_annual", "EYield_A"),
+             "tl_ps": ("ratios_annual", "PriceToSales_A"),
+             "tl_current_ratio": ("ratios_annual", "CRATIO_A"),
+             "tl_quick_ratio": ("ratios_annual", "QuickRatio_A"),
+             "tl_int_cover": ("ratios_annual", "InterestCoveragePostTax_A"),
+             "tl_cfo": ("cashflow", "CFO_A"),
+             "tl_piotroski": ("growth_quality", "PITROSKI_F"),
+             "tl_np_growth": ("growth_quality", "NP_TTM_GROWTH"),
+             "tl_rev_growth": ("growth_quality", "SR_TTM_GROWTH")}
+
+# Unit fix: EYield_A is stored as a FRACTION (0.03 = 3%); scale to a percentage so `tl_eyield > 4`
+# means ">4%" (Trendlyne's "Earnings Yield %" convention). Other ratios are already %/ratio-scaled.
+_FUND_SCALE = {"tl_eyield": 100.0}
 
 
 def raw_fundamental_panel(metric: str, symbols, dates) -> pd.DataFrame:
@@ -317,7 +341,51 @@ def raw_fundamental_panel(metric: str, symbols, dates) -> pd.DataFrame:
     idx = pd.DatetimeIndex(sorted(pd.to_datetime(dates).unique()))
     wide = df.pivot_table(index="avail", columns="symbol", values="value").sort_index()
     wide = wide.reindex(wide.index.union(idx)).ffill().reindex(idx)
-    return wide
+    return wide * _FUND_SCALE.get(metric, 1.0)
+
+
+def mcap_panel(symbols, dates) -> pd.DataFrame:
+    """Point-in-time market cap (Rs cr), SURVIVORSHIP-FREE: from universe_membership.mcap_cr (the same
+    PIT series that feeds the >500cr universe floor, live + delisted). Exposed as a feature so a
+    backtest can reproduce Trendlyne 'Market Capitalization' bands (e.g. mcap > 1000, mcap < 50000)
+    over history, not just the snapshot value. Forward-filled (<=2 wks) within each name's window."""
+    syms = [s.upper() for s in symbols]
+    df = _con().execute(
+        "SELECT symbol, date, mcap_cr FROM universe_membership WHERE symbol IN ("
+        + ",".join(["?"] * len(syms)) + ")", syms).fetchdf()
+    idx = pd.DatetimeIndex(sorted(pd.to_datetime(dates).unique()))
+    if df.empty:
+        return pd.DataFrame(index=idx)
+    df["date"] = pd.to_datetime(df["date"])
+    wide = df.pivot_table(index="date", columns="symbol", values="mcap_cr").sort_index()
+    return wide.reindex(wide.index.union(idx)).ffill(limit=10).reindex(idx)
+
+
+_SHARE_CAT = {"tl_pledge": "Pledged", "tl_fii": "FII", "tl_dii": "DII"}
+
+
+def shareholding_panel(metric: str, symbols, dates) -> pd.DataFrame:
+    """Quarterly shareholding % (promoter pledge / FII / DII) from shareholding_summary, readable only
+    on/after the real result-announcement date (result_lag join) -> no look-ahead. FFilled to `dates`."""
+    cat = _SHARE_CAT[metric]
+    syms = [s.upper() for s in symbols]
+    pkmap = symbol_pk_map()
+    live = {pk: s for s, pk in ((s, pkmap[s]) for s in syms if s in pkmap)}
+    if not live:
+        return pd.DataFrame()
+    pks = list(live.keys())
+    df = _con().execute(f"""
+        SELECT sh.pk, r.available_from AS avail, sh.pct AS value
+        FROM shareholding_summary sh JOIN result_lag r ON sh.pk=r.pk AND sh.date=r.period_end
+        WHERE sh.category=? AND sh.pk IN ({",".join(["?"]*len(pks))})""",
+        [cat] + pks).fetchdf()
+    if df.empty:
+        return pd.DataFrame()
+    df["symbol"] = df["pk"].map(live)
+    df["avail"] = pd.to_datetime(df["avail"])
+    idx = pd.DatetimeIndex(sorted(pd.to_datetime(dates).unique()))
+    wide = df.pivot_table(index="avail", columns="symbol", values="value").sort_index()
+    return wide.reindex(wide.index.union(idx)).ffill().reindex(idx)
 
 
 _BENCH_PK = {"NIFTY50": 1887, "NIFTY500": 1893, "NIFTYNEXT50": 1888,

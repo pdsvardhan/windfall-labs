@@ -31,8 +31,13 @@ _HIST_FUND = set(fund.SCREENER_HISTORY_FIELDS)
 # Trendlyne full-history features (data_source="trendlyne"): the platform's own daily DVM scores
 # and valuation multiples (point-in-time by construction), plus result-lag-gated raw fundamentals.
 _TL_DAILY = {"tl_durability", "tl_valuation", "tl_momentum", "tl_pe", "tl_peg", "tl_pbv"}
-_TL_LAGGED = {"tl_roe", "tl_roce", "tl_de", "tl_opm", "tl_eps"}
-_TL_FEATURES = _TL_DAILY | _TL_LAGGED
+_TL_LAGGED = {"tl_roe", "tl_roce", "tl_de", "tl_opm", "tl_eps",
+              # iter-32 curated factor library (result-lag-gated annual/quarterly, no look-ahead)
+              "tl_roic", "tl_eyield", "tl_ps", "tl_current_ratio", "tl_quick_ratio",
+              "tl_int_cover", "tl_cfo", "tl_piotroski", "tl_np_growth", "tl_rev_growth"}
+_TL_SHARE = {"tl_pledge", "tl_fii", "tl_dii"}   # quarterly shareholding %, result-lag-gated
+_TL_MCAP = {"mcap"}                              # point-in-time survivorship-free market cap (Rs cr)
+_TL_FEATURES = _TL_DAILY | _TL_LAGGED | _TL_SHARE | _TL_MCAP
 
 
 @dataclass
@@ -185,7 +190,11 @@ def resolve(cfg: StrategyConfig) -> ResolvedStrategy:
                 df = ts.dvm_panel(name, tickers).reindex(index=close.index, columns=tickers).ffill()
             elif name in ("tl_pe", "tl_peg", "tl_pbv"):
                 df = ts.valuation_panel(name, tickers).reindex(index=close.index, columns=tickers).ffill()
-            else:  # result-lag-gated raw annual fundamentals (no look-ahead per adr-016)
+            elif name in _TL_MCAP:  # point-in-time survivorship-free market cap (Rs cr)
+                df = ts.mcap_panel(tickers, close.index).reindex(index=close.index, columns=tickers)
+            elif name in _TL_SHARE:  # quarterly shareholding %, result-lag-gated (no look-ahead)
+                df = ts.shareholding_panel(name, tickers, close.index).reindex(columns=tickers)
+            else:  # result-lag-gated raw annual/quarterly fundamentals (no look-ahead per adr-016)
                 df = ts.raw_fundamental_panel(name, tickers, close.index).reindex(columns=tickers)
         elif name == "macd":
             df = ind.macd(close)[0]

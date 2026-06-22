@@ -33,6 +33,7 @@ export const PRICE_FACTORS: FactorDef[] = [
   { token: "macd", label: "MACD", group: "Momentum" },
   { token: "macd_signal", label: "MACD signal", group: "Momentum" },
   { token: "macd_hist", label: "MACD histogram", group: "Momentum" },
+  { token: "mcap", label: "Market cap (₹cr, point-in-time)", group: "Size · survivorship-free", note: "PIT mcap from universe membership — reproduces Trendlyne Market-Cap bands over history (mcap > 1000, mcap < 50000)" },
 ];
 
 // Raw fundamentals backed by the screener history (covers delisted names) — survivorship-safe.
@@ -46,20 +47,38 @@ export const OWN_FACTORS: FactorDef[] = [
   { token: "pb", label: "P/B (price ÷ book)", group: "Fundamental · survivorship-free" },
 ];
 
-// Trendlyne's own DVM + valuation + snapshot fundamentals — NOT available for delisted names.
+// Trendlyne's own DVM + valuation + fundamentals — NOT available for delisted names (survivors-only).
+// All result-lagged fundamentals are point-in-time (no look-ahead). iter-32 widened this from the
+// DVM core to a curated library (data was already in trendlyne.duckdb, just not wired).
 export const TL_FACTORS: FactorDef[] = [
   { token: "tl_durability", label: "Trendlyne Durability (0-100)", group: "Trendlyne DVM · survivors-only", survivorsOnly: true },
   { token: "tl_valuation", label: "Trendlyne Valuation (0-100)", group: "Trendlyne DVM · survivors-only", survivorsOnly: true },
   { token: "tl_momentum", label: "Trendlyne Momentum (0-100)", group: "Trendlyne DVM · survivors-only", survivorsOnly: true },
-  { token: "tl_pe", label: "P/E (TTM)", group: "Trendlyne DVM · survivors-only", survivorsOnly: true },
-  { token: "tl_peg", label: "PEG (TTM)", group: "Trendlyne DVM · survivors-only", survivorsOnly: true },
-  { token: "tl_pbv", label: "P/B", group: "Trendlyne DVM · survivors-only", survivorsOnly: true },
-  { token: "tl_roe", label: "ROE (annual, result-lagged)", group: "Trendlyne DVM · survivors-only", survivorsOnly: true },
-  { token: "tl_roce", label: "ROCE (annual, result-lagged)", group: "Trendlyne DVM · survivors-only", survivorsOnly: true },
-  { token: "tl_de", label: "Debt/Equity (annual)", group: "Trendlyne DVM · survivors-only", survivorsOnly: true },
-  { token: "piotroski", label: "Piotroski F (snapshot)", group: "Snapshot fundamentals · survivors-only", survivorsOnly: true },
-  { token: "promoter_pledge", label: "Promoter pledge % (snapshot)", group: "Snapshot fundamentals · survivors-only", survivorsOnly: true },
-  { token: "eps_growth", label: "EPS growth % (snapshot)", group: "Snapshot fundamentals · survivors-only", survivorsOnly: true },
+  { token: "tl_pe", label: "P/E TTM (Trendlyne, ≤0 dropped)", group: "Trendlyne valuation · survivors-only", survivorsOnly: true },
+  { token: "tl_peg", label: "PEG TTM (Trendlyne, ≤0 dropped)", group: "Trendlyne valuation · survivors-only", survivorsOnly: true },
+  { token: "tl_pbv", label: "P/B (Trendlyne)", group: "Trendlyne valuation · survivors-only", survivorsOnly: true },
+  { token: "tl_eyield", label: "Earnings yield % (annual)", group: "Trendlyne valuation · survivors-only", survivorsOnly: true },
+  { token: "tl_ps", label: "Price/Sales (annual)", group: "Trendlyne valuation · survivors-only", survivorsOnly: true },
+  { token: "tl_roe", label: "ROE % (annual, result-lagged)", group: "Trendlyne fundamentals · survivors-only", survivorsOnly: true },
+  { token: "tl_roce", label: "ROCE % (annual, result-lagged)", group: "Trendlyne fundamentals · survivors-only", survivorsOnly: true },
+  { token: "tl_roic", label: "ROIC % (annual, result-lagged)", group: "Trendlyne fundamentals · survivors-only", survivorsOnly: true },
+  { token: "tl_de", label: "Debt/Equity (annual)", group: "Trendlyne fundamentals · survivors-only", survivorsOnly: true },
+  { token: "tl_opm", label: "Operating margin % (annual)", group: "Trendlyne fundamentals · survivors-only", survivorsOnly: true },
+  { token: "tl_eps", label: "EPS (annual, result-lagged)", group: "Trendlyne fundamentals · survivors-only", survivorsOnly: true },
+  { token: "tl_cfo", label: "Cash from ops ₹ (annual)", group: "Trendlyne fundamentals · survivors-only", survivorsOnly: true },
+  { token: "tl_current_ratio", label: "Current ratio (annual)", group: "Trendlyne fundamentals · survivors-only", survivorsOnly: true },
+  { token: "tl_quick_ratio", label: "Quick ratio (annual)", group: "Trendlyne fundamentals · survivors-only", survivorsOnly: true },
+  { token: "tl_int_cover", label: "Interest coverage (annual)", group: "Trendlyne fundamentals · survivors-only", survivorsOnly: true },
+  { token: "tl_piotroski", label: "Piotroski F (result-lagged)", group: "Trendlyne quality · survivors-only", survivorsOnly: true },
+  { token: "tl_np_growth", label: "Net-profit TTM growth %", group: "Trendlyne quality · survivors-only", survivorsOnly: true },
+  { token: "tl_rev_growth", label: "Revenue TTM growth %", group: "Trendlyne quality · survivors-only", survivorsOnly: true },
+  { token: "tl_pledge", label: "Promoter pledge % (result-lagged)", group: "Trendlyne ownership · survivors-only", survivorsOnly: true, note: "shareholding history starts 2023 — NaN (fails filter) before then" },
+  { token: "tl_fii", label: "FII holding % (result-lagged)", group: "Trendlyne ownership · survivors-only", survivorsOnly: true, note: "shareholding history starts 2023" },
+  { token: "tl_dii", label: "DII holding % (result-lagged)", group: "Trendlyne ownership · survivors-only", survivorsOnly: true, note: "shareholding history starts 2023" },
+  // Live-only snapshot factor (from the single Trendlyne snapshot): NaN before the snapshot date, so
+  // it silently no-ops in a historical backtest — use only for live signals. (piotroski/pledge moved
+  // to the result-lagged tl_* versions above; eps_growth has no historical series yet.)
+  { token: "eps_growth", label: "EPS growth % (LIVE ONLY — no backtest)", group: "Snapshot · live signals only", survivorsOnly: true, note: "NaN before the snapshot date; does nothing in a historical backtest" },
 ];
 
 export const ALL_FACTORS = [...PRICE_FACTORS, ...OWN_FACTORS, ...TL_FACTORS];
