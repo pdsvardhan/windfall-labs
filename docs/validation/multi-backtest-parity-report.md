@@ -13,9 +13,14 @@
 | **#76** membership | re-ran `rebuild_pit_mcap_ca.py` — `pit_mcap` was stale at 2026-05-13 for ~50 non-delisted names (prices fresh to 06-12) | STLTECH (₹20k cr, missed 16×) + DEEDEV back in `pit_universe`; 548042 misses 162→128, NOT_IN_UNIVERSE 121→73 |
 | **#72** mcap holes | same rebuild filled the `pit_mcap` date holes | 548042 `NO_DATA:mcap` 32→3; 548040 10→1 |
 
-**Still open** (need external input): **#74** `adtv_cr` calc alignment — now the next binding gap (recovered
-names surface `NO_DATA:adtv_cr`); needs Trendlyne's exact ADTV window/definition. **#73** un-ingested
-recent IPOs (`OLAELEC`=0 rows) + numeric-token gold rows — needs an in-browser Trendlyne harvest.
+**#74** `adtv_cr` — **resolved, no change needed.** The screen filter is `AvgTradedValueCr > 10` (value in
+₹cr — matches our `adtv_cr` type). Calibrated our window against 705 v2.2 gold picks (all passed >10):
+our 20-day gives 96% agreement, peak 97% at 15d, and longer windows are *worse* (30d 92%, 126d 78%) —
+so Trendlyne's window is short (~2–4 weeks) and ours already matches. The residual ~4% is the NSE-only-
+vs-Consolidated(NSE+BSE) bias, accepted (user: NSE-only universe, no BSE feed). Verified, not assumed.
+
+**Still open** (needs external input): **#73** un-ingested recent IPOs (`OLAELEC`=0 rows) + numeric-token
+gold rows — needs an in-browser Trendlyne harvest.
 Backup before the rebuild: `backend/data/trendlyne.duckdb.bak-20260623-parity`.
 
 **What this is:** all 9 replicable Trendlyne backtests run through our engine at Trendlyne's exact
