@@ -231,3 +231,13 @@ decisions:
       - curated
       - cat:reliability
     body_path: docs/decisions/adr-025-windfall-rename-aliases.md
+  - id: adr-026-windfall-lossmaker-shares
+    project_slug: windfall-labs
+    title: Loss-maker share-count fallback — bring profitless IPOs (Swiggy, Meesho,
+      Ola) into the universe
+    status: accepted
+    date: 2026-06-24T00:00:00.000Z
+    tags:
+      - curated
+      - cat:reliability
+    body_path: docs/decisions/adr-026-windfall-lossmaker-shares.md

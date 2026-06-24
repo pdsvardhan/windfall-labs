@@ -47,8 +47,24 @@ con.execute("""CREATE TABLE pit_shares AS
        qtr AS (SELECT npq.pk, npq.date from_date, npq.v/epq.v shares_cr FROM npq JOIN epq USING(pk,date)),
        npa AS (SELECT pk,date,value v FROM pnl_annual WHERE metric='NP_A'),
        epa AS (SELECT pk,date,value v FROM pnl_annual WHERE metric='EPS_A' AND value>0),
-       ann AS (SELECT npa.pk, npa.date from_date, npa.v/epa.v shares_cr FROM npa JOIN epa USING(pk,date))
-  SELECT * FROM qtr WHERE shares_cr>0 UNION SELECT * FROM ann WHERE shares_cr>0""")
+       ann AS (SELECT npa.pk, npa.date from_date, npa.v/epa.v shares_cr FROM npa JOIN epa USING(pk,date)),
+       eps_derived AS (SELECT * FROM qtr WHERE shares_cr>0 UNION SELECT * FROM ann WHERE shares_cr>0),
+       -- iter-12 (#73 / adr-026): loss-makers have EPS<=0, so NP/EPS yields no share count and they
+       -- drop out of pit_mcap and the universe entirely (Swiggy, Meesho, Ola Electric, FirstCry, ...).
+       -- Fall back to the current mcap snapshot / latest adjusted close — the SAME constant-current-
+       -- shares identity used to build pit_mcap below (mcap = adj_close x current_shares). Only for
+       -- pks with NO eps-derived shares, so profitable names are untouched.
+       fallback AS (
+         SELECT s.pk, lc.from_date, s.mcap / lc.last_close AS shares_cr
+         FROM stocks s
+         JOIN (SELECT pk, min(date) AS from_date, arg_max(close, date) AS last_close
+               FROM ohlcv GROUP BY pk) lc ON lc.pk = s.pk
+         WHERE s.mcap > 0 AND lc.last_close > 0
+           AND s.pk NOT IN (SELECT pk FROM eps_derived)
+       )
+  SELECT * FROM eps_derived
+  UNION ALL
+  SELECT * FROM fallback""")
 con.execute("""CREATE OR REPLACE TEMP VIEW shares_now AS
   SELECT pk, arg_max(shares_cr, from_date) AS shares_cr FROM pit_shares GROUP BY pk""")
 con.execute("""CREATE OR REPLACE TEMP VIEW dead_shares_now AS
