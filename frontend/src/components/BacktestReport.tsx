@@ -9,18 +9,11 @@ import { survivorsOnly } from "@/lib/catalog";
 import { MetricCard, MetricMini, Card, Pill, useReveal } from "@/components/ui";
 import { EquityChart, DrawdownChart } from "@/components/charts";
 
-// One readable line summarising the screen that produced this result (the "query used").
-function queryLine(c?: StrategyConfig): string {
-  if (!c) return "";
-  const f = (c.universe?.filters ?? []);
-  const e = (c.entry_filters ?? []);
-  const screen = [...f, ...e];
-  const parts = [
-    screen.length ? `screen: ${screen.join(" & ")}` : "all names",
-    `rank ${c.rank_by || "—"} ${c.rank_order === "asc" ? "↑" : "↓"}`,
-    `top ${c.n_holdings} · ${c.rebalance}`,
-  ];
-  return parts.join("  →  ");
+// Human-readable rank description — handles both single rank_by and composite rank_blend.
+function rankDesc(c: StrategyConfig): string {
+  const blend = c.rank_blend ?? [];
+  if (blend.length) return "composite — " + blend.map((r) => `${r.factor} ${r.weight}%${r.order === "asc" ? "↑" : "↓"}`).join(" · ");
+  return `${c.rank_by || "—"} ${c.rank_order === "asc" ? "↑ (min first)" : "↓ (max first)"}`;
 }
 
 const EXIT_TONE: Record<string, string> = {
@@ -31,22 +24,18 @@ export function BacktestReport({ res, config }: { res: BacktestResultFull; confi
   const s = res.summary;
   const ref = useReveal();
   const sv = config ? survivorsOnly(config) : { survivorsOnly: false, offenders: [] };
-  const [showCfg, setShowCfg] = useState(false);
   const [showNotes, setShowNotes] = useState(false);
 
   return (
     <div className="space-y-3.5">
-      {/* config-used bar (the "view query" the owner asked for) — survivorship as a small chip */}
+      {/* consolidated, labeled config home (B-RES-CONFIG) — single structured place, no mono one-liner */}
       {config && (
-        <Card className="px-4 py-3">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2 flex-wrap min-w-0">
-              <Pill tone={sv.survivorsOnly ? "warn" : "good"}>{sv.survivorsOnly ? "SURVIVORS-ONLY" : "SURVIVORSHIP-FREE"}</Pill>
-              <span className="font-mono text-[12px] text-ink/70 truncate">{queryLine(config)}</span>
-            </div>
-            <button className="text-[12px] font-bold text-faint hover:text-ink shrink-0" onClick={() => setShowCfg(!showCfg)}>{showCfg ? "hide config" : "view config"}</button>
+        <Card className="px-5 py-4">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-[13px] font-extrabold text-muted">Configuration</span>
+            <Pill tone={sv.survivorsOnly ? "warn" : "good"}>{sv.survivorsOnly ? "SURVIVORS-ONLY" : "SURVIVORSHIP-FREE"}</Pill>
           </div>
-          {showCfg && <ConfigDetails c={config} sv={sv} />}
+          <ConfigGrid c={config} sv={sv} />
         </Card>
       )}
 
@@ -75,7 +64,6 @@ export function BacktestReport({ res, config }: { res: BacktestResultFull; confi
       </div>
 
       <CostStrip config={config} nTrades={s.n_trades} />
-      {config && <ExploreVariations config={config} />}
 
       {/* equity + drawdown */}
       <div className="grid lg:grid-cols-[1.55fr_1fr] gap-3.5">
@@ -84,7 +72,9 @@ export function BacktestReport({ res, config }: { res: BacktestResultFull; confi
             <div className="font-extrabold text-[15px]">Equity curve</div>
             <div className="flex gap-3.5 text-[12px] font-semibold">
               <span className="flex items-center gap-1.5 text-ink"><span className="w-3.5 h-0.5 rounded bg-ink" />Strategy</span>
-              <span className="flex items-center gap-1.5 text-faint"><span className="w-3.5 h-0.5 rounded" style={{ background: "#c3bdd0" }} />{res.benchmark_curve?.length ? "Benchmark" : ""}</span>
+              {res.benchmark_curve?.length ? (
+                <span className="flex items-center gap-1.5 text-faint"><span className="w-3.5 h-0.5 rounded" style={{ background: "#c3bdd0" }} />Benchmark</span>
+              ) : null}
             </div>
           </div>
           <EquityChart strategy={res.equity_curve} benchmark={res.benchmark_curve} />
@@ -100,8 +90,8 @@ export function BacktestReport({ res, config }: { res: BacktestResultFull; confi
       {/* engine notes — collapsed by default (the wall of data-provenance text the owner disliked) */}
       {res.warnings?.length > 0 && (
         <Card className="px-4 py-3">
-          <button className="flex items-center gap-2 text-[12px] font-bold text-muted" onClick={() => setShowNotes(!showNotes)}>
-            <span className="text-faint">{showNotes ? "▾" : "▸"}</span> Engine notes
+          <button className="flex items-center gap-2 text-[13px] font-bold text-ink w-full text-left py-1.5" onClick={() => setShowNotes(!showNotes)}>
+            <span className="inline-flex items-center justify-center w-5 h-5 rounded-md text-[13px] font-extrabold shrink-0" style={{ background: "#f1ecfb", color: "#5b4a9e" }}>{showNotes ? "−" : "+"}</span> Engine notes
             <span className="text-[11px] text-faint font-medium">— data provenance &amp; caveats ({res.warnings.length})</span>
           </button>
           {showNotes && (
@@ -148,22 +138,22 @@ function tonePill(tone: string): React.CSSProperties {
   return { background: bg, color };
 }
 
-// readable config detail (expanded from the "view config" bar).
-function ConfigDetails({ c, sv }: { c: StrategyConfig; sv: { survivorsOnly: boolean; offenders: string[] } }) {
+// labeled config grid — the single structured home for the run's definition (B-RES-CONFIG / C-6).
+function ConfigGrid({ c, sv }: { c: StrategyConfig; sv: { survivorsOnly: boolean; offenders: string[] } }) {
   const row = (k: string, v: React.ReactNode) => (
     <div className="flex gap-2"><span className="text-faint w-[92px] shrink-0">{k}</span><span className="font-mono text-ink/80 break-words">{v}</span></div>
   );
-  const f = c.universe?.filters ?? [], e = c.entry_filters ?? [];
+  const screen = [...(c.universe?.filters ?? []), ...(c.entry_filters ?? [])];
   return (
-    <div className="mt-3 pt-3 border-t grid sm:grid-cols-2 gap-x-6 gap-y-1 text-[12px]" style={{ borderColor: "#f0eef6" }}>
-      {row("Screener", f.length ? f.join("  ·  ") : "all names")}
-      {row("Entry", e.length ? e.join("  ·  ") : "—")}
-      {row("Rank", `${c.rank_by || "—"} ${c.rank_order === "asc" ? "↑ (min first)" : "↓ (max first)"}`)}
-      {row("Sizing", `top ${c.n_holdings} · ${c.weighting}${c.max_weight_per_stock ? ` · max ${c.max_weight_per_stock}/stock` : ""}${c.sector_cap ? ` · sector cap ${c.sector_cap}` : ""}`)}
-      {row("Exits", `stop ${c.stop_loss?.type ?? "none"} · tp ${c.take_profit?.type ?? "none"}${c.regime_filter?.enabled ? ` · regime MA${c.regime_filter.ma_period}` : ""}`)}
-      {row("Costs", `NSE delivery · ~22 bps round-trip + ₹15.93 DP/sell · capital ₹${(c.capital / 1e5).toFixed(2)}L`)}
+    <div className="grid sm:grid-cols-2 gap-x-6 gap-y-1.5 text-[12px]">
+      {row("Screener", screen.length ? screen.join("  ·  ") : "all names")}
       {row("Window", `${c.start} → ${c.end || "today"} · vs ${c.benchmark}`)}
-      {row("Universe", sv.survivorsOnly ? `survivors-only (${sv.offenders.join(", ")})` : "survivorship-free, point-in-time ₹500cr")}
+      {row("Rank", rankDesc(c))}
+      {row("Sizing", `top ${c.n_holdings} · ${c.weighting}${c.max_weight_per_stock ? ` · max ${Math.round(c.max_weight_per_stock * 100)}%/stock` : ""}${c.sector_cap ? ` · sector cap ${c.sector_cap}` : ""}`)}
+      {row("Rebalance", c.rebalance)}
+      {row("Costs", `NSE delivery · ~22 bps round-trip + ₹15.93 DP/sell · capital ₹${(c.capital / 1e5).toFixed(2)}L`)}
+      {row("Exits", `stop ${c.stop_loss?.type ?? "none"} · tp ${c.take_profit?.type ?? "none"}${c.regime_filter?.enabled ? ` · regime MA${c.regime_filter.ma_period}` : ""}`)}
+      {row("Universe", sv.survivorsOnly ? `survivors-only (${sv.offenders.join(", ")})` : "survivorship-free · point-in-time ₹500cr")}
     </div>
   );
 }
@@ -181,9 +171,8 @@ function applyOverrides(base: StrategyConfig, ov: Record<string, unknown>): Stra
   return c;
 }
 
-function ExploreVariations({ config }: { config: StrategyConfig }) {
+export function ExploreVariations({ config }: { config: StrategyConfig }) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
   const [grid, setGrid] = useState<Record<string, string>>({ n_holdings: "8, 10, 15, 20", "stop_loss.mult": "1.5, 2, 2.5, 3" });
   const [metric, setMetric] = useState("sharpe");
   const [res, setRes] = useState<SweepResult | null>(null);
@@ -212,47 +201,40 @@ function ExploreVariations({ config }: { config: StrategyConfig }) {
   }
 
   return (
-    <Card className="px-5 py-3">
-      <button className="flex items-center gap-2 text-[13px] font-bold text-ink" onClick={() => setOpen(!open)}>
-        <span className="text-faint">{open ? "▾" : "▸"}</span> Explore variations
-        <span className="text-[11.5px] text-faint font-medium">— sweep a parameter grid &amp; rank to find a better setup</span>
-      </button>
-      {open && (
-        <div className="mt-3 space-y-2.5">
-          {["n_holdings", "stop_loss.mult", "rebalance"].map((p) => (
-            <div key={p} className="flex items-center gap-2">
-              <span className="text-[12px] font-mono text-muted" style={{ width: 110 }}>{p}</span>
-              <input className="wf-in" placeholder="comma values e.g. 8, 10, 15" value={grid[p] || ""} onChange={(e) => setGrid({ ...grid, [p]: e.target.value })} />
-            </div>
-          ))}
-          <div className="flex items-center gap-2">
-            <select className="wf-in" style={{ width: 150 }} value={metric} onChange={(e) => setMetric(e.target.value)}>
-              <option value="sharpe">rank by sharpe</option><option value="cagr">rank by CAGR</option><option value="sortino">rank by sortino</option>
-            </select>
-            <button className="btn btn-ink flex-1" style={{ borderRadius: 11 }} disabled={busy} onClick={runSweep}>{busy ? "running grid…" : "Run sweep"}</button>
+    <div className="space-y-2.5">
+      <div className="text-[12px] text-muted">Sweep a parameter grid &amp; rank to find a better setup. “Save” forks a new strategy and backtests it.</div>
+      {["n_holdings", "stop_loss.mult", "rebalance"].map((p) => (
+        <div key={p} className="flex items-center gap-2">
+          <span className="text-[12px] font-mono text-muted" style={{ width: 110 }}>{p}</span>
+          <input className="wf-in" placeholder="comma values e.g. 8, 10, 15" value={grid[p] || ""} onChange={(e) => setGrid({ ...grid, [p]: e.target.value })} />
+        </div>
+      ))}
+      <div className="flex items-center gap-2">
+        <select className="wf-in" style={{ width: 150 }} value={metric} onChange={(e) => setMetric(e.target.value)}>
+          <option value="sharpe">rank by sharpe</option><option value="cagr">rank by CAGR</option><option value="sortino">rank by sortino</option>
+        </select>
+        <button className="btn btn-ink flex-1" style={{ borderRadius: 11 }} disabled={busy} onClick={runSweep}>{busy ? "running grid…" : "Run sweep"}</button>
+      </div>
+      {err && <div className="text-[12px] text-loss">{err}</div>}
+      {res && (
+        <div className="rounded-xl overflow-hidden bg-white border" style={{ borderColor: "#f0eef6" }}>
+          <div className="grid px-3 py-2 text-[11px] text-faint font-bold border-b" style={{ gridTemplateColumns: "1.6fr .7fr .7fr .7fr .8fr", borderColor: "#f0eef6" }}>
+            <span>Variant</span><span className="text-right">CAGR</span><span className="text-right">DD</span><span className="text-right">Sharpe</span><span></span>
           </div>
-          {err && <div className="text-[12px] text-loss">{err}</div>}
-          {res && (
-            <div className="rounded-xl overflow-hidden bg-white">
-              <div className="grid px-3 py-2 text-[11px] text-faint font-bold border-b" style={{ gridTemplateColumns: "1.6fr .7fr .7fr .7fr .8fr", borderColor: "#f0eef6" }}>
-                <span>Variant</span><span className="text-right">CAGR</span><span className="text-right">DD</span><span className="text-right">Sharpe</span><span></span>
+          <div className="scroll-y" style={{ maxHeight: 300 }}>
+            {res.ranked.filter((r) => r.summary).slice(0, 30).map((r, i) => (
+              <div key={i} className="wf-row grid px-3 py-2 text-[12px] items-center tn border-b" style={{ gridTemplateColumns: "1.6fr .7fr .7fr .7fr .8fr", borderColor: "#f6f4fb" }}>
+                <span className="font-mono text-[11px] text-muted truncate">{Object.entries(r.overrides).map(([k, v]) => `${k.split(".").pop()}=${v}`).join(" ") || "base"}</span>
+                <span className="text-right text-gain font-bold">{pctSigned(r.summary!.cagr)}</span>
+                <span className="text-right text-loss">{pctSigned(r.summary!.max_drawdown)}</span>
+                <span className="text-right">{num(r.summary!.sharpe)}</span>
+                <span className="text-right"><button className="text-[11px] font-bold px-2 py-1 rounded-full" style={{ border: "1.5px solid #c4e05a", background: "#f2fae0", color: "#3f7d1c" }} onClick={() => saveRow(r.overrides, i + 1)}>save</button></span>
               </div>
-              <div className="scroll-y" style={{ maxHeight: 240 }}>
-                {res.ranked.filter((r) => r.summary).slice(0, 30).map((r, i) => (
-                  <div key={i} className="wf-row grid px-3 py-2 text-[12px] items-center tn border-b" style={{ gridTemplateColumns: "1.6fr .7fr .7fr .7fr .8fr", borderColor: "#f6f4fb" }}>
-                    <span className="font-mono text-[11px] text-muted truncate">{Object.entries(r.overrides).map(([k, v]) => `${k.split(".").pop()}=${v}`).join(" ") || "base"}</span>
-                    <span className="text-right text-gain font-bold">{pctSigned(r.summary!.cagr)}</span>
-                    <span className="text-right text-loss">{pctSigned(r.summary!.max_drawdown)}</span>
-                    <span className="text-right">{num(r.summary!.sharpe)}</span>
-                    <span className="text-right"><button className="text-[11px] font-bold px-2 py-1 rounded-full" style={{ border: "1.5px solid #c4e05a", background: "#f2fae0", color: "#3f7d1c" }} onClick={() => saveRow(r.overrides, i + 1)}>save</button></span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+            ))}
+          </div>
         </div>
       )}
-    </Card>
+    </div>
   );
 }
 
@@ -276,8 +258,8 @@ function CostStrip({ config, nTrades }: { config?: StrategyConfig; nTrades?: num
 
   return (
     <Card className="px-5 py-3">
-      <button className="flex items-center gap-2 text-[13px] font-bold text-ink" onClick={() => (open ? setOpen(false) : (noTrades ? setOpen(true) : load()))}>
-        <span className="text-faint">{open ? "▾" : "▸"}</span> Cost sensitivity
+      <button className="flex items-center gap-2 text-[13px] font-bold text-ink w-full text-left py-1.5" onClick={() => (open ? setOpen(false) : (noTrades ? setOpen(true) : load()))}>
+        <span className="inline-flex items-center justify-center w-5 h-5 rounded-md text-[13px] font-extrabold shrink-0" style={{ background: "#f1ecfb", color: "#5b4a9e" }}>{open ? "−" : "+"}</span> Cost sensitivity
         <span className="text-[11.5px] text-faint font-medium">— how much do costs eat the edge?</span>
       </button>
       {open && (

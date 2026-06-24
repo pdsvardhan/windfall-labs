@@ -5,8 +5,8 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import type { BacktestResultFull, Strategy, StrategyConfig } from "@/lib/types";
-import { Card } from "@/components/ui";
-import { BacktestReport } from "@/components/BacktestReport";
+import { Card, Menu, Modal, ConfirmDialog } from "@/components/ui";
+import { BacktestReport, ExploreVariations } from "@/components/BacktestReport";
 
 export default function StrategyResult() {
   const id = String(useParams().id);
@@ -15,6 +15,8 @@ export default function StrategyResult() {
   const [res, setRes] = useState<BacktestResultFull | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [showVar, setShowVar] = useState(false);
+  const [confirmDel, setConfirmDel] = useState(false);
 
   useEffect(() => {
     api.getStrategy(id).then(setS).catch((e) => setErr(e.message));
@@ -31,6 +33,11 @@ export default function StrategyResult() {
     finally { setBusy(false); }
   }
   async function remove() { await api.deleteStrategy(id); router.push("/strategies"); }
+  function duplicate() {
+    if (!s) return;
+    sessionStorage.setItem("wf_seed", JSON.stringify({ name: `${s.name}_copy`, config: s.config }));
+    router.push("/strategies/new");
+  }
 
   if (err && !s) return <div className="mt-8 text-loss text-sm">{err}</div>;
   if (!s) return <div className="mt-8 text-muted text-sm">Loading…</div>;
@@ -46,21 +53,22 @@ export default function StrategyResult() {
             {res && <span className="text-[11px] font-extrabold px-2.5 py-1 rounded-full" style={{ background: "#b9d24a", color: "#3a4512" }}>BACKTESTED</span>}
           </div>
           <h1 className="text-[34px] font-extrabold tracking-tight mt-2">{s.name}</h1>
-          {res && (
-            <div className="inline-flex flex-wrap items-center gap-x-2.5 gap-y-1 mt-2 text-[13px] font-semibold font-mono px-3 py-1.5 rounded-lg" style={{ background: "#f1ecfb", color: "#4b3b86" }}>
-              <span>{res.period.start} → {res.period.end}</span><span className="opacity-40">·</span>
-              <span>{res.period.years}y</span><span className="opacity-40">·</span>
-              <span>{cfg.rebalance}</span><span className="opacity-40">·</span>
-              <span>top {cfg.n_holdings}</span><span className="opacity-40">·</span>
-              <span>sort {cfg.rank_by} {cfg.rank_order === "desc" ? "↓" : "↑"}</span>
-            </div>
-          )}
+          {res && <div className="text-[13px] text-faint font-semibold mt-1.5">{res.period.start} → {res.period.end} · {res.period.years}y</div>}
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
           <button className="btn btn-soft" disabled={busy} onClick={run}>{busy ? "running…" : res ? "↻ Re-run" : "Run backtest"}</button>
+          {res && (
+            <Menu label="▾" align="right" items={[
+              { label: "Re-run (same config)", onClick: run },
+              { label: "Explore variations…", onClick: () => setShowVar(true) },
+            ]} />
+          )}
           <Link href={`/strategies/${id}/edit`} className="btn btn-soft">Edit config</Link>
           <Link href={`/signals?strategy=${id}`} className="btn btn-ink">Use for signals →</Link>
-          <button className="btn btn-ghost" style={{ color: "#c23e74" }} onClick={remove}>Delete</button>
+          <Menu align="right" items={[
+            { label: "Duplicate", onClick: duplicate },
+            { label: "Delete", danger: true, onClick: () => setConfirmDel(true) },
+          ]} />
         </div>
       </div>
 
@@ -75,6 +83,13 @@ export default function StrategyResult() {
           <button className="btn btn-acc mx-auto" disabled={busy} onClick={run}>{busy ? "running…" : "Run backtest →"}</button>
         </Card>
       )}
+
+      <Modal open={showVar} onClose={() => setShowVar(false)} title="Explore variations" wide>
+        <ExploreVariations config={cfg} />
+      </Modal>
+      <ConfirmDialog open={confirmDel} title="Delete strategy?"
+        body={`“${s.name}” and its backtests will be permanently removed.`}
+        confirmLabel="Delete" onConfirm={() => { setConfirmDel(false); remove(); }} onCancel={() => setConfirmDel(false)} />
     </div>
   );
 }

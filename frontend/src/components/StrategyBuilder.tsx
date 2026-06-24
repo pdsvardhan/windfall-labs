@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import type { Readiness, StrategyConfig } from "@/lib/types";
 import { ALL_FACTORS, OPERATORS, FREQUENCIES, BENCHMARKS, defaultConfig, survivorsOnly } from "@/lib/catalog";
-import { Card, Field, Switch, Segmented, Slider, SectionTitle } from "@/components/ui";
+import { Card, Field, Switch, Segmented, Slider, SectionTitle, Pill } from "@/components/ui";
 import { JsonView } from "@/components/JsonView";
 
 // curated ready-to-use tokens for the pickers (own-DVM removed iter-31 — raw fundamentals + tl_DVM remain)
@@ -29,8 +29,9 @@ function set(obj: any, path: string[], val: any) {
 export function StrategyBuilder({ initial }: { initial?: { id?: string; name: string; config: StrategyConfig } }) {
   const router = useRouter();
   const [cfg, setCfg] = useState<StrategyConfig>(initial?.config || defaultConfig());
-  const [name, setName] = useState(initial?.name ?? "");
+  const [name, setName] = useState(initial?.name ?? "Untitled strategy");
   const [sid, setSid] = useState<string | null>(initial?.id || null);
+  const [rankMode, setRankMode] = useState<"single" | "composite">((initial?.config?.rank_blend?.length ?? 0) > 0 ? "composite" : "single");
   const [readiness, setReadiness] = useState<Readiness | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
@@ -49,7 +50,13 @@ export function StrategyBuilder({ initial }: { initial?: { id?: string; name: st
   const errs = useMemo(() => {
     const e: string[] = [];
     if (!name.trim()) e.push("Name your strategy.");
-    if (!cfg.rank_by?.trim()) e.push("Pick a “Sort by” variable (or write an expression).");
+    const blend = cfg.rank_blend || [];
+    if (blend.length > 0) {
+      if (blend.some((r) => !r.factor)) e.push("Pick a factor for every composite-ranking row.");
+      if (blend.reduce((s, r) => s + (r.weight || 0), 0) !== 100) e.push("Composite ranking weights must total 100%.");
+    } else if (!cfg.rank_by?.trim()) {
+      e.push("Pick a “Sort by” variable (or write an expression).");
+    }
     if (cfg.end && cfg.start && cfg.end <= cfg.start) e.push("End date must be after start date.");
     if (cfg.capital < 1000) e.push("Capital must be at least ₹1,000.");
     if (cfg.max_weight_per_stock != null && !(cfg.max_weight_per_stock > 0 && cfg.max_weight_per_stock <= 1))
@@ -108,41 +115,61 @@ export function StrategyBuilder({ initial }: { initial?: { id?: string; name: st
             <input className="bg-transparent text-[34px] font-extrabold tracking-tight outline-none w-full border-b-2 border-dashed pb-0.5 transition-colors focus:border-solid"
               style={{ borderColor: name ? "#e3dff0" : "#cdaaff" }} maxLength={100}
               placeholder="Name your strategy…" value={name} onChange={(e) => setName(e.target.value)} />
-            <span className="text-faint text-[17px]" title="Click the name to edit">✎</span>
           </div>
         </div>
       </div>
 
       <div className="grid lg:grid-cols-[1.65fr_1fr] gap-4 items-start">
-        {/* ── FORM ── */}
-        <div className="grid md:grid-cols-2 gap-3.5 min-w-0">
+        {/* ── FORM (single column — A-BLD-2: no neighbour reflow) ── */}
+        <div className="grid grid-cols-1 gap-3.5 min-w-0">
           {/* Universe & filters (merged) */}
-          <Card className="p-5 md:col-span-2">
+          <Card className="p-5">
             <SectionTitle dot="#a9c9f2">Universe &amp; filters</SectionTitle>
             <FilterBuilder label="Filters — every condition must pass for a stock to qualify"
               placeholder="raw expression, e.g. close > sma200 & roc126 > 0"
               list={filters} onChange={setFilters} />
             <div className="flex items-center justify-between mt-3 pt-3 border-t" style={{ borderColor: "#f0eef6" }}>
-              <span className="text-[12px]" style={{ color: sv.survivorsOnly ? "#9a6c12" : "#7a7689" }}>
-                {sv.survivorsOnly
-                  ? `Survivors-only — ${sv.offenders.join(", ")} lacks delisted-name data`
-                  : "Survivorship-free — incl. delisted, point-in-time ₹500cr"}
-              </span>
-              <Switch on={!sv.survivorsOnly} disabled />
+              <span className="text-[12px] text-muted">Universe coverage</span>
+              {sv.survivorsOnly
+                ? <Pill tone="warn">Survivors-only · {sv.offenders.join(", ")}</Pill>
+                : <Pill tone="good">✓ Survivorship-free</Pill>}
             </div>
           </Card>
 
           {/* Ranking */}
-          <Card className="p-5 md:col-span-2">
-            <SectionTitle dot="#b9d24a">Ranking</SectionTitle>
-            <div className="grid grid-cols-[1.4fr_1fr] gap-3.5 items-start">
-              <RankInput value={cfg.rank_by} onChange={(v) => upd(["rank_by"], v)} />
-              <div>
-                <span className="text-[12px] font-bold text-muted">Order</span>
-                <Segmented value={cfg.rank_order} onChange={(v) => upd(["rank_order"], v)}
-                  options={[{ value: "desc", label: "Max first" }, { value: "asc", label: "Min first" }]} />
+          <Card className="p-5">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2.5">
+                <span className="w-[11px] h-[11px] rounded" style={{ background: "#b9d24a" }} />
+                <span className="font-extrabold text-[15px]">Ranking</span>
+              </div>
+              <div className="flex gap-0.5 p-0.5 rounded-lg" style={{ background: "#f1eef8" }}>
+                {(["single", "composite"] as const).map((m) => (
+                  <button key={m} className="wf-seg" data-active={rankMode === m ? "1" : "0"} style={{ padding: "6px 12px", fontSize: 12 }}
+                    onClick={() => {
+                      if (m === rankMode) return;
+                      setRankMode(m);
+                      if (m === "single") upd(["rank_blend"], []);
+                      else if (!(cfg.rank_blend && cfg.rank_blend.length)) upd(["rank_blend"], [{ factor: cfg.rank_by || "tl_momentum", weight: 100, order: cfg.rank_order }]);
+                    }}>{m === "single" ? "Single" : "Composite"}</button>
+                ))}
               </div>
             </div>
+            {rankMode === "single" ? (
+              <div className="grid grid-cols-[1.4fr_1fr] gap-3.5 items-start">
+                <RankInput value={cfg.rank_by} onChange={(v) => upd(["rank_by"], v)} />
+                <div>
+                  <span className="text-[12px] font-bold text-muted">Order</span>
+                  <Segmented value={cfg.rank_order} onChange={(v) => upd(["rank_order"], v)}
+                    options={[{ value: "desc", label: "Max first" }, { value: "asc", label: "Min first" }]} />
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="text-[12px] text-muted mb-2.5">Weighted blend of up to 5 factors — names are ranked by the weighted percentile score (weights must total 100).</div>
+                <RankBlend rows={cfg.rank_blend || []} onChange={(r) => upd(["rank_blend"], r)} />
+              </>
+            )}
           </Card>
 
           {/* Sizing */}
@@ -225,7 +252,7 @@ export function StrategyBuilder({ initial }: { initial?: { id?: string; name: st
             </div>
             {cfg.end && cfg.start && cfg.end <= cfg.start && <div className="text-[11px] text-loss mt-1">End date must be after start date.</div>}
             <Field label="Benchmark"><select className="wf-in mt-1.5" value={cfg.benchmark} onChange={(e) => upd(["benchmark"], e.target.value)}>{BENCHMARKS.map((b) => <option key={b.value} value={b.value}>{b.label}</option>)}</select></Field>
-            <Field label="Capital (₹) — sizes the ADTV liquidity cap; flat DP makes it matter" hint={`≈ ${(cfg.capital / 1e5).toFixed(2)} L`}>
+            <Field label={`Capital (₹)  ·  ≈ ${(cfg.capital / 1e5).toFixed(2)} L`}>
               <input className="wf-in mt-1.5" type="number" step="50000" min="1000" value={cfg.capital} onChange={(e) => upd(["capital"], parseFloat(e.target.value) || 0)} />
             </Field>
           </Card>
@@ -233,12 +260,6 @@ export function StrategyBuilder({ initial }: { initial?: { id?: string; name: st
 
         {/* ── JSON PANE + actions ── */}
         <div className="lg:sticky lg:top-5 space-y-3.5 animate-rise min-w-0">
-          {readiness && (
-            <Card className="px-4 py-3" style={{ background: readiness.verdict === "invalid" ? "#fdeaf1" : readiness.verdict.includes("backtest") ? "#eef6dd" : "#fff3da" }}>
-              <div className="text-[11.5px] font-extrabold uppercase tracking-wide" style={{ color: readiness.verdict === "invalid" ? "#c23e74" : readiness.verdict.includes("backtest") ? "#5b6b1f" : "#9a6c12" }}>Readiness · {readiness.verdict}</div>
-              <div className="text-[12px] text-ink/80 mt-1">{readiness.summary}</div>
-            </Card>
-          )}
           <Card style={{ background: "#16151c", padding: "18px 20px" }}>
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2.5"><span className="w-2.5 h-2.5 rounded-full" style={{ background: "#c4e05a", boxShadow: "0 0 8px #c4e05a" }} /><span className="text-white font-bold text-[14px]">Live config</span></div>
@@ -249,10 +270,14 @@ export function StrategyBuilder({ initial }: { initial?: { id?: string; name: st
               <button className="btn flex-1" style={{ background: "#26252e", color: "#eceaf2" }} disabled={blocked} onClick={save}>{busy === "save" ? "saving…" : "Save"}</button>
               <button className="btn btn-acc flex-[1.4]" disabled={blocked} onClick={run}>{busy === "run" ? "running…" : "Run backtest →"}</button>
             </div>
+            {readiness && errs.length === 0 && (
+              <div className="mt-2.5 text-[11.5px] font-semibold" style={{ color: readiness.verdict === "invalid" ? "#ff9ec4" : "#c8f08a" }}>
+                {readiness.verdict === "invalid" ? `Invalid — ${readiness.summary}` : `Ready · ${readiness.summary}`}
+              </div>
+            )}
             {errs.length > 0 && <div className="mt-2.5 rounded-lg px-3 py-2 text-[12px] font-semibold" style={{ background: "#3a2230", color: "#ffadcb" }}>Fix to continue: {errs[0]}</div>}
             {msg && <div className="mt-2.5 rounded-lg px-3 py-2 text-[12px] font-semibold" style={{ background: msg.includes("fail") ? "#3a2230" : "#23302a", color: msg.includes("fail") ? "#ffadcb" : "#c8f08a" }}>{msg}</div>}
           </Card>
-          <p className="text-[11.5px] text-faint px-1">Tune parameters after you've run a base backtest — Explore variations lives on the result page.</p>
         </div>
       </div>
     </div>
@@ -280,7 +305,7 @@ function FilterBuilder({ label, placeholder, list, onChange }:
         <span className="text-[12px] font-bold text-muted">{label}</span>
         <div className="flex gap-0.5 p-0.5 rounded-lg" style={{ background: "#f1eef8" }}>
           {(["builder", "raw"] as const).map((m) => (
-            <button key={m} className="wf-seg" data-active={mode === m ? "1" : "0"} style={{ padding: "3px 11px", fontSize: 11 }} onClick={() => setMode(m)}>{m === "builder" ? "Builder" : "Raw"}</button>
+            <button key={m} className="wf-seg" data-active={mode === m ? "1" : "0"} style={{ padding: "6px 12px", fontSize: 12 }} onClick={() => setMode(m)}>{m === "builder" ? "Builder" : "Raw"}</button>
           ))}
         </div>
       </div>
@@ -322,7 +347,7 @@ function RankInput({ value, onChange }: { value: string; onChange: (v: string) =
         <span className="text-[12px] font-bold text-muted">Sort by</span>
         <div className="flex gap-0.5 p-0.5 rounded-lg" style={{ background: "#f1eef8" }}>
           {(["builder", "raw"] as const).map((m) => (
-            <button key={m} className="wf-seg" data-active={mode === m ? "1" : "0"} style={{ padding: "3px 11px", fontSize: 11 }} onClick={() => setMode(m)}>{m === "builder" ? "Variable" : "Expression"}</button>
+            <button key={m} className="wf-seg" data-active={mode === m ? "1" : "0"} style={{ padding: "6px 12px", fontSize: 12 }} onClick={() => setMode(m)}>{m === "builder" ? "Variable" : "Expression"}</button>
           ))}
         </div>
       </div>
@@ -332,6 +357,39 @@ function RankInput({ value, onChange }: { value: string; onChange: (v: string) =
           <input className="wf-in mt-1.5" placeholder="e.g. roc126 / atr14" value={value} onChange={(e) => onChange(e.target.value)} />
           <span className="block text-[11px] text-faint mt-1">Any expression — combine factors &amp; arithmetic; names are ranked by the result.</span>
         </>}
+    </div>
+  );
+}
+
+// ── composite ranking: weighted blend of up to 5 factors (writes cfg.rank_blend) ──
+function RankBlend({ rows, onChange }:
+  { rows: NonNullable<StrategyConfig["rank_blend"]>; onChange: (r: NonNullable<StrategyConfig["rank_blend"]>) => void }) {
+  const total = rows.reduce((s, r) => s + (r.weight || 0), 0);
+  const updRow = (i: number, patch: Partial<{ factor: string; weight: number; order: "desc" | "asc" }>) =>
+    onChange(rows.map((r, j) => (j === i ? { ...r, ...patch } : r)));
+  return (
+    <div className="space-y-2">
+      {rows.map((r, i) => (
+        <div key={i} className="flex gap-1.5 items-center">
+          <div className="flex-1 min-w-0"><FactorSelect value={r.factor} onChange={(v) => updRow(i, { factor: v })} compact /></div>
+          <input className="wf-in" style={{ width: 74 }} type="number" min="0" max="100" value={r.weight}
+            onChange={(e) => updRow(i, { weight: e.target.value === "" ? 0 : parseFloat(e.target.value) })} placeholder="wt %" />
+          <div className="flex gap-0.5 p-0.5 rounded-lg" style={{ background: "#f1eef8" }}>
+            {(["desc", "asc"] as const).map((o) => (
+              <button key={o} className="wf-seg" data-active={r.order === o ? "1" : "0"} style={{ padding: "6px 9px", fontSize: 11 }} onClick={() => updRow(i, { order: o })}>{o === "desc" ? "Max" : "Min"}</button>
+            ))}
+          </div>
+          <button className="wf-menubtn" style={{ width: 32, height: 32, fontSize: 16 }} title="Remove factor"
+            disabled={rows.length <= 1} onClick={() => onChange(rows.filter((_, j) => j !== i))}>×</button>
+        </div>
+      ))}
+      <div className="flex items-center justify-between pt-1">
+        <button className="btn btn-ghost" style={{ padding: "6px 12px" }} disabled={rows.length >= 5}
+          onClick={() => onChange([...rows, { factor: "", weight: 0, order: "desc" }])}>+ Add factor</button>
+        <span className="text-[12px] font-bold" style={{ color: total === 100 ? "#1f7a4d" : "#c23e74" }}>
+          Total {total}%{total === 100 ? " ✓" : " — must be 100"}
+        </span>
+      </div>
     </div>
   );
 }

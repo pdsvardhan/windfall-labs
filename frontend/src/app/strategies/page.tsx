@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import type { BacktestRow, Strategy } from "@/lib/types";
 import { pctSigned, num, signClass } from "@/lib/format";
-import { Card } from "@/components/ui";
+import { Card, Segmented, Menu, ConfirmDialog } from "@/components/ui";
 
 export default function StrategiesPage() {
   const router = useRouter();
@@ -16,6 +16,7 @@ export default function StrategiesPage() {
   const [err, setErr] = useState<string | null>(null);
   const [peek, setPeek] = useState<string | null>(null);
   const [running, setRunning] = useState<Set<string>>(new Set());
+  const [confirmDel, setConfirmDel] = useState<Strategy | null>(null);
 
   function load() {
     Promise.all([api.listStrategies(), api.listBacktests()])
@@ -56,9 +57,11 @@ export default function StrategiesPage() {
 
       <div className="flex items-center gap-2 mb-3 text-[12px] font-bold text-muted">
         Sort:
-        {(["cagr", "sharpe", "name"] as const).map((k) => (
-          <button key={k} className="wf-seg" data-active={sort === k ? "1" : "0"} style={{ flex: "none", padding: "5px 12px" }} onClick={() => setSort(k)}>{k.toUpperCase()}</button>
-        ))}
+        <Segmented
+          value={sort}
+          options={[{ value: "cagr", label: "CAGR" }, { value: "sharpe", label: "Sharpe" }, { value: "name", label: "Name" }]}
+          onChange={setSort}
+        />
       </div>
 
       {strats.length === 0 ? (
@@ -72,10 +75,18 @@ export default function StrategiesPage() {
           {rows.map(({ s, b }) => {
             const c = s.config as any;
             return (
-              <Card key={s.id} lift className="p-5 flex flex-col">
+              <Card key={s.id} lift className="p-5 flex flex-col h-full">
                 <div className="flex items-start justify-between gap-2">
                   <Link href={`/strategies/${s.id}`} className="font-extrabold text-[16px] hover:underline">{s.name}</Link>
-                  <button onClick={() => setPeek(peek === s.id ? null : s.id)} title="View config" className="text-faint hover:text-ink text-[14px] leading-none">{peek === s.id ? "✕" : "⊙ config"}</button>
+                  <button
+                    type="button"
+                    onClick={() => setPeek(peek === s.id ? null : s.id)}
+                    aria-expanded={peek === s.id}
+                    className="btn btn-ghost shrink-0"
+                    style={{ padding: "5px 11px", fontSize: 12, minHeight: 28 }}
+                  >
+                    Config <span className="inline-block transition-transform" style={{ transform: peek === s.id ? "rotate(180deg)" : "none" }}>▾</span>
+                  </button>
                 </div>
                 <div className="text-[11.5px] text-faint mt-1 font-mono">
                   {c?.rebalance} · top {c?.n_holdings} · sort {c?.rank_by || "—"} · {c?.data_source === "trendlyne" ? "survivorship-free" : c?.universe?.index}
@@ -101,17 +112,33 @@ export default function StrategiesPage() {
                     <button className="btn btn-acc" style={{ padding: "5px 12px", fontSize: 12 }} disabled={running.has(s.id)} onClick={() => runOne(s)}>{running.has(s.id) ? "running…" : "Run backtest"}</button>
                   </div>
                 )}
-                <div className="flex gap-2 mt-4 pt-3 border-t" style={{ borderColor: "#f0eef6" }}>
+                <div className="flex items-center gap-2 mt-auto pt-3 border-t" style={{ borderColor: "#f0eef6" }}>
                   <Link href={`/strategies/${s.id}`} className="btn btn-soft" style={{ padding: "7px 14px", fontSize: 12 }}>Open</Link>
                   <Link href={`/strategies/${s.id}/edit`} className="btn btn-ghost" style={{ padding: "7px 14px", fontSize: 12 }}>Edit</Link>
-                  <button className="btn btn-ghost" style={{ padding: "7px 14px", fontSize: 12 }} onClick={() => duplicate(s)}>Duplicate</button>
-                  <button className="btn btn-ghost ml-auto" style={{ padding: "7px 12px", fontSize: 12, color: "#c23e74" }} onClick={() => remove(s.id)}>Delete</button>
+                  <div className="ml-auto">
+                    <Menu
+                      align="right"
+                      items={[
+                        { label: "Duplicate", onClick: () => duplicate(s) },
+                        { label: "Delete", danger: true, onClick: () => setConfirmDel(s) },
+                      ]}
+                    />
+                  </div>
                 </div>
               </Card>
             );
           })}
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirmDel !== null}
+        title="Delete strategy?"
+        body={confirmDel ? <>This permanently deletes <b>{confirmDel.name}</b> and can&apos;t be undone.</> : null}
+        confirmLabel="Delete"
+        onConfirm={() => { if (confirmDel) remove(confirmDel.id); setConfirmDel(null); }}
+        onCancel={() => setConfirmDel(null)}
+      />
     </div>
   );
 }

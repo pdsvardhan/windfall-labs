@@ -30,14 +30,14 @@ const TONE: Record<string, { bg: string; label: string }> = {
   pink: { bg: "#f7b9dd", label: "#8c4a72" },
   sky: { bg: "#a9c9f2", label: "#345a87" },
   lilac: { bg: "#c4b6f7", label: "#4b3b86" },
-  white: { bg: "#ffffff", label: "#9694a4" },
+  white: { bg: "#ffffff", label: "#7a7689" },
 };
 
 export function StatCard({ label, value, sub, tone = "white", delay = 0 }:
   { label: string; value: React.ReactNode; sub?: React.ReactNode; tone?: keyof typeof TONE; delay?: number }) {
   const t = TONE[tone];
   return (
-    <div className="wf-card wf-card-lift animate-pop" style={{ background: t.bg, padding: "20px 22px", animationDelay: `${delay}ms` }}>
+    <div className="wf-card animate-pop" style={{ background: t.bg, padding: "20px 22px", animationDelay: `${delay}ms` }}>
       <div className="text-[13px] font-bold" style={{ color: t.label }}>{label}</div>
       <div className="text-[34px] font-extrabold mt-1.5 tracking-tight leading-none">{value}</div>
       {sub && <div className="text-[12px] mt-1.5 font-semibold" style={{ color: t.label }}>{sub}</div>}
@@ -119,6 +119,70 @@ export function Pill({ children, tone = "neutral" }: { children: React.ReactNode
   };
   const css = Object.fromEntries(map[tone].split(";").map((p) => p.split(":"))) as React.CSSProperties;
   return <span className="text-[11px] font-extrabold px-2.5 py-1 rounded-full" style={css}>{children}</span>;
+}
+
+// ── kebab menu (⋯ dropdown) ──────────────────────────────────────────────────
+export function Menu({ items, label = "⋯", align = "right" }:
+  { items: { label: string; onClick: () => void; danger?: boolean }[]; label?: string; align?: "left" | "right" }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    const onEsc = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("mousedown", onDoc); document.addEventListener("keydown", onEsc);
+    return () => { document.removeEventListener("mousedown", onDoc); document.removeEventListener("keydown", onEsc); };
+  }, [open]);
+  return (
+    <div className="wf-menuwrap" ref={ref}>
+      <button type="button" className="wf-menubtn" aria-haspopup="menu" aria-expanded={open}
+        aria-label="More actions" onClick={() => setOpen((o) => !o)}>{label}</button>
+      {open && (
+        <div className="wf-menu" role="menu" style={align === "left" ? { left: 0 } : { right: 0 }}>
+          {items.map((it, k) => (
+            <button key={k} type="button" role="menuitem" className={`wf-menu-item ${it.danger ? "danger" : ""}`}
+              onClick={() => { setOpen(false); it.onClick(); }}>{it.label}</button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── modal overlay ────────────────────────────────────────────────────────────
+export function Modal({ open, onClose, title, children, wide = false }:
+  { open: boolean; onClose: () => void; title?: React.ReactNode; children: React.ReactNode; wide?: boolean }) {
+  useEffect(() => {
+    if (!open) return;
+    const onEsc = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", onEsc);
+    return () => document.removeEventListener("keydown", onEsc);
+  }, [open, onClose]);
+  if (!open) return null;
+  return (
+    <div className="wf-overlay" onMouseDown={onClose}>
+      <div className={`wf-modal ${wide ? "wide" : ""}`} role="dialog" aria-modal="true" onMouseDown={(e) => e.stopPropagation()}>
+        {title && <div className="text-[16px] font-extrabold mb-3">{title}</div>}
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// ── confirm dialog (destructive actions) ─────────────────────────────────────
+export function ConfirmDialog({ open, title = "Are you sure?", body, confirmLabel = "Delete",
+  cancelLabel = "Cancel", danger = true, onConfirm, onCancel }:
+  { open: boolean; title?: string; body?: React.ReactNode; confirmLabel?: string; cancelLabel?: string;
+    danger?: boolean; onConfirm: () => void; onCancel: () => void }) {
+  return (
+    <Modal open={open} onClose={onCancel} title={title}>
+      {body && <div className="text-[13px] text-muted mb-4">{body}</div>}
+      <div className="flex justify-end gap-2">
+        <button type="button" className="btn btn-ghost" onClick={onCancel}>{cancelLabel}</button>
+        <button type="button" className={`btn ${danger ? "btn-danger" : "btn-ink"}`} onClick={onConfirm}>{confirmLabel}</button>
+      </div>
+    </Modal>
+  );
 }
 
 // reveal-on-mount wrapper (light)

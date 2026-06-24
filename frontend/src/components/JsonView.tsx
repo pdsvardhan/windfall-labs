@@ -10,10 +10,13 @@ function hl(json: string): string {
     .replace(/(:\s*)(-?\d+\.?\d*)/g, '$1<span style="color:#f48fc6">$2</span>');
 }
 
-export function JsonView({ value, maxHeight = 540 }: { value: unknown; maxHeight?: number }) {
+// maxHeight is optional: when omitted (or 0) the pane grows naturally with the content
+// (B-BLD-JSON-SCROLL — no out-of-place vertical scrollbar). Pass a number to cap + scroll.
+export function JsonView({ value, maxHeight }: { value: unknown; maxHeight?: number }) {
   const json = JSON.stringify(value, null, 2);
+  const cap = !!maxHeight && maxHeight > 0;
   return (
-    <div className="rounded-xl" style={{ background: "#100f17", padding: "14px 16px", maxHeight, overflow: "auto" }}>
+    <div className="rounded-xl" style={{ background: "#100f17", padding: "14px 16px", ...(cap ? { maxHeight, overflow: "auto" } : {}) }}>
       <pre className="wf-jsonpre" dangerouslySetInnerHTML={{ __html: hl(json) }} />
     </div>
   );

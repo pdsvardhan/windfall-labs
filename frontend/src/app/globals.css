@@ -151,5 +151,48 @@ input[type="range"].wf-range::-moz-range-thumb {
 .wf-tip b { font-weight: 800; }
 .wf-tip .d { color: #b9b7c4; }
 
+/* ── danger button ───────────────────────────────────────────────────── */
+.btn-danger { background: #e0518a; color: #fff; }
+.btn-danger:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(224, 81, 138, 0.4); }
+
+/* ── kebab menu (⋯ dropdown) ─────────────────────────────────────────── */
+.wf-menuwrap { position: relative; display: inline-block; }
+.wf-menubtn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; border-radius: 10px; border: 1.5px solid #e6e2f0;
+  background: #fff; color: #6b6979; font-size: 18px; line-height: 1; cursor: pointer; transition: all 0.15s;
+}
+.wf-menubtn:hover { background: #faf6fc; color: #16151c; }
+.wf-menu {
+  position: absolute; top: calc(100% + 6px); z-index: 30; min-width: 172px;
+  background: #fff; border: 1px solid #e6e2f0; border-radius: 12px; padding: 6px;
+  box-shadow: 0 12px 30px rgba(80, 60, 120, 0.18); animation: wfPop 0.16s both;
+}
+.wf-menu-item {
+  display: block; width: 100%; text-align: left; padding: 8px 10px; border-radius: 8px;
+  background: transparent; border: 0; cursor: pointer; color: #16151c;
+  @apply font-sans font-semibold text-[13px];
+}
+.wf-menu-item:hover { background: #f4f1fb; }
+.wf-menu-item.danger { color: #c23e74; }
+.wf-menu-item.danger:hover { background: #fdeaf1; }
+
+/* ── modal / overlay ─────────────────────────────────────────────────── */
+.wf-overlay {
+  position: fixed; inset: 0; z-index: 100; background: rgba(22, 21, 28, 0.42);
+  display: flex; align-items: center; justify-content: center; padding: 20px; animation: wfFade 0.18s both;
+}
+.wf-modal {
+  background: #fff; border-radius: 20px; padding: 22px 24px; width: 100%; max-width: 440px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.3); animation: wfPop 0.22s both; max-height: 88vh; overflow: auto;
+}
+.wf-modal.wide { max-width: 760px; }
+
+/* ── chart axis labels ───────────────────────────────────────────────── */
+.wf-axlbl {
+  font-size: 10.5px; font-weight: 600; color: #7a7689; white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
 /* legacy .card so any un-migrated bit still renders as a clean white card */
 .card { @apply wf-card; }

@@ -12,7 +12,7 @@ const config: Config = {
         ink: "#16151c",
         card: "#ffffff",
         muted: "#6b6979",
-        faint: "#9694a4",
+        faint: "#7a7689", // A-X-2: darkened from #9694a4 for >=4.5:1 contrast on white
         line: "#f0eef6",
         // pastel surfaces
         limeY: "#f5e049",
