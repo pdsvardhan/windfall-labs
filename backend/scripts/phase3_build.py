@@ -1,6 +1,9 @@
 """Phase 3: build result-announcement lag so period-end fundamentals are point-in-time-safe.
 For each (pk, period_end), available_from = earliest board-meeting/result date after period_end
-(within 100d) from result_dates; fallback = period_end + 45d (SEBI quarterly deadline)."""
+(within 100d) from result_dates; fallback when no real date matched is period-type-aware (audit F1,
+adr-028): ANNUAL period-ends get +60d (SEBI LODR Reg 33 audited-annual deadline) and QUARTERLY get
++45d (unaudited-quarter deadline). A flat 45d for annual periods was a mild look-ahead — annual
+audited results land up to 60d after FY-end, so a 45d fallback made them visible ~15d too early."""
 import duckdb
 TL = "/mnt/storage/websites/windfall-labs/backend/data/trendlyne.duckdb"
 con = duckdb.connect(TL)  # rw
@@ -12,17 +15,25 @@ print("== RELIANCE result_dates 2024 ==", [(str(d), p) for d, p in q("SELECT dat
 con.execute("DROP TABLE IF EXISTS result_lag")
 con.execute("""CREATE TABLE result_lag AS
   WITH qe AS (
-      SELECT DISTINCT pk, date AS period_end FROM pnl_quarterly
-      UNION SELECT DISTINCT pk, date FROM pnl_annual),
+      -- is_annual=1 if the (pk, period_end) appears in pnl_annual (a fiscal-year-end). Year-ends
+      -- show up in BOTH the quarterly (Q4) and annual tables; max() marks them annual so the
+      -- audited-annual 60d fallback governs when no real board date is matched (audit F1).
+      SELECT pk, period_end, max(is_ann) AS is_annual FROM (
+          SELECT DISTINCT pk, date AS period_end, 0 AS is_ann FROM pnl_quarterly
+          UNION ALL SELECT DISTINCT pk, date, 1 FROM pnl_annual)
+      GROUP BY 1,2),
    m AS (
       SELECT q.pk, q.period_end, min(r.date) AS announce
       FROM qe q JOIN result_dates r
         ON r.pk=q.pk AND r.date > q.period_end AND r.date <= q.period_end + INTERVAL 100 DAY
       GROUP BY 1,2)
   SELECT qe.pk, qe.period_end,
-         COALESCE(m.announce, qe.period_end + INTERVAL 45 DAY) AS available_from,
+         COALESCE(m.announce, qe.period_end
+                  + CASE WHEN qe.is_annual=1 THEN INTERVAL 60 DAY ELSE INTERVAL 45 DAY END) AS available_from,
          (m.announce IS NOT NULL) AS matched,
-         date_diff('day', qe.period_end, COALESCE(m.announce, qe.period_end + INTERVAL 45 DAY)) AS lag_days
+         date_diff('day', qe.period_end,
+                   COALESCE(m.announce, qe.period_end
+                            + CASE WHEN qe.is_annual=1 THEN INTERVAL 60 DAY ELSE INTERVAL 45 DAY END)) AS lag_days
   FROM qe LEFT JOIN m USING(pk, period_end)""")
 con.execute("CREATE INDEX idx_rlag ON result_lag(pk, period_end)")
 

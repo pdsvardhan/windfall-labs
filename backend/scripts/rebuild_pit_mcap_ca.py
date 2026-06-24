@@ -66,14 +66,38 @@ con.execute("""CREATE TABLE pit_shares AS
   UNION ALL
   SELECT * FROM fallback""")
 con.execute("""CREATE OR REPLACE TEMP VIEW shares_now AS
-  SELECT pk, arg_max(shares_cr, from_date) AS shares_cr FROM pit_shares GROUP BY pk""")
+  WITH eps_now AS (SELECT pk, arg_max(shares_cr, from_date) AS shares_cr FROM pit_shares GROUP BY pk),
+       lc AS (SELECT pk, arg_max(close, date) AS last_close FROM ohlcv WHERE close>0 GROUP BY pk)
+  -- F6 (audit 2026-06-24, adr-029): prefer Trendlyne's own current market cap as the share anchor
+  -- (shares = stocks.mcap / last_close). NP/EPS-derived shares are unstable near zero EPS and
+  -- meaningless for REITs/InvITs, which wrongly DROPPED large names from the universe (PRAJIND
+  -- Rs6,259cr->Rs3cr, BAGMANE REIT Rs34,904cr->Rs62cr) and over-inflated others (NAZARA 5x). Fall
+  -- back to the NP/EPS count only where stocks.mcap is absent (e.g. some megacaps with null mcap).
+  SELECT lc.pk,
+         COALESCE(CASE WHEN s.mcap > 0 THEN s.mcap / lc.last_close END, e.shares_cr) AS shares_cr
+  FROM lc LEFT JOIN stocks s USING(pk) LEFT JOIN eps_now e USING(pk)
+  WHERE COALESCE(CASE WHEN s.mcap > 0 THEN s.mcap / lc.last_close END, e.shares_cr) > 0""")
+# F3 (audit 2026-06-24, adr-030): researched share-count anchors (equity shares outstanding, crore)
+# for material dead loss-makers that screener fundamentals_history lacks — bankrupt names had no
+# positive-EPS screener page, so they got no shares -> no mcap -> were ABSENT from the survivorship-
+# free universe, silently hiding the biggest blow-ups (DHFL, Bhushan Steel, Kingfisher, ...). Counts
+# are each name's pre-NCLT/pre-resolution share count from its annual report / exchange filings (see
+# adr-030 for per-name sources + confidence). Dilution-heavy names (3IINFOTECH, ALOKTEXT, IVRCLINFRA,
+# AMTEKINDIA) are deferred — a single constant anchor would be inaccurate; they need a time series.
+con.execute("""CREATE OR REPLACE TEMP VIEW dead_share_seed(sym, shares_cr) AS VALUES
+  ('DHFL', 31.4), ('DEWANHOUS', 31.4), ('EDUCOMP', 12.0), ('BINANIIND', 3.14),
+  ('RNAVAL', 73.76), ('MONNETISPA', 6.37), ('BHUSANSTL', 22.65), ('KFA', 26.6), ('FCONSUMER', 191.0)""")
 con.execute("""CREATE OR REPLACE TEMP VIEW dead_shares_now AS
-  SELECT upper(regexp_replace(ticker,'\\.NS$','')) sym,
-         arg_max(coalesce(net_profit_owner,net_profit)/eps, period_end) AS shares_cr
-  FROM sc.fundamentals_history
-  WHERE eps>0 AND coalesce(net_profit_owner,net_profit)>0
-    AND upper(regexp_replace(ticker,'\\.NS$','')) IN (SELECT sym FROM dead_names)
-  GROUP BY 1""")
+  SELECT sym, shares_cr FROM dead_share_seed
+  UNION ALL
+  SELECT sym, shares_cr FROM (
+    SELECT upper(regexp_replace(ticker,'\\.NS$','')) sym,
+           arg_max(coalesce(net_profit_owner,net_profit)/eps, period_end) AS shares_cr
+    FROM sc.fundamentals_history
+    WHERE eps>0 AND coalesce(net_profit_owner,net_profit)>0
+      AND upper(regexp_replace(ticker,'\\.NS$','')) IN (SELECT sym FROM dead_names)
+    GROUP BY 1)
+  WHERE sym NOT IN (SELECT sym FROM dead_share_seed)""")
 
 # ── pit_mcap (live): Trendlyne adjusted close x current shares ────────────────────────────────
 # raw_close (for audit) via a hash join, not a per-row correlated lookup.
@@ -135,4 +159,19 @@ for d in ['2016-06-30', '2019-06-28', '2022-06-30', '2025-06-30']:
               WHERE m>500 GROUP BY source""")
     d2 = {s: n for s, n in r}
     print(f"   {d}: {d2.get('live',0)} live + {d2.get('dead',0)} dead = {sum(d2.values())} eligible")
+
+print("\n== F3: seeded dead loss-makers now in pit_mcap_dead (peak / last mcap, Rs cr) ==")
+for sym in ['DHFL', 'BHUSANSTL', 'KFA', 'EDUCOMP', 'BINANIIND', 'RNAVAL', 'MONNETISPA', 'FCONSUMER', 'DEWANHOUS']:
+    r = q(f"""SELECT round(max(mcap_cr),0), round(arg_max(mcap_cr,date),0), count(*),
+                     bool_or(mcap_cr>500) FROM pit_mcap_dead WHERE sym='{sym}'""")
+    peak, last, n, ever500 = r[0] if r else (None, None, 0, None)
+    print(f"   {sym:10s} peak={peak} last={last} bars={n} ever>500cr={ever500}")
+
+print("\n== F6: false-exclusion fixes — current mcap now matches Trendlyne (Rs cr) ==")
+for sym in ['PRAJIND', 'BAGMANE', 'TVSINVIT', 'NAZARA', 'ADANIPOWER', 'RELIANCE']:
+    r = q(f"""SELECT round(arg_max(p.mcap_cr,p.date),0), round(s.mcap,0)
+              FROM pit_mcap p JOIN stocks s USING(pk) WHERE upper(s.nsecode)='{sym}' GROUP BY s.mcap""")
+    if r:
+        cur, tl = r[0]
+        print(f"   {sym:10s} pit_mcap_now={cur}  trendlyne_mcap={tl}")
 con.close()

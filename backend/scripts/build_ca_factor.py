@@ -190,6 +190,31 @@ def main() -> None:
     if uncertain_syms:
         con.execute("UPDATE delistings SET ca_uncertain=TRUE WHERE symbol IN ("
                     + ",".join("'%s'" % s.replace("'", "''") for s in uncertain_syms) + ")")
+
+    # ── live-name silent delistings (audit 2026-06-24, F5/adr-031) ───────────────────────────────
+    # A pk-keyed (live) name whose Trendlyne ohlcv AND NSE Bhavcopy BOTH stop >30d before the latest
+    # available bar has genuinely stopped trading (merger/delisting), not merely lagged. Such names
+    # never reach the dead_names path (they have a pk), so without this they drop out SILENTLY — no
+    # terminal-exit record, uncounted in coverage. Register them (GSPL = Gujarat State Petronet,
+    # merged ~2026-05, ever ~Rs26,000cr). Requires pit_mcap (prior run) for ever_mcap_cr, same as the
+    # pit_mcap_dead reference above.
+    if con.execute("SELECT count(*) FROM duckdb_tables() WHERE table_name='pit_mcap'").fetchone()[0]:
+        con.execute(r"""
+            INSERT INTO delistings (symbol, last_date, last_raw_close, ever_mcap_cr, ca_uncertain)
+            WITH live AS (SELECT pk, upper(nsecode) sym FROM stocks WHERE nsecode<>''),
+                 bc_last AS (SELECT upper(regexp_replace(ticker,'\.NS$','')) sym, max(date) d
+                             FROM bc.bhavcopy_prices WHERE series='EQ' AND close>0 GROUP BY 1),
+                 bc_max AS (SELECT max(date) d FROM bc.bhavcopy_prices WHERE series='EQ'),
+                 ohlcv_max AS (SELECT max(date) d FROM ohlcv),
+                 live_last AS (SELECT l.sym, max(y.date) last_date, arg_max(y.close,y.date) last_close
+                               FROM ohlcv y JOIN live l USING(pk) GROUP BY 1)
+            SELECT ll.sym, ll.last_date, ll.last_close,
+                   (SELECT max(p.mcap_cr) FROM pit_mcap p JOIN live l USING(pk) WHERE l.sym=ll.sym),
+                   FALSE
+            FROM live_last ll JOIN bc_last bl USING(sym), bc_max, ohlcv_max
+            WHERE ll.last_date < ohlcv_max.d - 30 AND bl.d < bc_max.d - 30
+              AND ll.sym NOT IN (SELECT symbol FROM delistings)""")
+
     nd = con.execute("SELECT count(*), sum(CASE WHEN ca_uncertain THEN 1 ELSE 0 END), "
                      "count(ever_mcap_cr) FROM delistings").fetchone()
     print(f"delistings: {nd[0]} dead names · {nd[1] or 0} ca_uncertain · {nd[2]} with pit_mcap history")

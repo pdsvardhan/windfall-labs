@@ -339,12 +339,14 @@ def dvm_panel(score: str, symbols) -> pd.DataFrame:
 def valuation_panel(metric: str, symbols) -> pd.DataFrame:
     """Trendlyne daily valuation multiple: PE_TTM / PEG_TTM / PBV_A. Published daily -> point-in-time.
 
-    PE_TTM and PEG_TTM are NEGATIVE for loss-makers and explode near zero earnings (caveat #7). A
-    negative PE is NOT 'cheap', so we mask PE/PEG <= 0 -> NaN: a `tl_pe < N` filter then EXCLUDES
-    loss-makers (instead of admitting every negative), and an ascending 'prefer-low PE' rank no
-    longer ranks loss-makers as the cheapest. PBV is left as-is (negative book is rare and real)."""
+    All three go NEGATIVE for distressed names and explode near zero (caveat #7): PE/PEG for
+    loss-makers, PBV for negative net worth (accumulated losses wipe out book value). A negative
+    multiple is NOT 'cheap', so we mask <= 0 -> NaN for ALL THREE: a `tl_pe < N` / `tl_pbv < N`
+    filter then EXCLUDES the distressed name (instead of admitting every negative), and an ascending
+    'prefer-low' rank no longer ranks it as the cheapest. The audit (2026-06-24, F1) found PBV_A <= 0
+    on ~30 names currently / 158 ever — masking it for consistency with the PE/PEG guard (adr-027)."""
     df = _pk_panel("valuation_ratios", "metric", _VAL[metric], symbols)
-    if not df.empty and _VAL[metric] in ("PE_TTM", "PEG_TTM"):
+    if not df.empty and _VAL[metric] in ("PE_TTM", "PEG_TTM", "PBV_A"):
         df = df.where(df > 0)
     return df
 
