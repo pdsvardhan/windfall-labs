@@ -2,8 +2,8 @@
 
 > Session 1 of the two-session plan (`SESSION-data-audit.md` → `SESSION-backtest-revalidation.md`).
 > Method: read-only profiling of `trendlyne.duckdb` (30 tables) + PIT/identity layer while the API stayed
-> live (API opens the file `read_only`, so concurrent read is safe). Scripts: `_staging/audit_engine.py`,
-> `audit_drill.py`, `audit_drill2.py` (root-cause). Reference snapshot: ohlcv last bar **2026-06-16**.
+> live (API opens the file `read_only`, so concurrent read is safe). Reusable profiler committed at
+> `docs/validation/data_audit_engine.py` (root-cause drills were one-off). Reference snapshot: ohlcv last bar **2026-06-16**.
 
 ## Store at a glance
 - 30 tables; ~5.47M ohlcv bars (1959 priced pks), 9.67M DVM rows, 10.47M valuation rows, 5.80M universe rows.
