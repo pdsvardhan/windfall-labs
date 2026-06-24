@@ -176,3 +176,25 @@ rebuild so membership staleness can't silently recur.
 1. **#82 / Session 1** — engine-facing data audit + fix (no prereqs). Spec: `docs/validation/SESSION-data-audit.md`.
 2. **#83 / Session 2** — backtest re-validation vs Trendlyne; owner first fills `C:\Users\pdsva\Downloads\backtest-data` with Trendlyne CSVs + per-test screenshots. Spec: `docs/validation/SESSION-backtest-revalidation.md`.
 3. Pre-existing anti-gaslight note (not this session): 2 SO1 features at status=done lack `feature_claims` (cockpit-dashboard +1) — reconciliation gap from original Stage 3.
+
+## Session 2026-06-24 (evening) — Session 1: engine-facing data audit + fix (#82)
+
+**Stage:** Stage 4 (iteration #15) — owner-requested dedicated data-audit session
+**What changed:** read-only audit of `trendlyne.duckdb` (30 tables) + PIT/identity layer (profiler committed at `docs/validation/data_audit_engine.py`; report `docs/validation/data_audit_run-2026-06-24.md`). 13 findings triaged; owner locked 5 fixes, all independently verifier-APPROVED:
+
+- **F1 (adr-027) — PBV ≤ 0 guard.** `valuation_panel` masked PE/PEG ≤ 0 but left PBV; 30 names currently have negative book value that a `tl_pbv < N` filter admitted / an ascending P/B rank ranked "cheapest". Now masked, mirroring PE/PEG. `trendlyne_store.py`.
+- **F2 (adr-028) — result_lag look-ahead.** Unmatched fallback was a flat 45d; annual audited results need 60d (SEBI LODR Reg 33), so unmatched annual fundamentals were visible ~15d early. Now period-aware: annual 60d / quarterly 45d. `phase3_build.py`. After rebuild: 12,184 annual=60d, 29,076 qtr=45d, 0 negative lag.
+- **F3 (adr-030) — dead-bankruptcy survivorship.** 81 dead names (78 >₹50cr peak turnover) absent from the survivorship-free universe because bankrupt loss-makers had no positive-EPS screener page → no shares → no mcap. Seeded researched share anchors for 9 material deaths (DHFL, Bhushan Steel, Kingfisher, Educomp, Binani, Reliance Naval, Monnet, Future Consumer, Dewan). Now ride peak→delisting (DHFL ₹21,328cr→524cr, Bhushan ₹48,730cr→615cr). `rebuild_pit_mcap_ca.py`. Dilution-heavy 4 (3i/Alok/IVRCL/Amtek) deferred → todo 89.
+- **F5 (adr-031) — silent delistings.** A live (pk-keyed) name that stops in BOTH Trendlyne ohlcv AND Bhavcopy >30d before the latest bar has genuinely delisted (not lagged) but had no terminal-exit record. Detector added to `build_ca_factor.py` + one-time `migrate_f5_delistings.py`. GSPL (Gujarat State Petronet, merged 2026-05, ever ₹26k cr) registered; detector flags only GSPL.
+- **F6 (adr-029) — pit_mcap share anchor.** Current shares = NP/EPS was unstable near-zero EPS and meaningless for REITs/InvITs, wrongly EXCLUDING large names (PRAJIND ₹6,259cr→₹3cr, BAGMANE REIT ₹34,904cr→₹62cr, TVSINVIT) and over-inflating others (NAZARA 5×). Now anchored to `stocks.mcap / last_close` where present; NP/EPS fallback only where Trendlyne mcap is null. `rebuild_pit_mcap_ca.py`. Pure constant-scaling per name (verifier proved ratio stddev 0 → no look-ahead).
+
+**Data rebuilt** (DuckDB, gitignored): result_lag, pit_mcap, pit_mcap_dead, universe_membership, delistings. Verified vs pre-fix backup `trendlyne.duckdb.bak-audit-20260624-201855`: ever-universe **2102→2133 (+31)**, **0 names wrongly dropped**, pit_mcap==ohlcv rows, 0 null/negative mcap.
+
+**Decisions:** adr-027, adr-028, adr-029, adr-030, adr-031 (all curated). **Tracker:** closed #82; iteration #15 integrated; created follow-ups #84–89 (F4 renames, F7 return-sanity, F9 staleness refresh, F10 smallcap benchmark, F11/F12 cosmetic, F3 dilution-heavy dead names).
+
+**Commits:** 281f1a5 (code+data), 820fbb4 (ADRs+mirror), 37ac1b6 (profiler) — pushed to Gitea.
+
+**Next session pick-up:**
+1. **#83 / Session 2** — backtest re-validation vs Trendlyne. NOW UNBLOCKED; F3/F6 shifted universe membership, so backtests WILL change — re-run against the corrected universe. Owner first fills `C:\Users\pdsva\Downloads\backtest-data` with Trendlyne CSVs + screenshots. Spec: `docs/validation/SESSION-backtest-revalidation.md`.
+2. Audit follow-ups #84–89 (all non-blocking).
+3. Pre-existing anti-gaslight (not this session): `unclaimed-done` on 2 SO1 features (cockpit-dashboard, strategy-editor) lacking feature_claims; `stale-verification` SOFT on 7 engine features — reconciliation gaps from original Stage 3, unaffected by this data session.
