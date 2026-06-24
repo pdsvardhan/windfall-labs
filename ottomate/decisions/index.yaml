@@ -241,3 +241,53 @@ decisions:
       - curated
       - cat:reliability
     body_path: docs/decisions/adr-026-windfall-lossmaker-shares.md
+  - id: adr-027-windfall-pbv-guard
+    project_slug: windfall-labs
+    title: Guard negative book value (P/B ≤ 0) so distressed stocks arent ranked
+      cheapest
+    status: accepted
+    date: 2026-06-24T00:00:00.000Z
+    tags:
+      - curated
+      - cat:system
+    body_path: docs/decisions/adr-027-windfall-pbv-guard.md
+  - id: adr-028-windfall-result-lag-annual
+    project_slug: windfall-labs
+    title: "Point-in-time fundamentals: 60-day annual / 45-day quarterly result lag
+      (no look-ahead)"
+    status: accepted
+    date: 2026-06-24T00:00:00.000Z
+    tags:
+      - curated
+      - cat:system
+    body_path: docs/decisions/adr-028-windfall-result-lag-annual.md
+  - id: adr-029-windfall-mcap-share-anchor
+    project_slug: windfall-labs
+    title: Anchor historical market cap to Trendlynes own value, not a fragile
+      NP/EPS share estimate
+    status: accepted
+    date: 2026-06-24T00:00:00.000Z
+    tags:
+      - curated
+      - cat:reliability
+    body_path: docs/decisions/adr-029-windfall-mcap-share-anchor.md
+  - id: adr-030-windfall-dead-survivorship
+    project_slug: windfall-labs
+    title: Put real bankruptcies (DHFL, Bhushan Steel, Kingfisher) back into the
+      survivorship-free universe
+    status: accepted
+    date: 2026-06-24T00:00:00.000Z
+    tags:
+      - curated
+      - cat:reliability
+    body_path: docs/decisions/adr-030-windfall-dead-survivorship.md
+  - id: adr-031-windfall-silent-delisting
+    project_slug: windfall-labs
+    title: Detect silently-delisted names (e.g. GSPL merger) and record a terminal
+      exit
+    status: accepted
+    date: 2026-06-24T00:00:00.000Z
+    tags:
+      - curated
+      - cat:reliability
+    body_path: docs/decisions/adr-031-windfall-silent-delisting.md
