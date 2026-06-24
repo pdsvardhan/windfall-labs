@@ -159,3 +159,20 @@ rebuild so membership staleness can't silently recur.
    for OLAELEC + the numeric-token/ISIN names; user runs it, returns CSVs, ingest (ohlcv + dvm + shares).
 2. Decide whether to cron `rebuild_pit_mcap_ca.py` (membership freshness).
 3. DB backup `backend/data/trendlyne.duckdb.bak-20260623-parity` retained as rollback — delete after #73.
+
+## Session 2026-06-24 — engine data fixes + UI handoff port + validation planning
+
+**Stage:** Stage 4 (iterations 12–14) + next-session planning
+**What changed:**
+- **iter-12 (#73 · adr-026) — loss-maker universe coverage.** Root cause: `pit_shares` derived shares = NP/EPS (requires EPS>0), so every loss-making name produced no share count → no `pit_mcap` → absent from `universe_membership` entirely. 19 names affected incl. SWIGGY (~₹70k cr), MEESHO (~₹80k cr), OLAELEC, ATHERENERG, FIRSTCRY, MTNL, UNITECH. Fix: fallback `shares = stocks.mcap / latest_close` for EPS-less pks, in canonical `rebuild_pit_mcap_ca.py` + surgical apply. +19 universe symbols (2101→2120). Numeric-token gold rows confirmed unresolvable internally; KRN/ALPEXSOLAR/DEEDEV confirmed already-covered (stale 06-23 gap run). Verifier APPROVE.
+- **iter-13 (#81 · PARITY-5) — sub-floor NSE coverage.** Ingested 13 historically-liquid NSE names that sit below the ₹500cr Trendlyne harvest floor (GSPL, MIRZAINT, UGARSUGAR, SHANKARA, ORIENTBELL, KESORAMIND, 3IINFOLTD, HCL-INSYS, VINYLINDIA, SAKUMA, OMAXAUTO, APCL, RAMAPHO) via a targeted in-browser harvester (`trendlyne_harvester_parity5.js`, owner-run). Loaded ohlcv/dvm/pnl/etc; built pit_shares(EPS)/pit_mcap/membership (live path). +13 symbols (2120→2133). GSPL resolved fine (not delisted). NSE-only rule reaffirmed (adr-024): BSE-only names + numeric tokens deliberately dropped. Verifier APPROVE.
+- **iter-14 (#39) — UI handoff port.** Implemented owner `CHANGES_HANDOFF.md`: Part A (20 review fixes) + Part B (owner changes). New shared primitives (Menu/Modal/ConfirmDialog), chart axes+gridlines+year-axis, darkened faint token, Single/Composite ranking (rank_blend — engine already supported), consolidated labeled config grid, Re-run split-button → Explore-variations modal, mobile nav, slim inline readiness (C-1), Export-CSV skipped (C-5). `next build` green; rebuilt + deployed `windfall-web`. Verifier APPROVE.
+
+**Decisions:** adr-026 (loss-maker share-count fallback). NSE-only universe rule reaffirmed.
+
+**Tracker:** closed #73, #81; deleted #18 (post-v1 roadmap — owner no longer tracking); created #82 (Session 1: engine-facing data audit + fix) and #83 (Session 2: backtest re-validation vs Trendlyne), both with detailed specs in `docs/validation/SESSION-*.md`.
+
+**Next session pick-up:**
+1. **#82 / Session 1** — engine-facing data audit + fix (no prereqs). Spec: `docs/validation/SESSION-data-audit.md`.
+2. **#83 / Session 2** — backtest re-validation vs Trendlyne; owner first fills `C:\Users\pdsva\Downloads\backtest-data` with Trendlyne CSVs + per-test screenshots. Spec: `docs/validation/SESSION-backtest-revalidation.md`.
+3. Pre-existing anti-gaslight note (not this session): 2 SO1 features at status=done lack `feature_claims` (cockpit-dashboard +1) — reconciliation gap from original Stage 3.
