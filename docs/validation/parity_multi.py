@@ -57,6 +57,23 @@ TEST_TABLE = {
         entry=["mcap > 500", "mcap < 50000", "tl_durability > 50", "rsi14 > 50", "close > sma50",
                "close > sma200", "tl_pledge < 20", "adtv_cr > 10", "tl_pe < 100", "tl_momentum > 60"],
         rank_by="tl_momentum", rank_order="desc", freq="weekly", floor=500.0, nhold=10),
+    # --- restored 2026-06-25 (Session 2 revalidation): the 4 deep-history / no-floor tests trimmed
+    #     from parity_multi after the 2026-06-22 baseline; still present in gap_analysis.py. Configs
+    #     re-confirmed against owner Trendlyne screenshots (547992 full query expanded). ---
+    "547991": dict(name="Windfall v2.2 (monthly, full 2021-26)",
+        entry=["mcap > 500", "mcap < 50000", "tl_durability > 50", "rsi14 > 50", "close > sma50",
+               "close > sma200", "tl_pledge < 20", "adtv_cr > 10", "tl_pe < 100", "tl_momentum > 60"],
+        rank_by="tl_momentum", rank_order="desc", freq="monthly", floor=500.0, nhold=10),
+    "547992": dict(name="Windfall v2.2 (quarterly, 2013-26 deep history)",
+        entry=["mcap > 500", "mcap < 50000", "tl_durability > 50", "rsi14 > 50", "close > sma50",
+               "close > sma200", "tl_pledge < 20", "adtv_cr > 10", "tl_pe < 100", "tl_momentum > 60"],
+        rank_by="tl_momentum", rank_order="desc", freq="quarterly", floor=500.0, nhold=10),
+    "547994": dict(name="Pure DVM (weekly, no liquidity floor)",
+        entry=["tl_durability > 55", "tl_valuation > 50", "tl_momentum > 60"],
+        rank_by="tl_momentum", rank_order="desc", freq="weekly", floor=500.0, nhold=10),
+    "547995": dict(name="Pure DVM (monthly, no liquidity floor)",
+        entry=["tl_durability > 55", "tl_valuation > 50", "tl_momentum > 60"],
+        rank_by="tl_momentum", rank_order="desc", freq="monthly", floor=500.0, nhold=10),
 }
 
 # rename old->live so external gold tickers join our current-symbol universe (iter-34/adr-025)

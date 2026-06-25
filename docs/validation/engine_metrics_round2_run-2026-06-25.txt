@@ -1,0 +1,28 @@
+=== NET (cost_mult=1.0) ===
+ENG|548012|cagr=16.6|tot=112.7|maxdd=-32.8|sharpe=0.6887|turn=857|ntr=435|win=50|benchcagr=10.7|ddwin=2024-09-16-2026-03-30
+ENG|548776|cagr=23.2|tot=179.0|maxdd=-33.6|sharpe=0.9167|turn=750|ntr=389|win=51|benchcagr=10.7|ddwin=2021-10-18-2022-06-20
+ENG|548042|cagr=-1.9|tot=-2.0|maxdd=-27.3|sharpe=0.0549|turn=2706|ntr=294|win=40|benchcagr=-1.0|ddwin=2025-10-15-2026-04-08
+ENG|548040|cagr=7.3|tot=7.5|maxdd=-19.3|sharpe=0.4226|turn=4392|ntr=457|win=45|benchcagr=-1.0|ddwin=2025-11-03-2026-03-23
+ENG|548017|cagr=16.7|tot=113.3|maxdd=-34.4|sharpe=0.6915|turn=855|ntr=433|win=51|benchcagr=10.7|ddwin=2024-09-13-2026-03-30
+ENG|548015|cagr=14.7|tot=96.3|maxdd=-33.6|sharpe=0.6398|turn=808|ntr=409|win=50|benchcagr=10.7|ddwin=2024-09-16-2026-03-30
+ENG|548014|cagr=16.7|tot=113.1|maxdd=-31.5|sharpe=0.6533|turn=929|ntr=234|win=53|benchcagr=10.7|ddwin=2022-01-20-2022-06-20
+ENG|547990|cagr=5.1|tot=5.3|maxdd=-31.3|sharpe=0.3211|turn=1049|ntr=112|win=39|benchcagr=-1.0|ddwin=2025-09-24-2026-03-23
+ENG|547989|cagr=6.5|tot=6.6|maxdd=-26.3|sharpe=0.3768|turn=2564|ntr=279|win=42|benchcagr=-1.0|ddwin=2025-09-08-2026-04-02
+ENG|547991|cagr=0.6|tot=3.0|maxdd=-48.6|sharpe=0.1465|turn=623|ntr=300|win=44|benchcagr=10.7|ddwin=2024-12-16-2026-03-23
+ENG|547992|cagr=-1.5|tot=-17.6|maxdd=-54.0|sharpe=-0.0392|turn=77|ntr=105|win=37|benchcagr=12.9|ddwin=2024-04-22-2026-03-30
+ENG|547994|cagr=48.7|tot=50.2|maxdd=-15.3|sharpe=1.6627|turn=2327|ntr=255|win=42|benchcagr=-1.0|ddwin=2025-11-03-2026-03-09
+ENG|547995|cagr=28.6|tot=243.5|maxdd=-29.5|sharpe=1.0322|turn=873|ntr=453|win=54|benchcagr=10.7|ddwin=2022-01-20-2022-06-20
+=== GROSS (cost_mult=0.0) ===
+ENG0|548012|cagr=19.0|tot=134.9|maxdd=-30.9|sharpe=0.7596|turn=857|ntr=435|win=51|benchcagr=10.7|ddwin=2024-09-16-2026-03-30
+ENG0|548776|cagr=25.4|tot=203.9|maxdd=-32.7|sharpe=0.9813|turn=751|ntr=389|win=51|benchcagr=10.7|ddwin=2021-10-18-2022-06-20
+ENG0|548042|cagr=4.6|tot=4.7|maxdd=-25.2|sharpe=0.3058|turn=2710|ntr=294|win=42|benchcagr=-1.0|ddwin=2025-10-15-2026-04-08
+ENG0|548040|cagr=18.9|tot=19.4|maxdd=-16.0|sharpe=0.8651|turn=4401|ntr=457|win=47|benchcagr=-1.0|ddwin=2025-11-03-2026-03-23
+ENG0|548017|cagr=19.1|tot=135.4|maxdd=-32.7|sharpe=0.7621|turn=855|ntr=433|win=51|benchcagr=10.7|ddwin=2024-09-13-2026-03-30
+ENG0|548015|cagr=16.9|tot=114.9|maxdd=-32.2|sharpe=0.7064|turn=807|ntr=409|win=51|benchcagr=10.7|ddwin=2024-09-16-2026-03-30
+ENG0|548014|cagr=19.1|tot=136.1|maxdd=-30.9|sharpe=0.72|turn=928|ntr=234|win=53|benchcagr=10.7|ddwin=2022-01-20-2022-06-20
+ENG0|547990|cagr=7.6|tot=7.8|maxdd=-30.5|sharpe=0.4058|turn=1050|ntr=112|win=39|benchcagr=-1.0|ddwin=2025-09-24-2026-03-23
+ENG0|547989|cagr=13.3|tot=13.7|maxdd=-23.2|sharpe=0.6242|turn=2571|ntr=279|win=43|benchcagr=-1.0|ddwin=2025-09-08-2026-04-02
+ENG0|547991|cagr=1.9|tot=9.8|maxdd=-47.2|sharpe=0.2025|turn=631|ntr=300|win=45|benchcagr=10.7|ddwin=2024-12-16-2026-03-23
+ENG0|547992|cagr=-1.3|tot=-15.5|maxdd=-53.2|sharpe=-0.0249|turn=78|ntr=105|win=37|benchcagr=12.9|ddwin=2024-04-22-2026-03-30
+ENG0|547994|cagr=57.7|tot=59.7|maxdd=-13.6|sharpe=1.8835|turn=2336|ntr=255|win=44|benchcagr=-1.0|ddwin=2026-01-07-2026-03-09
+ENG0|547995|cagr=31.3|tot=280.5|maxdd=-28.8|sharpe=1.1049|turn=871|ntr=453|win=55|benchcagr=10.7|ddwin=2022-01-20-2022-06-20

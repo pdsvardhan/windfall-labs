@@ -1,0 +1,843 @@
+##############################################################################
+# TEST 548012 — Tradeable (DVM-mom)
+# filters: ['tl_durability > 55', 'tl_valuation > 50', 'tl_momentum > 60', 'adtv_cr > 10']
+# rank: tl_momentum desc | freq=monthly floor=1000.0 nhold=10
+# window: 2021-07-30 -> 2026-06-12 (59 periods); resolve warmup from 2020-06-05
+##############################################################################
+
+=== 1. SELECTION (name-by-name vs Trendlyne, Phase A current-membership) ===
+periods=59 avg_overlap=8.0/10 total_matches=474/547=87%
+distinct TL-only names=53 slot-misses=73 | most common: [('MIRZAINT', 5), ('JSLHISAR', 3), ('AMBIKCO', 3), ('UJJIVAN', 3), ('MANGCHEFER', 3), ('BCG', 2), ('TV18BRDCST', 2), ('UTTAMSUGAR', 2), ('GSPL', 2), ('JAIBALAJI', 2)]
+distinct ours-only names=64 slot-extras=78 | most common: [('PENIND', 3), ('AIIL', 3), ('FORCEMOT', 3), ('GOODLUCK', 2), ('VENUSREM', 2), ('TALBROAUTO', 2), ('DATAPATTNS', 2), ('MAHSEAMLES', 2), ('GMRP&UI', 2), ('INDIANB', 2)]
+  boundary (first 3 periods, rank #nhold-1..nhold+3):
+   2021-07-30: TL-only=['JSLHISAR', 'TNPETRO'] ours-only=['GOODLUCK', 'KIRLFER']
+     our rank #9-13: ['NATIONALUM=76.1', 'KIRLFER=76.0', 'RAIN=75.7', 'TIRUMALCHM=75.6', 'CENTENKA=75.2']
+   2021-08-31: TL-only=['BCG', 'JSLHISAR', 'NITINSPIN'] ours-only=['GOODLUCK', 'USHAMART', 'VENUSREM']
+     our rank #9-13: ['OIL=68.6', 'USHAMART=68.5', 'BANCOINDIA=68.1', 'TATASTEEL=67.6', 'JSL=67.0']
+   2021-09-30: TL-only=['AMBIKCO', 'BCG'] ours-only=['FIEMIND', 'IGPL']
+     our rank #9-13: ['IGPL=71.1', 'FIEMIND=69.4', 'JSL=68.8', 'UFLEX=68.7', 'KPRMILL=68.5']
+
+=== 2. PRICING (our adj price vs Trendlyne CSV price, per stock-period) ===
+stock-periods=543 mean|Δ|=0.128pp median=0.003pp p95=0.34pp max=44.35pp
+  within 0.5pp=96% within 1pp=99% | gold names unpriceable=3/224
+  CA-adj mismatches (ratio start->end jumped >5%): 1
+    2023-09-29 GVKPIL       ratio 1.0->1.736 tl_chg=-39.8% our_chg=+4.6%
+  worst 6 |Δ|: [('2023-09-29', 'GVKPIL', 'tl=-39.75', 'ours=4.6'), ('2022-05-31', 'TIMETECHNO', 'tl=-2.3', 'ours=-0.3'), ('2022-10-31', 'POWERMECH', 'tl=29.79', 'ours=27.9'), ('2021-12-31', 'VTL', 'tl=2.55', 'ours=3.7'), ('2022-06-30', 'MAHSEAMLES', 'tl=16.66', 'ours=15.6'), ('2021-08-31', 'FIEMIND', 'tl=6.85', 'ours=5.8')]
+  gold names we cannot price at all (3): ['CIAN', 'DCMSRIND', 'SREERAYALK']
+
+=== 3. RETURN DECOMPOSITION (compounded NAV, ÷nhold fixed slots) ===
+  Trendlyne reported NAV                 : 227.0  (+127.0%)
+  gold picks @ Trendlyne prices (avg_row): 227.0  (+127.0%)
+  gold picks @ OUR prices (PRICING)      : 232.9  (+132.9%)  <- == above => prices reproduce TL
+  OUR picks  @ OUR prices (+ SELECTION)  : 215.2  (+115.2%)
+  (ca_uncertain slot-instances parked as cash in OUR-price recon: 4)
+
+=== 4. THIN PERIODS & CASH DRAG ===
+  gold pick-count distribution: {1: 1, 2: 1, 3: 2, 4: 2, 10: 53}
+  periods with <10 gold names: 6 (Trendlyne parks empty slots in cash)
+  if FULLY invested (÷actual count): 332.9  vs ÷10 227.0  -> cash drag = +106 NAV pts
+
+=== 5. LOCALIZE (per-period gold@ourpx vs avg_row, |Δ|>0.4pp) ===
+   [ 6] 2022-01-31 n_gold=10 priced_by_us=10 | ourpx=-5.77% avg_row=-5.36% Δ=-0.41pp
+   [ 7] 2022-02-28 n_gold=10 priced_by_us=10 | ourpx=+5.40% avg_row=+7.35% Δ=-1.95pp
+   [ 9] 2022-04-29 n_gold=10 priced_by_us=9 | ourpx=-6.33% avg_row=-8.40% Δ=+2.07pp
+   [13] 2022-08-30 n_gold=10 priced_by_us=9 | ourpx=-5.86% avg_row=-4.38% Δ=-1.48pp
+   [24] 2023-07-31 n_gold=10 priced_by_us=9 | ourpx=+8.46% avg_row=+9.38% Δ=-0.92pp
+   [26] 2023-09-29 n_gold=10 priced_by_us=10 | ourpx=-3.70% avg_row=-7.67% Δ=+3.97pp
+   [50] 2025-09-30 n_gold=10 priced_by_us=9 | ourpx=+6.41% avg_row=+5.68% Δ=+0.73pp
+
+=== PHASE B (PIT survivorship-free) summary ===
+  PIT universe size=1708 | our-pick overlap vs gold=494/547=90% | OUR-picks NAV=205.0 (+105.0%)
+
+SUMMARY|548012|Tradeable (DVM-mom)|periods=59|overlapA=87%|priceMeanAbs=0.128|goldNAV=227.0|goldOurpx=232.9|ourNAV_A=215.2|ourNAV_B=205.0|overlapB=90%|unpriced=3|thin=6|caFlags=1
+  warnA: survivorship-free Trendlyne layer: 1425 names ever >Rs500cr in-window (live + delisted, blow-ups included); membership i
+  warnA: universe gated to point-in-time Rs500cr membership (survivorship-free).
+
+
+##############################################################################
+# TEST 548776 — Test A (value/PE)
+# filters: ['tl_durability > 55', 'tl_valuation > 50', 'tl_momentum > 60', 'adtv_cr > 10', 'tl_pe > 0']
+# rank: tl_pe asc | freq=monthly floor=1000.0 nhold=10
+# window: 2021-07-30 -> 2026-06-12 (59 periods); resolve warmup from 2020-06-05
+##############################################################################
+
+=== 1. SELECTION (name-by-name vs Trendlyne, Phase A current-membership) ===
+periods=59 avg_overlap=8.3/10 total_matches=491/545=90%
+distinct TL-only names=38 slot-misses=54 | most common: [('IDFC', 5), ('JSLHISAR', 4), ('UJJIVAN', 3), ('RELINFRA', 3), ('GSPL', 2), ('GVKPIL', 2), ('FEDERALBNK', 2), ('PDMJEPAPER', 2), ('WHEELS', 2), ('TATASTLBSL', 1)]
+distinct ours-only names=49 slot-extras=61 | most common: [('AEROENTER', 3), ('AIIL', 3), ('GMRP&UI', 3), ('NHPC', 2), ('PRECWIRE', 2), ('SARDAEN', 2), ('DATAPATTNS', 2), ('KTKBANK', 2), ('JASH', 2), ('VEDL', 1)]
+  boundary (first 3 periods, rank #nhold-1..nhold+3):
+   2021-07-30: TL-only=['JSLHISAR', 'TATASTLBSL'] ours-only=['BEPL', 'VEDL']
+     our rank #9-13: ['BEPL=7.5', 'VEDL=7.6', 'NTPC=7.8', 'NMDC=8.5', 'CESC=8.5']
+   2021-08-31: TL-only=['BCG', 'JSLHISAR'] ours-only=['NHPC', 'SOTL']
+     our rank #9-13: ['SOTL=7.7', 'NHPC=8.0', 'TATASTEEL=8.4', 'GHCL=8.5', 'PANAMAPET=8.6']
+   2021-09-30: TL-only=['GPIL'] ours-only=['POWERGRID']
+     our rank #9-13: ['J&KBANK=5.2', 'POWERGRID=6.2', 'JKTYRE=6.6', 'PTC=7.2', 'GNFC=7.2']
+
+=== 2. PRICING (our adj price vs Trendlyne CSV price, per stock-period) ===
+stock-periods=543 mean|Δ|=0.135pp median=0.003pp p95=0.32pp max=44.35pp
+  within 0.5pp=96% within 1pp=99% | gold names unpriceable=1/173
+  CA-adj mismatches (ratio start->end jumped >5%): 1
+    2023-09-29 GVKPIL       ratio 1.0->1.736 tl_chg=-39.8% our_chg=+4.6%
+  worst 6 |Δ|: [('2023-09-29', 'GVKPIL', 'tl=-39.75', 'ours=4.6'), ('2021-07-30', 'TATASTLBSL', 'tl=-0.89', 'ours=3.5'), ('2021-11-30', 'VTL', 'tl=15.74', 'ours=14.1'), ('2021-09-30', 'GPIL', 'tl=11.06', 'ours=9.6'), ('2021-12-31', 'VTL', 'tl=2.55', 'ours=3.7'), ('2022-06-30', 'MAHSEAMLES', 'tl=16.66', 'ours=15.6')]
+  gold names we cannot price at all (1): ['SREERAYALK']
+
+=== 3. RETURN DECOMPOSITION (compounded NAV, ÷nhold fixed slots) ===
+  Trendlyne reported NAV                 : 260.3  (+160.3%)
+  gold picks @ Trendlyne prices (avg_row): 260.3  (+160.3%)
+  gold picks @ OUR prices (PRICING)      : 267.0  (+167.0%)  <- == above => prices reproduce TL
+  OUR picks  @ OUR prices (+ SELECTION)  : 316.0  (+216.0%)
+  (ca_uncertain slot-instances parked as cash in OUR-price recon: 9)
+
+=== 4. THIN PERIODS & CASH DRAG ===
+  gold pick-count distribution: {1: 1, 2: 1, 3: 2, 4: 2, 9: 2, 10: 51}
+  periods with <10 gold names: 8 (Trendlyne parks empty slots in cash)
+  if FULLY invested (÷actual count): 376.5  vs ÷10 260.3  -> cash drag = +116 NAV pts
+
+=== 5. LOCALIZE (per-period gold@ourpx vs avg_row, |Δ|>0.4pp) ===
+   [ 0] 2021-07-30 n_gold=10 priced_by_us=10 | ourpx=-8.55% avg_row=-9.09% Δ=+0.54pp
+   [ 7] 2022-02-28 n_gold=10 priced_by_us=10 | ourpx=+5.34% avg_row=+7.30% Δ=-1.96pp
+   [ 9] 2022-04-29 n_gold=10 priced_by_us=9 | ourpx=-12.64% avg_row=-14.79% Δ=+2.15pp
+   [13] 2022-08-30 n_gold=10 priced_by_us=9 | ourpx=-7.77% avg_row=-6.49% Δ=-1.28pp
+   [23] 2023-06-30 n_gold=10 priced_by_us=10 | ourpx=+9.51% avg_row=+11.08% Δ=-1.57pp
+   [25] 2023-08-31 n_gold=10 priced_by_us=10 | ourpx=+14.80% avg_row=+15.38% Δ=-0.58pp
+   [26] 2023-09-29 n_gold=9 priced_by_us=9 | ourpx=-1.64% avg_row=-5.61% Δ=+3.97pp
+   [29] 2023-12-29 n_gold=10 priced_by_us=10 | ourpx=+8.84% avg_row=+8.27% Δ=+0.57pp
+   [30] 2024-01-31 n_gold=9 priced_by_us=9 | ourpx=-5.36% avg_row=-5.89% Δ=+0.53pp
+
+=== PHASE B (PIT survivorship-free) summary ===
+  PIT universe size=1708 | our-pick overlap vs gold=500/545=92% | OUR-picks NAV=273.2 (+173.2%)
+
+SUMMARY|548776|Test A (value/PE)|periods=59|overlapA=90%|priceMeanAbs=0.135|goldNAV=260.3|goldOurpx=267.0|ourNAV_A=316.0|ourNAV_B=273.2|overlapB=92%|unpriced=1|thin=8|caFlags=1
+  warnA: survivorship-free Trendlyne layer: 1425 names ever >Rs500cr in-window (live + delisted, blow-ups included); membership i
+  warnA: universe gated to point-in-time Rs500cr membership (survivorship-free).
+
+
+##############################################################################
+# TEST 548042 — Short-term breakout (pure technical)
+# filters: ['mcap > 1000', 'adtv_cr > 10', 'close > sma50', 'close > sma200', 'roc21 > 10', 'rsi14 > 60']
+# rank: roc21 desc | freq=weekly floor=1000.0 nhold=10
+# window: 2025-05-30 -> 2026-06-12 (54 periods); resolve warmup from 2024-04-05
+##############################################################################
+
+=== 1. SELECTION (name-by-name vs Trendlyne, Phase A current-membership) ===
+periods=54 avg_overlap=7.9/10 total_matches=424/537=79%
+distinct TL-only names=46 slot-misses=113 | most common: [('14060423', 17), ('CIAN', 6), ('WAAREEINDO', 6), ('BGRENERGY', 5), ('542012', 5), ('SEIL', 5), ('SIKA', 4), ('IBULLSLTD', 4), ('SIGMAADV', 4), ('MOSCHIP', 3)]
+distinct ours-only names=83 slot-extras=112 | most common: [('KMEW', 4), ('ORIENTTECH', 4), ('INDOTHAI', 3), ('RPEL', 3), ('SMCGLOBAL', 3), ('ASIANTILES', 2), ('DIACABS', 2), ('POCL', 2), ('SHAILY', 2), ('GMDCLTD', 2)]
+  boundary (first 3 periods, rank #nhold-1..nhold+3):
+   2025-05-30: TL-only=[] ours-only=[]
+     our rank #9-13: ['LUMAXTECH=55.8', 'BANCOINDIA=55.5', 'MMTC=52.6', 'PGIL=51.8', 'ZENTEC=51.1']
+   2025-06-06: TL-only=['APS', 'SIKA'] ours-only=['AVANTEL', 'IFCI']
+     our rank #9-13: ['IFCI=65.6', 'AVANTEL=62.3', 'HLEGLAS=61.7', 'RPOWER=61.1', 'SUVEN=60.5']
+   2025-06-13: TL-only=['17160453', 'ORIANA', 'SIKA'] ours-only=['CARYSIL', 'FMGOETZE', 'SIRCA']
+     our rank #9-13: ['SIRCA=43.2', 'CARYSIL=43.1', 'APOLLO=42.2', 'PREMEXPLN=40.5', 'WOCKPHARMA=38.4']
+
+=== 2. PRICING (our adj price vs Trendlyne CSV price, per stock-period) ===
+stock-periods=498 mean|Δ|=0.004pp median=0.003pp p95=0.00pp max=0.27pp
+  within 0.5pp=100% within 1pp=100% | gold names unpriceable=7/224
+  CA-adj mismatches (ratio start->end jumped >5%): 0
+  worst 6 |Δ|: [('2025-09-12', 'MOSCHIP', 'tl=5.39', 'ours=5.7'), ('2025-09-05', 'MOSCHIP', 'tl=3.41', 'ours=3.2'), ('2025-09-19', 'MOSCHIP', 'tl=-10.99', 'ours=-11.1'), ('2025-06-20', 'FORCEMOT', 'tl=1.61', 'ours=1.7'), ('2025-10-17', 'SANDUMA', 'tl=-1.06', 'ours=-1.0'), ('2025-08-01', 'CUPID', 'tl=6.01', 'ours=6.0')]
+  gold names we cannot price at all (7): ['14060423', '17160453', '542012', 'AAYUSH', 'ABCGAS', 'CIAN', 'RDBRIL']
+
+=== 3. RETURN DECOMPOSITION (compounded NAV, ÷nhold fixed slots) ===
+  Trendlyne reported NAV                 : 124.9  (+24.9%)
+  gold picks @ Trendlyne prices (avg_row): 124.9  (+24.9%)
+  gold picks @ OUR prices (PRICING)      : 103.9  (+3.9%)  <- == above => prices reproduce TL
+  OUR picks  @ OUR prices (+ SELECTION)  : 117.3  (+17.3%)
+  (ca_uncertain slot-instances parked as cash in OUR-price recon: 0)
+
+=== 4. THIN PERIODS & CASH DRAG ===
+  gold pick-count distribution: {7: 1, 10: 53}
+  periods with <10 gold names: 1 (Trendlyne parks empty slots in cash)
+  if FULLY invested (÷actual count): 126.5  vs ÷10 124.9  -> cash drag = +2 NAV pts
+
+=== 5. LOCALIZE (per-period gold@ourpx vs avg_row, |Δ|>0.4pp) ===
+   [ 2] 2025-06-13 n_gold=10 priced_by_us=9 | ourpx=-0.42% avg_row=-1.62% Δ=+1.20pp
+   [ 6] 2025-07-11 n_gold=10 priced_by_us=9 | ourpx=-0.82% avg_row=-0.21% Δ=-0.61pp
+   [ 7] 2025-07-18 n_gold=10 priced_by_us=9 | ourpx=-0.73% avg_row=-1.68% Δ=+0.95pp
+   [11] 2025-08-14 n_gold=10 priced_by_us=9 | ourpx=+4.08% avg_row=+5.12% Δ=-1.04pp
+   [12] 2025-08-22 n_gold=10 priced_by_us=9 | ourpx=-0.52% avg_row=+0.30% Δ=-0.82pp
+   [13] 2025-08-29 n_gold=10 priced_by_us=9 | ourpx=-0.08% avg_row=+0.96% Δ=-1.04pp
+   [14] 2025-09-05 n_gold=10 priced_by_us=9 | ourpx=+2.61% avg_row=+3.67% Δ=-1.06pp
+   [15] 2025-09-12 n_gold=10 priced_by_us=9 | ourpx=+4.54% avg_row=+5.55% Δ=-1.01pp
+   [16] 2025-09-19 n_gold=10 priced_by_us=9 | ourpx=-1.97% avg_row=-0.92% Δ=-1.05pp
+   [17] 2025-09-26 n_gold=10 priced_by_us=8 | ourpx=+0.59% avg_row=+3.56% Δ=-2.97pp
+   [18] 2025-10-03 n_gold=10 priced_by_us=7 | ourpx=-5.36% avg_row=-1.55% Δ=-3.81pp
+   [19] 2025-10-10 n_gold=10 priced_by_us=7 | ourpx=+1.00% avg_row=+1.91% Δ=-0.91pp
+   [20] 2025-10-17 n_gold=10 priced_by_us=7 | ourpx=-0.13% avg_row=-0.64% Δ=+0.51pp
+   [21] 2025-10-24 n_gold=10 priced_by_us=9 | ourpx=-2.04% avg_row=-1.01% Δ=-1.03pp
+   [24] 2025-11-14 n_gold=10 priced_by_us=8 | ourpx=-2.67% avg_row=-0.00% Δ=-2.67pp
+   [25] 2025-11-21 n_gold=10 priced_by_us=8 | ourpx=-0.35% avg_row=+2.31% Δ=-2.66pp
+   [26] 2025-11-28 n_gold=10 priced_by_us=8 | ourpx=-0.49% avg_row=-2.85% Δ=+2.36pp
+   [32] 2026-01-09 n_gold=10 priced_by_us=9 | ourpx=-1.70% avg_row=+0.44% Δ=-2.14pp
+   [33] 2026-01-16 n_gold=10 priced_by_us=9 | ourpx=-3.91% avg_row=-5.92% Δ=+2.01pp
+   [43] 2026-03-27 n_gold=10 priced_by_us=9 | ourpx=+0.19% avg_row=+0.79% Δ=-0.60pp
+   [44] 2026-04-02 n_gold=10 priced_by_us=9 | ourpx=-0.64% avg_row=+0.39% Δ=-1.03pp
+   [45] 2026-04-10 n_gold=10 priced_by_us=9 | ourpx=+4.90% avg_row=+5.72% Δ=-0.82pp
+   [48] 2026-04-30 n_gold=10 priced_by_us=9 | ourpx=+3.02% avg_row=+5.78% Δ=-2.76pp
+   [49] 2026-05-08 n_gold=10 priced_by_us=9 | ourpx=-3.12% avg_row=-5.38% Δ=+2.26pp
+
+=== PHASE B (PIT survivorship-free) summary ===
+  PIT universe size=1664 | our-pick overlap vs gold=436/537=81% | OUR-picks NAV=114.3 (+14.3%)
+
+SUMMARY|548042|Short-term breakout (pure technical)|periods=54|overlapA=79%|priceMeanAbs=0.004|goldNAV=124.9|goldOurpx=103.9|ourNAV_A=117.3|ourNAV_B=114.3|overlapB=81%|unpriced=7|thin=1|caFlags=0
+  warnA: survivorship-free Trendlyne layer: 1425 names ever >Rs500cr in-window (live + delisted, blow-ups included); membership i
+  warnA: universe gated to point-in-time Rs500cr membership (survivorship-free).
+
+
+##############################################################################
+# TEST 548040 — Pullback in uptrend (mean-reversion)
+# filters: ['mcap > 1000', 'adtv_cr > 10', 'tl_durability > 50', 'close > sma200', 'rsi14 > 40', 'rsi14 < 55']
+# rank: tl_momentum desc | freq=weekly floor=1000.0 nhold=10
+# window: 2025-05-30 -> 2026-06-12 (54 periods); resolve warmup from 2024-04-05
+##############################################################################
+
+=== 1. SELECTION (name-by-name vs Trendlyne, Phase A current-membership) ===
+periods=54 avg_overlap=9.1/10 total_matches=493/540=91%
+distinct TL-only names=35 slot-misses=47 | most common: [('MANGCHEFER', 4), ('CIAN', 3), ('CAMLINFINE', 2), ('SIKA', 2), ('AXISCADES', 2), ('ALPEXSOLAR', 2), ('IDFCFIRSTB', 2), ('IZMO', 2), ('IFBAGRO', 2), ('TFCILTD', 1)]
+distinct ours-only names=38 slot-extras=47 | most common: [('POCL', 4), ('KMEW', 4), ('AGIIL', 3), ('SINDHUTRAD', 2), ('LICHSGFIN', 1), ('WINDMACHIN', 1), ('PARAS', 1), ('GULFOILLUB', 1), ('SUPRIYA', 1), ('AVALON', 1)]
+  boundary (first 3 periods, rank #nhold-1..nhold+3):
+   2025-05-30: TL-only=[] ours-only=[]
+     our rank #9-13: ['KPRMILL=61.5', 'GRMOVER=61.1', 'INDIASHLTR=61.0', 'NH=60.6', 'REDINGTON=60.4']
+   2025-06-06: TL-only=[] ours-only=[]
+     our rank #9-13: ['PRIVISCL=61.5', 'MANORAMA=61.5', 'KPRMILL=60.9', 'MARUTI=59.9', 'NH=59.2']
+   2025-06-13: TL-only=['TFCILTD'] ours-only=['AGIIL']
+     our rank #9-13: ['MAZDOCK=61.6', 'CENTUM=61.4', 'TFCILTD=61.3', 'GABRIEL=61.3', 'INDIGO=61.1']
+
+=== 2. PRICING (our adj price vs Trendlyne CSV price, per stock-period) ===
+stock-periods=533 mean|Δ|=0.004pp median=0.002pp p95=0.00pp max=0.17pp
+  within 0.5pp=100% within 1pp=100% | gold names unpriceable=4/268
+  CA-adj mismatches (ratio start->end jumped >5%): 0
+  worst 6 |Δ|: [('2025-11-14', 'FORCEMOT', 'tl=-4.07', 'ours=-4.2'), ('2026-01-23', 'FORCEMOT', 'tl=-2.97', 'ours=-2.8'), ('2025-08-22', 'EFCIL', 'tl=0.21', 'ours=0.4'), ('2025-09-05', 'FORCEMOT', 'tl=3.88', 'ours=3.8'), ('2025-09-19', 'FORCEMOT', 'tl=-6.43', 'ours=-6.5'), ('2025-08-01', 'FORCEMOT', 'tl=6.48', 'ours=6.6')]
+  gold names we cannot price at all (4): ['17160453', '542012', 'CIAN', 'RDBRIL']
+
+=== 3. RETURN DECOMPOSITION (compounded NAV, ÷nhold fixed slots) ===
+  Trendlyne reported NAV                 : 99.1  (-0.9%)
+  gold picks @ Trendlyne prices (avg_row): 99.1  (-0.9%)
+  gold picks @ OUR prices (PRICING)      : 103.0  (+3.0%)  <- == above => prices reproduce TL
+  OUR picks  @ OUR prices (+ SELECTION)  : 111.6  (+11.6%)
+  (ca_uncertain slot-instances parked as cash in OUR-price recon: 0)
+
+=== 4. THIN PERIODS & CASH DRAG ===
+  gold pick-count distribution: {10: 54}
+  periods with <10 gold names: 0 (Trendlyne parks empty slots in cash)
+  if FULLY invested (÷actual count): 99.1  vs ÷10 99.1  -> cash drag = +0 NAV pts
+
+=== 5. LOCALIZE (per-period gold@ourpx vs avg_row, |Δ|>0.4pp) ===
+   [ 8] 2025-07-25 n_gold=10 priced_by_us=9 | ourpx=-2.59% avg_row=-1.91% Δ=-0.68pp
+   [15] 2025-09-12 n_gold=10 priced_by_us=9 | ourpx=+0.84% avg_row=+0.35% Δ=+0.49pp
+   [21] 2025-10-24 n_gold=10 priced_by_us=9 | ourpx=+3.72% avg_row=+1.46% Δ=+2.26pp
+   [27] 2025-12-05 n_gold=10 priced_by_us=9 | ourpx=-0.45% avg_row=-1.90% Δ=+1.45pp
+   [28] 2025-12-12 n_gold=10 priced_by_us=9 | ourpx=-0.35% avg_row=+1.20% Δ=-1.55pp
+   [33] 2026-01-16 n_gold=10 priced_by_us=9 | ourpx=-4.39% avg_row=-5.78% Δ=+1.39pp
+   [34] 2026-01-23 n_gold=10 priced_by_us=9 | ourpx=-2.96% avg_row=-3.36% Δ=+0.40pp
+
+=== PHASE B (PIT survivorship-free) summary ===
+  PIT universe size=1664 | our-pick overlap vs gold=494/540=91% | OUR-picks NAV=111.6 (+11.6%)
+
+SUMMARY|548040|Pullback in uptrend (mean-reversion)|periods=54|overlapA=91%|priceMeanAbs=0.004|goldNAV=99.1|goldOurpx=103.0|ourNAV_A=111.6|ourNAV_B=111.6|overlapB=91%|unpriced=4|thin=0|caFlags=0
+  warnA: survivorship-free Trendlyne layer: 1425 names ever >Rs500cr in-window (live + delisted, blow-ups included); membership i
+  warnA: universe gated to point-in-time Rs500cr membership (survivorship-free).
+
+
+##############################################################################
+# TEST 548017 — Trend/regime proxy
+# filters: ['tl_durability > 55', 'tl_valuation > 50', 'tl_momentum > 60', 'adtv_cr > 10', 'mcap > 1000', 'close > sma200']
+# rank: tl_momentum desc | freq=monthly floor=1000.0 nhold=10
+# window: 2021-07-30 -> 2026-06-12 (59 periods); resolve warmup from 2020-06-05
+##############################################################################
+
+=== 1. SELECTION (name-by-name vs Trendlyne, Phase A current-membership) ===
+periods=59 avg_overlap=8.1/10 total_matches=477/547=87%
+distinct TL-only names=49 slot-misses=70 | most common: [('MIRZAINT', 5), ('JSLHISAR', 3), ('AMBIKCO', 3), ('UJJIVAN', 3), ('MANGCHEFER', 3), ('BCG', 2), ('TV18BRDCST', 2), ('UTTAMSUGAR', 2), ('GSPL', 2), ('JAIBALAJI', 2)]
+distinct ours-only names=64 slot-extras=74 | most common: [('GOODLUCK', 2), ('UNIONBANK', 2), ('GUJALKALI', 2), ('KARURVYSYA', 2), ('DATAPATTNS', 2), ('PENIND', 2), ('LTF', 2), ('MAHSEAMLES', 2), ('GMRP&UI', 2), ('INDIANB', 2)]
+  boundary (first 3 periods, rank #nhold-1..nhold+3):
+   2021-07-30: TL-only=['JSLHISAR', 'TNPETRO'] ours-only=['GOODLUCK', 'KIRLFER']
+     our rank #9-13: ['NATIONALUM=76.1', 'KIRLFER=76.0', 'RAIN=75.7', 'TIRUMALCHM=75.6', 'CENTENKA=75.2']
+   2021-08-31: TL-only=['BCG', 'JSLHISAR', 'NITINSPIN'] ours-only=['BANCOINDIA', 'GOODLUCK', 'USHAMART']
+     our rank #9-13: ['USHAMART=68.5', 'BANCOINDIA=68.1', 'TATASTEEL=67.6', 'JSL=67.0', 'POLYPLEX=66.6']
+   2021-09-30: TL-only=['AMBIKCO', 'BCG'] ours-only=['FIEMIND', 'IGPL']
+     our rank #9-13: ['IGPL=71.1', 'FIEMIND=69.4', 'JSL=68.8', 'UFLEX=68.7', 'KPRMILL=68.5']
+
+=== 2. PRICING (our adj price vs Trendlyne CSV price, per stock-period) ===
+stock-periods=543 mean|Δ|=0.128pp median=0.003pp p95=0.34pp max=44.35pp
+  within 0.5pp=96% within 1pp=99% | gold names unpriceable=3/224
+  CA-adj mismatches (ratio start->end jumped >5%): 1
+    2023-09-29 GVKPIL       ratio 1.0->1.736 tl_chg=-39.8% our_chg=+4.6%
+  worst 6 |Δ|: [('2023-09-29', 'GVKPIL', 'tl=-39.75', 'ours=4.6'), ('2022-05-31', 'TIMETECHNO', 'tl=-2.3', 'ours=-0.3'), ('2022-10-31', 'POWERMECH', 'tl=29.79', 'ours=27.9'), ('2021-12-31', 'VTL', 'tl=2.55', 'ours=3.7'), ('2022-06-30', 'MAHSEAMLES', 'tl=16.66', 'ours=15.6'), ('2021-08-31', 'FIEMIND', 'tl=6.85', 'ours=5.8')]
+  gold names we cannot price at all (3): ['CIAN', 'DCMSRIND', 'SREERAYALK']
+
+=== 3. RETURN DECOMPOSITION (compounded NAV, ÷nhold fixed slots) ===
+  Trendlyne reported NAV                 : 227.0  (+127.0%)
+  gold picks @ Trendlyne prices (avg_row): 227.0  (+127.0%)
+  gold picks @ OUR prices (PRICING)      : 232.9  (+132.9%)  <- == above => prices reproduce TL
+  OUR picks  @ OUR prices (+ SELECTION)  : 222.6  (+122.6%)
+  (ca_uncertain slot-instances parked as cash in OUR-price recon: 4)
+
+=== 4. THIN PERIODS & CASH DRAG ===
+  gold pick-count distribution: {1: 1, 2: 1, 3: 2, 4: 2, 10: 53}
+  periods with <10 gold names: 6 (Trendlyne parks empty slots in cash)
+  if FULLY invested (÷actual count): 332.9  vs ÷10 227.0  -> cash drag = +106 NAV pts
+
+=== 5. LOCALIZE (per-period gold@ourpx vs avg_row, |Δ|>0.4pp) ===
+   [ 6] 2022-01-31 n_gold=10 priced_by_us=10 | ourpx=-5.77% avg_row=-5.36% Δ=-0.41pp
+   [ 7] 2022-02-28 n_gold=10 priced_by_us=10 | ourpx=+5.40% avg_row=+7.35% Δ=-1.95pp
+   [ 9] 2022-04-29 n_gold=10 priced_by_us=9 | ourpx=-6.33% avg_row=-8.40% Δ=+2.07pp
+   [13] 2022-08-30 n_gold=10 priced_by_us=9 | ourpx=-5.86% avg_row=-4.38% Δ=-1.48pp
+   [24] 2023-07-31 n_gold=10 priced_by_us=9 | ourpx=+8.46% avg_row=+9.38% Δ=-0.92pp
+   [26] 2023-09-29 n_gold=10 priced_by_us=10 | ourpx=-3.70% avg_row=-7.67% Δ=+3.97pp
+   [50] 2025-09-30 n_gold=10 priced_by_us=9 | ourpx=+6.41% avg_row=+5.68% Δ=+0.73pp
+
+=== PHASE B (PIT survivorship-free) summary ===
+  PIT universe size=1708 | our-pick overlap vs gold=494/547=90% | OUR-picks NAV=214.3 (+114.3%)
+
+SUMMARY|548017|Trend/regime proxy|periods=59|overlapA=87%|priceMeanAbs=0.128|goldNAV=227.0|goldOurpx=232.9|ourNAV_A=222.6|ourNAV_B=214.3|overlapB=90%|unpriced=3|thin=6|caFlags=1
+  warnA: survivorship-free Trendlyne layer: 1425 names ever >Rs500cr in-window (live + delisted, blow-ups included); membership i
+  warnA: universe gated to point-in-time Rs500cr membership (survivorship-free).
+
+
+##############################################################################
+# TEST 548015 — Tighter momentum (>65)
+# filters: ['tl_durability > 55', 'tl_valuation > 50', 'tl_momentum > 65', 'adtv_cr > 10', 'mcap > 1000']
+# rank: tl_momentum desc | freq=monthly floor=1000.0 nhold=10
+# window: 2021-07-30 -> 2026-06-12 (57 periods); resolve warmup from 2020-06-05
+##############################################################################
+
+=== 1. SELECTION (name-by-name vs Trendlyne, Phase A current-membership) ===
+periods=57 avg_overlap=7.6/10 total_matches=434/495=88%
+distinct TL-only names=42 slot-misses=61 | most common: [('MIRZAINT', 5), ('JSLHISAR', 3), ('AMBIKCO', 3), ('UJJIVAN', 3), ('BCG', 2), ('TV18BRDCST', 2), ('UTTAMSUGAR', 2), ('GSPL', 2), ('JAIBALAJI', 2), ('VASCONEQ', 2)]
+distinct ours-only names=55 slot-extras=64 | most common: [('GOODLUCK', 2), ('UNIONBANK', 2), ('DATAPATTNS', 2), ('PENIND', 2), ('LTF', 2), ('MAHSEAMLES', 2), ('AIIL', 2), ('FORCEMOT', 2), ('GMRP&UI', 2), ('KIRLFER', 1)]
+  boundary (first 3 periods, rank #nhold-1..nhold+3):
+   2021-07-30: TL-only=['JSLHISAR', 'TNPETRO'] ours-only=['GOODLUCK', 'KIRLFER']
+     our rank #9-13: ['NATIONALUM=76.1', 'KIRLFER=76.0', 'RAIN=75.7', 'TIRUMALCHM=75.6', 'CENTENKA=75.2']
+   2021-08-31: TL-only=['BCG', 'JSLHISAR', 'NITINSPIN'] ours-only=['BANCOINDIA', 'GOODLUCK', 'USHAMART']
+     our rank #9-13: ['USHAMART=68.5', 'BANCOINDIA=68.1', 'TATASTEEL=67.6', 'JSL=67.0', 'POLYPLEX=66.6']
+   2021-09-30: TL-only=['AMBIKCO', 'BCG'] ours-only=['FIEMIND', 'IGPL']
+     our rank #9-13: ['IGPL=71.1', 'FIEMIND=69.4', 'JSL=68.8', 'UFLEX=68.7', 'KPRMILL=68.5']
+
+=== 2. PRICING (our adj price vs Trendlyne CSV price, per stock-period) ===
+stock-periods=491 mean|Δ|=0.136pp median=0.003pp p95=0.34pp max=44.35pp
+  within 0.5pp=97% within 1pp=99% | gold names unpriceable=3/215
+  CA-adj mismatches (ratio start->end jumped >5%): 1
+    2023-09-29 GVKPIL       ratio 1.0->1.736 tl_chg=-39.8% our_chg=+4.6%
+  worst 6 |Δ|: [('2023-09-29', 'GVKPIL', 'tl=-39.75', 'ours=4.6'), ('2022-05-31', 'TIMETECHNO', 'tl=-2.3', 'ours=-0.3'), ('2022-10-31', 'POWERMECH', 'tl=29.79', 'ours=27.9'), ('2021-12-31', 'VTL', 'tl=2.55', 'ours=3.7'), ('2022-06-30', 'MAHSEAMLES', 'tl=16.66', 'ours=15.6'), ('2021-08-31', 'FIEMIND', 'tl=6.85', 'ours=5.8')]
+  gold names we cannot price at all (3): ['CIAN', 'DCMSRIND', 'SREERAYALK']
+
+=== 3. RETURN DECOMPOSITION (compounded NAV, ÷nhold fixed slots) ===
+  Trendlyne reported NAV                 : 202.2  (+102.2%)
+  gold picks @ Trendlyne prices (avg_row): 202.2  (+102.2%)
+  gold picks @ OUR prices (PRICING)      : 206.6  (+106.6%)  <- == above => prices reproduce TL
+  OUR picks  @ OUR prices (+ SELECTION)  : 181.7  (+81.7%)
+  (ca_uncertain slot-instances parked as cash in OUR-price recon: 3)
+
+=== 4. THIN PERIODS & CASH DRAG ===
+  gold pick-count distribution: {1: 1, 2: 2, 3: 1, 4: 1, 5: 5, 7: 2, 8: 1, 9: 4, 10: 40}
+  periods with <10 gold names: 17 (Trendlyne parks empty slots in cash)
+  if FULLY invested (÷actual count): 366.3  vs ÷10 202.2  -> cash drag = +164 NAV pts
+
+=== 5. LOCALIZE (per-period gold@ourpx vs avg_row, |Δ|>0.4pp) ===
+   [ 6] 2022-01-31 n_gold=10 priced_by_us=10 | ourpx=-5.77% avg_row=-5.36% Δ=-0.41pp
+   [ 7] 2022-02-28 n_gold=5 priced_by_us=5 | ourpx=+5.23% avg_row=+7.30% Δ=-2.07pp
+   [ 9] 2022-04-29 n_gold=10 priced_by_us=9 | ourpx=-6.33% avg_row=-8.40% Δ=+2.07pp
+   [13] 2022-08-30 n_gold=10 priced_by_us=9 | ourpx=-5.86% avg_row=-4.38% Δ=-1.48pp
+   [24] 2023-07-31 n_gold=10 priced_by_us=9 | ourpx=+8.46% avg_row=+9.38% Δ=-0.92pp
+   [26] 2023-09-29 n_gold=10 priced_by_us=10 | ourpx=-3.70% avg_row=-7.67% Δ=+3.97pp
+   [48] 2025-09-30 n_gold=9 priced_by_us=8 | ourpx=+6.48% avg_row=+5.75% Δ=+0.73pp
+
+=== PHASE B (PIT survivorship-free) summary ===
+  PIT universe size=1708 | our-pick overlap vs gold=451/495=91% | OUR-picks NAV=177.0 (+77.0%)
+
+SUMMARY|548015|Tighter momentum (>65)|periods=57|overlapA=88%|priceMeanAbs=0.136|goldNAV=202.2|goldOurpx=206.6|ourNAV_A=181.7|ourNAV_B=177.0|overlapB=91%|unpriced=3|thin=17|caFlags=1
+  warnA: survivorship-free Trendlyne layer: 1425 names ever >Rs500cr in-window (live + delisted, blow-ups included); membership i
+  warnA: universe gated to point-in-time Rs500cr membership (survivorship-free).
+
+
+##############################################################################
+# TEST 548014 — Tighter momentum (20% max weight = 5 slots)
+# filters: ['tl_durability > 55', 'tl_valuation > 50', 'tl_momentum > 65', 'adtv_cr > 10', 'mcap > 1000']
+# rank: tl_momentum desc | freq=monthly floor=1000.0 nhold=5
+# window: 2021-07-30 -> 2026-06-12 (57 periods); resolve warmup from 2020-06-05
+##############################################################################
+
+=== 1. SELECTION (name-by-name vs Trendlyne, Phase A current-membership) ===
+periods=57 avg_overlap=4.0/5 total_matches=229/272=84%
+distinct TL-only names=34 slot-misses=43 | most common: [('BCG', 2), ('AMBIKCO', 2), ('VEDL', 2), ('TV18BRDCST', 2), ('MIRZAINT', 2), ('UJJIVAN', 2), ('PDMJEPAPER', 2), ('PGEL', 2), ('IFBAGRO', 2), ('JSL', 1)]
+distinct ours-only names=36 slot-extras=41 | most common: [('GOODLUCK', 2), ('DATAPATTNS', 2), ('FORCEMOT', 2), ('GMRP&UI', 2), ('EDELWEISS', 2), ('APARINDS', 1), ('GHCL', 1), ('CANBK', 1), ('INDIANB', 1), ('NITINSPIN', 1)]
+  boundary (first 3 periods, rank #nhold-1..nhold+3):
+   2021-07-30: TL-only=['JSL'] ours-only=['GOODLUCK']
+     our rank #4-8: ['SSWL=77.7', 'USHAMART=77.5', 'JSL=77.4', 'COSMOFIRST=77.3', 'MANGLMCEM=76.2']
+   2021-08-31: TL-only=['BCG', 'NITINSPIN'] ours-only=['APARINDS', 'GOODLUCK']
+     our rank #4-8: ['NATIONALUM=72.3', 'APARINDS=69.9', 'COSMOFIRST=69.6', 'HINDALCO=69.0', 'OIL=68.6']
+   2021-09-30: TL-only=['BCG'] ours-only=['GHCL']
+     our rank #4-8: ['USHAMART=75.3', 'GHCL=75.2', 'INDIAGLYCO=73.5', 'RAIN=72.5', 'HINDALCO=71.4']
+
+=== 2. PRICING (our adj price vs Trendlyne CSV price, per stock-period) ===
+stock-periods=269 mean|Δ|=0.213pp median=0.003pp p95=0.36pp max=44.35pp
+  within 0.5pp=96% within 1pp=98% | gold names unpriceable=2/154
+  CA-adj mismatches (ratio start->end jumped >5%): 1
+    2023-09-29 GVKPIL       ratio 1.0->1.736 tl_chg=-39.8% our_chg=+4.6%
+  worst 6 |Δ|: [('2023-09-29', 'GVKPIL', 'tl=-39.75', 'ours=4.6'), ('2022-05-31', 'TIMETECHNO', 'tl=-2.3', 'ours=-0.3'), ('2021-12-31', 'VTL', 'tl=2.55', 'ours=3.7'), ('2022-06-30', 'MAHSEAMLES', 'tl=16.66', 'ours=15.6'), ('2021-08-31', 'FIEMIND', 'tl=6.85', 'ours=5.8'), ('2022-08-30', 'ANDHRAPAP', 'tl=-9.18', 'ours=-10.0')]
+  gold names we cannot price at all (2): ['CIAN', 'SREERAYALK']
+
+=== 3. RETURN DECOMPOSITION (compounded NAV, ÷nhold fixed slots) ===
+  Trendlyne reported NAV                 : 196.1  (+96.1%)
+  gold picks @ Trendlyne prices (avg_row): 196.1  (+96.1%)
+  gold picks @ OUR prices (PRICING)      : 211.0  (+111.0%)  <- == above => prices reproduce TL
+  OUR picks  @ OUR prices (+ SELECTION)  : 133.8  (+33.8%)
+  (ca_uncertain slot-instances parked as cash in OUR-price recon: 3)
+
+=== 4. THIN PERIODS & CASH DRAG ===
+  gold pick-count distribution: {1: 1, 2: 2, 3: 1, 4: 1, 5: 52}
+  periods with <5 gold names: 5 (Trendlyne parks empty slots in cash)
+  if FULLY invested (÷actual count): 266.0  vs ÷5 196.1  -> cash drag = +70 NAV pts
+
+=== 5. LOCALIZE (per-period gold@ourpx vs avg_row, |Δ|>0.4pp) ===
+   [ 6] 2022-01-31 n_gold=5 priced_by_us=5 | ourpx=-5.58% avg_row=-4.76% Δ=-0.82pp
+   [ 7] 2022-02-28 n_gold=5 priced_by_us=5 | ourpx=+10.47% avg_row=+14.61% Δ=-4.14pp
+   [ 9] 2022-04-29 n_gold=5 priced_by_us=4 | ourpx=-7.80% avg_row=-12.12% Δ=+4.32pp
+   [10] 2022-05-31 n_gold=5 priced_by_us=5 | ourpx=-3.56% avg_row=-4.10% Δ=+0.54pp
+   [13] 2022-08-30 n_gold=5 priced_by_us=4 | ourpx=-8.37% avg_row=-5.34% Δ=-3.03pp
+   [26] 2023-09-29 n_gold=5 priced_by_us=5 | ourpx=-4.88% avg_row=-12.83% Δ=+7.95pp
+   [48] 2025-09-30 n_gold=5 priced_by_us=4 | ourpx=+7.32% avg_row=+5.86% Δ=+1.46pp
+
+=== PHASE B (PIT survivorship-free) summary ===
+  PIT universe size=1708 | our-pick overlap vs gold=236/272=87% | OUR-picks NAV=119.4 (+19.4%)
+
+SUMMARY|548014|Tighter momentum (20% max weight = 5 slots)|periods=57|overlapA=84%|priceMeanAbs=0.213|goldNAV=196.1|goldOurpx=211.0|ourNAV_A=133.8|ourNAV_B=119.4|overlapB=87%|unpriced=2|thin=5|caFlags=1
+  warnA: survivorship-free Trendlyne layer: 1425 names ever >Rs500cr in-window (live + delisted, blow-ups included); membership i
+  warnA: universe gated to point-in-time Rs500cr membership (survivorship-free).
+
+
+##############################################################################
+# TEST 547990 — Windfall v2.2 (monthly)
+# filters: ['mcap > 500', 'mcap < 50000', 'tl_durability > 50', 'rsi14 > 50', 'close > sma50', 'close > sma200', 'tl_pledge < 20', 'adtv_cr > 10', 'tl_pe < 100', 'tl_momentum > 60']
+# rank: tl_momentum desc | freq=monthly floor=500.0 nhold=10
+# window: 2025-06-30 -> 2026-06-12 (12 periods); resolve warmup from 2024-05-06
+##############################################################################
+
+=== 1. SELECTION (name-by-name vs Trendlyne, Phase A current-membership) ===
+periods=12 avg_overlap=8.3/10 total_matches=100/120=83%
+distinct TL-only names=19 slot-misses=20 | most common: [('MCX', 2), ('AXISCADES', 1), ('MANGCHEFER', 1), ('ADVAIT', 1), ('TIMEX', 1), ('IZMO', 1), ('TVSELECT', 1), ('WAAREEINDO', 1), ('PROZONER', 1), ('RAMAPHO', 1)]
+distinct ours-only names=19 slot-extras=20 | most common: [('POCL', 2), ('INDIAGLYCO', 1), ('LAURUSLABS', 1), ('NAVA', 1), ('SHRIPISTON', 1), ('SINDHUTRAD', 1), ('CARTRADE', 1), ('BHAGYANGR', 1), ('KERNEX', 1), ('SOLEX', 1)]
+  boundary (first 3 periods, rank #nhold-1..nhold+3):
+   2025-06-30: TL-only=['AXISCADES'] ours-only=['INDIAGLYCO']
+     our rank #9-13: ['TFCILTD=71.6', 'INDIAGLYCO=71.0', 'KRISHANA=70.4', 'GALLANTT=70.0', 'DEEPAKFERT=69.9']
+   2025-07-31: TL-only=['ADVAIT', 'MANGCHEFER'] ours-only=['LAURUSLABS', 'POCL']
+     our rank #9-13: ['VIMTALABS=71.4', 'LAURUSLABS=71.3', 'SMLMAH=71.1', 'GABRIEL=70.8', 'PUNJABCHEM=70.7']
+   2025-08-29: TL-only=['TIMEX'] ours-only=['NAVA']
+     our rank #9-13: ['RISHABH=72.6', 'NAVA=71.3', 'SMLMAH=71.3', 'JMFINANCIL=71.1', 'HBLENGINE=70.9']
+
+=== 2. PRICING (our adj price vs Trendlyne CSV price, per stock-period) ===
+stock-periods=119 mean|Δ|=0.004pp median=0.002pp p95=0.00pp max=0.15pp
+  within 0.5pp=100% within 1pp=100% | gold names unpriceable=0/88
+  CA-adj mismatches (ratio start->end jumped >5%): 0
+  worst 6 |Δ|: [('2025-06-30', 'FORCEMOT', 'tl=5.54', 'ours=5.4'), ('2025-06-30', 'GRMOVER', 'tl=2.42', 'ours=2.4'), ('2026-03-30', 'APARINDS', 'tl=24.8', 'ours=24.8'), ('2025-10-31', 'IFBAGRO', 'tl=2.54', 'ours=2.5'), ('2026-05-29', 'SAKAR', 'tl=3.47', 'ours=3.5'), ('2026-01-30', 'GMDCLTD', 'tl=-1.45', 'ours=-1.4')]
+  gold names we cannot price at all (0): []
+
+=== 3. RETURN DECOMPOSITION (compounded NAV, ÷nhold fixed slots) ===
+  Trendlyne reported NAV                 : 82.3  (-17.7%)
+  gold picks @ Trendlyne prices (avg_row): 82.3  (-17.7%)
+  gold picks @ OUR prices (PRICING)      : 84.2  (-15.8%)  <- == above => prices reproduce TL
+  OUR picks  @ OUR prices (+ SELECTION)  : 82.1  (-17.9%)
+  (ca_uncertain slot-instances parked as cash in OUR-price recon: 0)
+
+=== 4. THIN PERIODS & CASH DRAG ===
+  gold pick-count distribution: {10: 12}
+  periods with <10 gold names: 0 (Trendlyne parks empty slots in cash)
+  if FULLY invested (÷actual count): 82.3  vs ÷10 82.3  -> cash drag = -0 NAV pts
+
+=== 5. LOCALIZE (per-period gold@ourpx vs avg_row, |Δ|>0.4pp) ===
+   [ 1] 2025-07-31 n_gold=10 priced_by_us=9 | ourpx=-4.94% avg_row=-7.11% Δ=+2.17pp
+
+=== PHASE B (PIT survivorship-free) summary ===
+  PIT universe size=1748 | our-pick overlap vs gold=102/120=85% | OUR-picks NAV=80.9 (-19.1%)
+
+SUMMARY|547990|Windfall v2.2 (monthly)|periods=12|overlapA=83%|priceMeanAbs=0.004|goldNAV=82.3|goldOurpx=84.2|ourNAV_A=82.1|ourNAV_B=80.9|overlapB=85%|unpriced=0|thin=0|caFlags=0
+  warnA: survivorship-free Trendlyne layer: 1699 names ever >Rs500cr in-window (live + delisted, blow-ups included); membership i
+  warnA: universe gated to point-in-time Rs500cr membership (survivorship-free).
+
+
+##############################################################################
+# TEST 547989 — Windfall v2.2 (weekly)
+# filters: ['mcap > 500', 'mcap < 50000', 'tl_durability > 50', 'rsi14 > 50', 'close > sma50', 'close > sma200', 'tl_pledge < 20', 'adtv_cr > 10', 'tl_pe < 100', 'tl_momentum > 60']
+# rank: tl_momentum desc | freq=weekly floor=500.0 nhold=10
+# window: 2025-05-30 -> 2026-06-12 (54 periods); resolve warmup from 2024-04-05
+##############################################################################
+
+=== 1. SELECTION (name-by-name vs Trendlyne, Phase A current-membership) ===
+periods=54 avg_overlap=8.5/10 total_matches=459/540=85%
+distinct TL-only names=44 slot-misses=81 | most common: [('AXISCADES', 7), ('WAAREEINDO', 6), ('CAMLINFINE', 5), ('TIMEX', 5), ('MCX', 5), ('TVSELECT', 3), ('RAMAPHO', 3), ('MAHSCOOTER', 2), ('MANGCHEFER', 2), ('ALPEXSOLAR', 2)]
+distinct ours-only names=45 slot-extras=80 | most common: [('POCL', 9), ('KMEW', 8), ('AGIIL', 7), ('CARTRADE', 5), ('BHAGYANGR', 3), ('TMB', 3), ('AIIL', 2), ('NH', 2), ('SOLEX', 2), ('RMDRIP', 2)]
+  boundary (first 3 periods, rank #nhold-1..nhold+3):
+   2025-05-30: TL-only=['AXISCADES', 'CAMLINFINE'] ours-only=['AIIL', 'BLUEJET']
+     our rank #9-13: ['BLUEJET=70.8', 'AIIL=70.0', 'SDBL=69.8', 'GABRIEL=69.4', 'AARTIPHARM=69.2']
+   2025-06-06: TL-only=['AXISCADES', 'CAMLINFINE'] ours-only=['CEMPRO', 'NDRAUTO']
+     our rank #9-13: ['CEMPRO=71.2', 'NDRAUTO=70.2', 'AARTIPHARM=69.9', 'TFCILTD=68.8', 'SBFC=68.4']
+   2025-06-13: TL-only=['AXISCADES', 'CAMLINFINE', 'MAHSCOOTER', 'SHANKARA'] ours-only=['GRMOVER', 'NH', 'REDINGTON', 'VISHNU']
+     our rank #9-13: ['GRMOVER=69.4', 'NH=68.8', 'GRSE=68.7', 'INDIASHLTR=67.8', 'STYRENIX=67.6']
+
+=== 2. PRICING (our adj price vs Trendlyne CSV price, per stock-period) ===
+stock-periods=540 mean|Δ|=0.004pp median=0.003pp p95=0.00pp max=0.20pp
+  within 0.5pp=100% within 1pp=100% | gold names unpriceable=0/152
+  CA-adj mismatches (ratio start->end jumped >5%): 0
+  worst 6 |Δ|: [('2026-02-06', 'FORCEMOT', 'tl=11.27', 'ours=11.5'), ('2025-06-13', 'FORCEMOT', 'tl=6.94', 'ours=6.8'), ('2025-08-22', 'FORCEMOT', 'tl=-3.58', 'ours=-3.6'), ('2025-08-08', 'FORCEMOT', 'tl=10.56', 'ours=10.5'), ('2025-06-20', 'FORCEMOT', 'tl=1.61', 'ours=1.7'), ('2025-07-25', 'FORCEMOT', 'tl=-6.44', 'ours=-6.5')]
+  gold names we cannot price at all (0): []
+
+=== 3. RETURN DECOMPOSITION (compounded NAV, ÷nhold fixed slots) ===
+  Trendlyne reported NAV                 : 117.4  (+17.4%)
+  gold picks @ Trendlyne prices (avg_row): 117.4  (+17.4%)
+  gold picks @ OUR prices (PRICING)      : 117.4  (+17.4%)  <- == above => prices reproduce TL
+  OUR picks  @ OUR prices (+ SELECTION)  : 120.3  (+20.3%)
+  (ca_uncertain slot-instances parked as cash in OUR-price recon: 0)
+
+=== 4. THIN PERIODS & CASH DRAG ===
+  gold pick-count distribution: {10: 54}
+  periods with <10 gold names: 0 (Trendlyne parks empty slots in cash)
+  if FULLY invested (÷actual count): 117.4  vs ÷10 117.4  -> cash drag = +0 NAV pts
+
+=== 5. LOCALIZE (per-period gold@ourpx vs avg_row, |Δ|>0.4pp) ===
+   (no period exceeds 0.4pp — pricing tracks avg_row cleanly)
+
+=== PHASE B (PIT survivorship-free) summary ===
+  PIT universe size=1749 | our-pick overlap vs gold=462/540=86% | OUR-picks NAV=123.6 (+23.6%)
+
+SUMMARY|547989|Windfall v2.2 (weekly)|periods=54|overlapA=85%|priceMeanAbs=0.004|goldNAV=117.4|goldOurpx=117.4|ourNAV_A=120.3|ourNAV_B=123.6|overlapB=86%|unpriced=0|thin=0|caFlags=0
+  warnA: survivorship-free Trendlyne layer: 1699 names ever >Rs500cr in-window (live + delisted, blow-ups included); membership i
+  warnA: universe gated to point-in-time Rs500cr membership (survivorship-free).
+
+
+##############################################################################
+# TEST 547991 — Windfall v2.2 (monthly, full 2021-26)
+# filters: ['mcap > 500', 'mcap < 50000', 'tl_durability > 50', 'rsi14 > 50', 'close > sma50', 'close > sma200', 'tl_pledge < 20', 'adtv_cr > 10', 'tl_pe < 100', 'tl_momentum > 60']
+# rank: tl_momentum desc | freq=monthly floor=500.0 nhold=10
+# window: 2021-07-30 -> 2026-06-12 (59 periods); resolve warmup from 2020-06-05
+##############################################################################
+
+=== 1. SELECTION (name-by-name vs Trendlyne, Phase A current-membership) ===
+periods=59 avg_overlap=4.1/10 total_matches=242/585=41%
+distinct TL-only names=230 slot-misses=343 | most common: [('APARINDS', 6), ('BLS', 5), ('TITAGARH', 5), ('SAKSOFT', 4), ('GRAVITA', 4), ('TRITURBINE', 4), ('NDTV', 4), ('DATAMATICS', 3), ('RKFORGE', 3), ('MANINFRA', 3)]
+distinct ours-only names=81 slot-extras=95 | most common: [('CARTRADE', 4), ('SMSPHARMA', 3), ('POCL', 3), ('BLUEJET', 3), ('SARDAEN', 2), ('SANGHVIMOV', 2), ('ARVIND', 2), ('MAHSEAMLES', 2), ('NBCC', 2), ('RESPONIND', 1)]
+  boundary (first 3 periods, rank #nhold-1..nhold+3):
+   2021-07-30: TL-only=['APCL', 'DATAMATICS', 'DOLATALGO', 'GOODLUCK', 'HGINFRA', 'HITECH', 'IMFA', 'LUXIND', 'NITINSPIN', 'VIDHIING'] ours-only=[]
+   2021-08-31: TL-only=['APOLLOPIPE', 'BALAMINES', 'BLS', 'DATAMATICS', 'GLOBUSSPR', 'POKARNA', 'PUNJABCHEM', 'RKFORGE', 'SAKSOFT', 'TIRUMALCHM'] ours-only=[]
+   2021-09-30: TL-only=['ALLCARGO', 'DCMSHRIRAM', 'HINDOILEXP', 'ICIL', 'MANINFRA', 'SAKSOFT', 'SURYAROSNI', 'TATAELXSI', 'TIRUMALCHM', 'TRIDENT'] ours-only=[]
+
+=== 2. PRICING (our adj price vs Trendlyne CSV price, per stock-period) ===
+stock-periods=560 mean|Δ|=0.160pp median=0.003pp p95=0.36pp max=44.35pp
+  within 0.5pp=96% within 1pp=99% | gold names unpriceable=12/353
+  CA-adj mismatches (ratio start->end jumped >5%): 3
+    2023-09-29 GVKPIL       ratio 1.0->1.736 tl_chg=-39.8% our_chg=+4.6%
+    2023-12-29 VERTOZ       ratio 2.0->2.124 tl_chg=+58.5% our_chg=+68.3%
+    2024-01-31 VERTOZ       ratio 2.124->1.971 tl_chg=+7.8% our_chg=+0.0%
+  worst 6 |Δ|: [('2023-09-29', 'GVKPIL', 'tl=-39.75', 'ours=4.6'), ('2023-12-29', 'VERTOZ', 'tl=58.5', 'ours=68.3'), ('2024-01-31', 'VERTOZ', 'tl=7.78', 'ours=0.0'), ('2022-05-31', 'TIMETECHNO', 'tl=-2.3', 'ours=-0.3'), ('2021-12-31', 'UNOMINDA', 'tl=-8.44', 'ours=-9.9'), ('2022-06-30', 'ROLEXRINGS', 'tl=22.4', 'ours=21.2')]
+  gold names we cannot price at all (12): ['ASHIMASYN', 'AVG', 'DENORA', 'ESFL', 'LIBERTSHOE', 'MANAKSTEEL', 'MEDICO', 'MOLDTECH', 'REPL', 'ROSSELLIND', 'SARVESHWAR', 'SREERAYALK']
+
+=== 3. RETURN DECOMPOSITION (compounded NAV, ÷nhold fixed slots) ===
+  Trendlyne reported NAV                 : 165.4  (+65.4%)
+  gold picks @ Trendlyne prices (avg_row): 165.4  (+65.4%)
+  gold picks @ OUR prices (PRICING)      : 174.4  (+74.4%)  <- == above => prices reproduce TL
+  OUR picks  @ OUR prices (+ SELECTION)  : 92.1  (-7.9%)
+  (ca_uncertain slot-instances parked as cash in OUR-price recon: 3)
+
+=== 4. THIN PERIODS & CASH DRAG ===
+  gold pick-count distribution: {5: 1, 10: 58}
+  periods with <10 gold names: 1 (Trendlyne parks empty slots in cash)
+  if FULLY invested (÷actual count): 172.5  vs ÷10 165.4  -> cash drag = +7 NAV pts
+
+=== 5. LOCALIZE (per-period gold@ourpx vs avg_row, |Δ|>0.4pp) ===
+   [ 8] 2022-03-31 n_gold=10 priced_by_us=10 | ourpx=-2.83% avg_row=-5.66% Δ=+2.83pp
+   [13] 2022-08-30 n_gold=10 priced_by_us=8 | ourpx=-1.23% avg_row=-0.07% Δ=-1.16pp
+   [14] 2022-09-30 n_gold=10 priced_by_us=9 | ourpx=-1.16% avg_row=-1.80% Δ=+0.64pp
+   [16] 2022-11-30 n_gold=10 priced_by_us=9 | ourpx=+1.89% avg_row=+0.77% Δ=+1.12pp
+   [22] 2023-05-31 n_gold=10 priced_by_us=9 | ourpx=+7.19% avg_row=+7.65% Δ=-0.46pp
+   [23] 2023-06-30 n_gold=10 priced_by_us=8 | ourpx=+5.65% avg_row=+6.57% Δ=-0.92pp
+   [26] 2023-09-29 n_gold=10 priced_by_us=10 | ourpx=-2.04% avg_row=-6.01% Δ=+3.97pp
+   [27] 2023-10-31 n_gold=10 priced_by_us=9 | ourpx=+13.18% avg_row=+12.02% Δ=+1.16pp
+   [28] 2023-11-30 n_gold=10 priced_by_us=9 | ourpx=-2.18% avg_row=-3.04% Δ=+0.86pp
+   [29] 2023-12-29 n_gold=10 priced_by_us=10 | ourpx=+14.41% avg_row=+13.43% Δ=+0.98pp
+   [30] 2024-01-31 n_gold=10 priced_by_us=8 | ourpx=-8.71% avg_row=-5.48% Δ=-3.23pp
+   [31] 2024-02-29 n_gold=10 priced_by_us=8 | ourpx=-6.21% avg_row=-10.04% Δ=+3.83pp
+   [33] 2024-04-30 n_gold=10 priced_by_us=7 | ourpx=+4.67% avg_row=+3.73% Δ=+0.94pp
+   [36] 2024-07-31 n_gold=10 priced_by_us=9 | ourpx=+4.72% avg_row=+3.85% Δ=+0.87pp
+   [38] 2024-09-30 n_gold=10 priced_by_us=9 | ourpx=-6.71% avg_row=-2.44% Δ=-4.27pp
+   [39] 2024-10-31 n_gold=10 priced_by_us=9 | ourpx=+8.57% avg_row=+15.70% Δ=-7.13pp
+   [42] 2025-01-31 n_gold=10 priced_by_us=9 | ourpx=-11.52% avg_row=-13.88% Δ=+2.36pp
+   [48] 2025-07-31 n_gold=10 priced_by_us=9 | ourpx=-4.94% avg_row=-7.11% Δ=+2.17pp
+
+=== PHASE B (PIT survivorship-free) summary ===
+  PIT universe size=1790 | our-pick overlap vs gold=246/585=42% | OUR-picks NAV=87.3 (-12.7%)
+
+SUMMARY|547991|Windfall v2.2 (monthly, full 2021-26)|periods=59|overlapA=41%|priceMeanAbs=0.160|goldNAV=165.4|goldOurpx=174.4|ourNAV_A=92.1|ourNAV_B=87.3|overlapB=42%|unpriced=12|thin=1|caFlags=3
+  warnA: survivorship-free Trendlyne layer: 1699 names ever >Rs500cr in-window (live + delisted, blow-ups included); membership i
+  warnA: universe gated to point-in-time Rs500cr membership (survivorship-free).
+
+
+##############################################################################
+# TEST 547992 — Windfall v2.2 (quarterly, 2013-26 deep history)
+# filters: ['mcap > 500', 'mcap < 50000', 'tl_durability > 50', 'rsi14 > 50', 'close > sma50', 'close > sma200', 'tl_pledge < 20', 'adtv_cr > 10', 'tl_pe < 100', 'tl_momentum > 60']
+# rank: tl_momentum desc | freq=quarterly floor=500.0 nhold=10
+# window: 2013-03-28 -> 2026-06-12 (53 periods); resolve warmup from 2012-02-02
+##############################################################################
+
+=== 1. SELECTION (name-by-name vs Trendlyne, Phase A current-membership) ===
+periods=53 avg_overlap=1.6/10 total_matches=83/500=17%
+distinct TL-only names=289 slot-misses=417 | most common: [('BATAINDIA', 8), ('MARKSANS', 5), ('WELSPUNLIV', 5), ('IGL', 4), ('IPCALAB', 4), ('CEATLTD', 4), ('GNFC', 4), ('MCX', 4), ('VENKEYS', 4), ('GRAPHITE', 4)]
+distinct ours-only names=27 slot-extras=27 | most common: [('NELCAST', 1), ('DHANBANK', 1), ('MAHSEAMLES', 1), ('TATAINVEST', 1), ('SKMEGGPROD', 1), ('DEN', 1), ('MMTC', 1), ('ASTRAMICRO', 1), ('COCHINSHIP', 1), ('SYNCOMF', 1)]
+  boundary (first 3 periods, rank #nhold-1..nhold+3):
+   2013-03-28: TL-only=['ASIANPAINT', 'GODREJCP', 'IGL', 'RAMCOCEM'] ours-only=[]
+   2013-06-28: TL-only=['BRITANNIA', 'IDEA', 'IPCALAB', 'RCOM'] ours-only=[]
+   2013-09-30: TL-only=['BATAINDIA', 'BRITANNIA', 'HEROMOTOCO', 'HEXAWARE', 'IPCALAB', 'MINDTREE', 'RCOM', 'TECHM', 'UPL'] ours-only=[]
+
+=== 2. PRICING (our adj price vs Trendlyne CSV price, per stock-period) ===
+stock-periods=486 mean|Δ|=0.517pp median=0.005pp p95=2.15pp max=20.82pp
+  within 0.5pp=77% within 1pp=87% | gold names unpriceable=6/342
+  CA-adj mismatches (ratio start->end jumped >5%): 5
+    2016-03-31 BSOFT        ratio 0.977->1.173 tl_chg=+3.8% our_chg=+24.7%
+    2016-06-30 TATAMETALI   ratio 1.06->0.997 tl_chg=+16.6% our_chg=+9.7%
+    2018-06-29 DHANI        ratio 1.025->0.925 tl_chg=+10.8% our_chg=+0.0%
+    2023-09-29 GVKPIL       ratio 1.0->1.244 tl_chg=-15.9% our_chg=+4.6%
+    2023-12-29 VERTOZ       ratio 2.0->2.21 tl_chg=+52.3% our_chg=+68.3%
+  worst 6 |Δ|: [('2016-03-31', 'BSOFT', 'tl=3.83', 'ours=24.7'), ('2023-09-29', 'GVKPIL', 'tl=-15.9', 'ours=4.6'), ('2023-12-29', 'VERTOZ', 'tl=52.32', 'ours=68.3'), ('2018-06-29', 'DHANI', 'tl=10.76', 'ours=0.0'), ('2016-06-30', 'TATAMETALI', 'tl=16.62', 'ours=9.7'), ('2013-12-31', 'CEATLTD', 'tl=31.53', 'ours=37.5')]
+  gold names we cannot price at all (6): ['ASHIMASYN', 'ESFL', 'KUSHAL', 'LIBERTSHOE', 'POTENTIAL', 'REPL']
+
+=== 3. RETURN DECOMPOSITION (compounded NAV, ÷nhold fixed slots) ===
+  Trendlyne reported NAV                 : 1048.1  (+948.1%)
+  gold picks @ Trendlyne prices (avg_row): 1048.3  (+948.3%)
+  gold picks @ OUR prices (PRICING)      : 1097.5  (+997.5%)  <- == above => prices reproduce TL
+  OUR picks  @ OUR prices (+ SELECTION)  : 75.7  (-24.3%)
+  (ca_uncertain slot-instances parked as cash in OUR-price recon: 16)
+
+=== 4. THIN PERIODS & CASH DRAG ===
+  gold pick-count distribution: {1: 1, 3: 1, 4: 2, 9: 2, 10: 47}
+  periods with <10 gold names: 6 (Trendlyne parks empty slots in cash)
+  if FULLY invested (÷actual count): 1052.1  vs ÷10 1048.1  -> cash drag = +4 NAV pts
+
+=== 5. LOCALIZE (per-period gold@ourpx vs avg_row, |Δ|>0.4pp) ===
+   [ 1] 2013-06-28 n_gold=4 priced_by_us=4 | ourpx=+5.00% avg_row=+8.18% Δ=-3.18pp
+   [ 2] 2013-09-30 n_gold=9 priced_by_us=9 | ourpx=+11.38% avg_row=+13.94% Δ=-2.56pp
+   [ 3] 2013-12-31 n_gold=10 priced_by_us=10 | ourpx=+3.96% avg_row=+1.36% Δ=+2.60pp
+   [ 5] 2014-06-30 n_gold=10 priced_by_us=10 | ourpx=+11.85% avg_row=+13.17% Δ=-1.32pp
+   [ 6] 2014-09-30 n_gold=10 priced_by_us=8 | ourpx=+0.58% avg_row=-4.81% Δ=+5.39pp
+   [ 7] 2014-12-31 n_gold=10 priced_by_us=10 | ourpx=+13.11% avg_row=+13.91% Δ=-0.80pp
+   [10] 2015-09-30 n_gold=10 priced_by_us=9 | ourpx=+4.57% avg_row=+7.80% Δ=-3.23pp
+   [11] 2015-12-31 n_gold=10 priced_by_us=10 | ourpx=-2.83% avg_row=-4.79% Δ=+1.96pp
+   [12] 2016-03-31 n_gold=10 priced_by_us=10 | ourpx=+1.09% avg_row=-1.22% Δ=+2.31pp
+   [14] 2016-09-30 n_gold=10 priced_by_us=9 | ourpx=+0.60% avg_row=+2.75% Δ=-2.15pp
+   [15] 2016-12-30 n_gold=10 priced_by_us=9 | ourpx=+7.67% avg_row=+4.15% Δ=+3.52pp
+   [17] 2017-06-30 n_gold=10 priced_by_us=9 | ourpx=+44.52% avg_row=+42.52% Δ=+2.00pp
+   [19] 2017-12-29 n_gold=10 priced_by_us=9 | ourpx=-7.56% avg_row=-9.87% Δ=+2.31pp
+   [20] 2018-03-28 n_gold=10 priced_by_us=10 | ourpx=+1.95% avg_row=+4.09% Δ=-2.14pp
+   [21] 2018-06-29 n_gold=10 priced_by_us=10 | ourpx=+2.09% avg_row=+2.85% Δ=-0.76pp
+   [32] 2021-03-31 n_gold=9 priced_by_us=8 | ourpx=+27.98% avg_row=+33.77% Δ=-5.79pp
+   [36] 2022-03-31 n_gold=10 priced_by_us=10 | ourpx=-20.52% avg_row=-25.47% Δ=+4.95pp
+   [38] 2022-09-30 n_gold=10 priced_by_us=9 | ourpx=-9.43% avg_row=-10.61% Δ=+1.18pp
+   [41] 2023-06-30 n_gold=10 priced_by_us=8 | ourpx=+28.40% avg_row=+38.17% Δ=-9.77pp
+   [42] 2023-09-29 n_gold=10 priced_by_us=10 | ourpx=+9.60% avg_row=+8.01% Δ=+1.59pp
+   [43] 2023-12-29 n_gold=10 priced_by_us=10 | ourpx=+15.79% avg_row=+14.19% Δ=+1.60pp
+   [45] 2024-06-28 n_gold=10 priced_by_us=9 | ourpx=-7.60% avg_row=-9.96% Δ=+2.36pp
+   [46] 2024-09-30 n_gold=10 priced_by_us=9 | ourpx=+0.92% avg_row=+8.98% Δ=-8.06pp
+   [47] 2024-12-31 n_gold=10 priced_by_us=9 | ourpx=-22.19% avg_row=-27.01% Δ=+4.82pp
+
+=== PHASE B (PIT survivorship-free) summary ===
+  PIT universe size=1880 | our-pick overlap vs gold=84/500=17% | OUR-picks NAV=73.5 (-26.5%)
+
+SUMMARY|547992|Windfall v2.2 (quarterly, 2013-26 deep history)|periods=53|overlapA=17%|priceMeanAbs=0.517|goldNAV=1048.1|goldOurpx=1097.5|ourNAV_A=75.7|ourNAV_B=73.5|overlapB=17%|unpriced=6|thin=6|caFlags=5
+  warnA: survivorship-free Trendlyne layer: 1699 names ever >Rs500cr in-window (live + delisted, blow-ups included); membership i
+  warnA: universe gated to point-in-time Rs500cr membership (survivorship-free).
+
+
+##############################################################################
+# TEST 547994 — Pure DVM (weekly, no liquidity floor)
+# filters: ['tl_durability > 55', 'tl_valuation > 50', 'tl_momentum > 60']
+# rank: tl_momentum desc | freq=weekly floor=500.0 nhold=10
+# window: 2025-05-30 -> 2026-06-12 (54 periods); resolve warmup from 2024-04-05
+##############################################################################
+
+=== 1. SELECTION (name-by-name vs Trendlyne, Phase A current-membership) ===
+periods=54 avg_overlap=4.8/10 total_matches=261/530=49%
+distinct TL-only names=76 slot-misses=269 | most common: [('BRAHMINFRA', 23), ('GARNET', 14), ('KESORAMIND', 10), ('SKPMIL', 8), ('RRFIN', 8), ('530805', 8), ('STELLANT', 8), ('KANSHST', 7), ('YUVRAAJHPL', 7), ('CIAN', 6)]
+distinct ours-only names=102 slot-extras=270 | most common: [('INDIANB', 11), ('IFBAGRO', 7), ('TNPETRO', 7), ('JAYNECOIND', 7), ('HINDALCO', 7), ('TVSHLTD', 7), ('PARAGMILK', 6), ('CANBK', 6), ('TATASTEEL', 6), ('UNIONBANK', 5)]
+  boundary (first 3 periods, rank #nhold-1..nhold+3):
+   2025-05-30: TL-only=['CIAN', 'CONTPTR', 'KANPRPLA', 'RITESHIN', 'RODIUM', 'TEEAI'] ours-only=['DEEPAKFERT', 'MAHSEAMLES', 'SARLAPOLY', 'SOUTHBANK', 'SUNFLAG', 'WELCORP']
+     our rank #9-13: ['SARLAPOLY=64.8', 'MAHSEAMLES=64.7', 'UNIONBANK=64.1', 'POLYPLEX=63.8', 'INDIANB=63.7']
+   2025-06-06: TL-only=['KANPRPLA', 'RAMAPULP', 'RELINFRA', 'TEEAI'] ours-only=['DEEPAKFERT', 'ORICONENT', 'SARLAPOLY', 'UNIONBANK']
+     our rank #9-13: ['ORICONENT=66.6', 'SARLAPOLY=65.5', 'IDBI=65.5', 'WELCORP=65.3', 'PENIND=64.6']
+   2025-06-13: TL-only=['NATFIT', 'RAJTUBE', 'RELINFRA', 'RODIUM'] ours-only=['DCAL', 'DEEPAKFERT', 'IFBAGRO', 'ORICONENT']
+     our rank #9-13: ['DEEPAKFERT=66.6', 'DCAL=66.4', 'WELCORP=66.3', 'ELECTHERM=65.5', 'KOLTEPATIL=65.2']
+
+=== 2. PRICING (our adj price vs Trendlyne CSV price, per stock-period) ===
+stock-periods=289 mean|Δ|=0.016pp median=0.003pp p95=0.02pp max=0.94pp
+  within 0.5pp=99% within 1pp=100% | gold names unpriceable=69/143
+  CA-adj mismatches (ratio start->end jumped >5%): 0
+  worst 6 |Δ|: [('2025-09-26', 'BHARATSE', 'tl=10.66', 'ours=11.6'), ('2025-09-05', 'BHARATSE', 'tl=6.18', 'ours=5.3'), ('2025-08-29', 'BHARATSE', 'tl=7.89', 'ours=8.6'), ('2025-10-03', 'BHARATSE', 'tl=11.27', 'ours=10.8'), ('2025-09-12', 'BHARATSE', 'tl=-9.16', 'ours=-8.8'), ('2025-08-22', 'BHARATSE', 'tl=7.5', 'ours=7.4')]
+  gold names we cannot price at all (69): ['11200005', '16610252', '522091', '523874', '524534', '524548', '530805', '531399', 'ABCGAS', 'AGROPHOS', 'AKARTOOL', 'AMBAR', 'APMIN', 'AUSOMENT', 'BAFNAPH', 'BEMHY', 'BGWTATO', 'BHARATGEAR', 'BONLON', 'BRAHMINFRA']
+
+=== 3. RETURN DECOMPOSITION (compounded NAV, ÷nhold fixed slots) ===
+  Trendlyne reported NAV                 : 174.0  (+74.0%)
+  gold picks @ Trendlyne prices (avg_row): 174.0  (+74.0%)
+  gold picks @ OUR prices (PRICING)      : 151.7  (+51.7%)  <- == above => prices reproduce TL
+  OUR picks  @ OUR prices (+ SELECTION)  : 153.7  (+53.7%)
+  (ca_uncertain slot-instances parked as cash in OUR-price recon: 0)
+
+=== 4. THIN PERIODS & CASH DRAG ===
+  gold pick-count distribution: {9: 10, 10: 44}
+  periods with <10 gold names: 10 (Trendlyne parks empty slots in cash)
+  if FULLY invested (÷actual count): 172.4  vs ÷10 174.0  -> cash drag = -2 NAV pts
+
+=== 5. LOCALIZE (per-period gold@ourpx vs avg_row, |Δ|>0.4pp) ===
+   [ 0] 2025-05-30 n_gold=10 priced_by_us=4 | ourpx=+1.71% avg_row=+1.01% Δ=+0.70pp
+   [ 1] 2025-06-06 n_gold=10 priced_by_us=7 | ourpx=+2.72% avg_row=+0.23% Δ=+2.49pp
+   [ 3] 2025-06-20 n_gold=10 priced_by_us=6 | ourpx=+7.01% avg_row=+4.48% Δ=+2.53pp
+   [ 4] 2025-06-27 n_gold=9 priced_by_us=7 | ourpx=+3.16% avg_row=+2.34% Δ=+0.82pp
+   [ 5] 2025-07-04 n_gold=10 priced_by_us=8 | ourpx=+4.01% avg_row=+5.86% Δ=-1.85pp
+   [ 6] 2025-07-11 n_gold=10 priced_by_us=5 | ourpx=+4.52% avg_row=+3.32% Δ=+1.20pp
+   [ 7] 2025-07-18 n_gold=10 priced_by_us=6 | ourpx=+0.66% avg_row=+2.08% Δ=-1.42pp
+   [ 8] 2025-07-25 n_gold=10 priced_by_us=6 | ourpx=+1.73% avg_row=+4.53% Δ=-2.80pp
+   [ 9] 2025-08-01 n_gold=10 priced_by_us=5 | ourpx=+3.78% avg_row=+6.81% Δ=-3.03pp
+   [10] 2025-08-08 n_gold=10 priced_by_us=5 | ourpx=-1.47% avg_row=+0.32% Δ=-1.79pp
+   [11] 2025-08-14 n_gold=10 priced_by_us=4 | ourpx=+0.59% avg_row=+5.43% Δ=-4.84pp
+   [12] 2025-08-22 n_gold=10 priced_by_us=3 | ourpx=+0.22% avg_row=-0.61% Δ=+0.83pp
+   [13] 2025-08-29 n_gold=10 priced_by_us=2 | ourpx=+1.00% avg_row=+3.98% Δ=-2.98pp
+   [14] 2025-09-05 n_gold=10 priced_by_us=3 | ourpx=-0.71% avg_row=+0.34% Δ=-1.05pp
+   [15] 2025-09-12 n_gold=10 priced_by_us=5 | ourpx=+0.95% avg_row=+4.32% Δ=-3.37pp
+   [16] 2025-09-19 n_gold=10 priced_by_us=4 | ourpx=+3.14% avg_row=+8.72% Δ=-5.58pp
+   [17] 2025-09-26 n_gold=10 priced_by_us=4 | ourpx=+1.55% avg_row=+5.14% Δ=-3.59pp
+   [19] 2025-10-10 n_gold=10 priced_by_us=5 | ourpx=+1.30% avg_row=-1.89% Δ=+3.19pp
+   [21] 2025-10-24 n_gold=10 priced_by_us=5 | ourpx=-0.50% avg_row=+1.07% Δ=-1.57pp
+   [22] 2025-10-31 n_gold=10 priced_by_us=6 | ourpx=+1.42% avg_row=+3.62% Δ=-2.20pp
+   [23] 2025-11-07 n_gold=10 priced_by_us=5 | ourpx=+0.40% avg_row=+4.75% Δ=-4.35pp
+   [24] 2025-11-14 n_gold=9 priced_by_us=4 | ourpx=-1.12% avg_row=-0.11% Δ=-1.01pp
+   [25] 2025-11-21 n_gold=9 priced_by_us=5 | ourpx=-1.81% avg_row=-2.63% Δ=+0.82pp
+   [26] 2025-11-28 n_gold=9 priced_by_us=6 | ourpx=-2.58% avg_row=-0.89% Δ=-1.69pp
+   [27] 2025-12-05 n_gold=10 priced_by_us=6 | ourpx=+1.13% avg_row=-0.81% Δ=+1.94pp
+   [28] 2025-12-12 n_gold=10 priced_by_us=4 | ourpx=-0.29% avg_row=-0.78% Δ=+0.49pp
+   [30] 2025-12-26 n_gold=10 priced_by_us=6 | ourpx=+3.54% avg_row=+5.43% Δ=-1.89pp
+   [32] 2026-01-09 n_gold=10 priced_by_us=5 | ourpx=-0.86% avg_row=+0.34% Δ=-1.20pp
+   [33] 2026-01-16 n_gold=10 priced_by_us=5 | ourpx=-0.41% avg_row=-2.55% Δ=+2.14pp
+   [34] 2026-01-23 n_gold=10 priced_by_us=5 | ourpx=-2.64% avg_row=-6.77% Δ=+4.13pp
+   [35] 2026-02-01 n_gold=10 priced_by_us=5 | ourpx=+0.29% avg_row=+0.84% Δ=-0.55pp
+   [36] 2026-02-06 n_gold=9 priced_by_us=4 | ourpx=+3.39% avg_row=+7.41% Δ=-4.02pp
+   [37] 2026-02-13 n_gold=10 priced_by_us=3 | ourpx=+0.70% avg_row=-2.48% Δ=+3.18pp
+   [38] 2026-02-20 n_gold=9 priced_by_us=5 | ourpx=-4.22% avg_row=-5.47% Δ=+1.25pp
+   [39] 2026-02-27 n_gold=9 priced_by_us=5 | ourpx=-3.19% avg_row=-6.07% Δ=+2.88pp
+   [41] 2026-03-13 n_gold=10 priced_by_us=4 | ourpx=-1.38% avg_row=-0.76% Δ=-0.62pp
+   [43] 2026-03-27 n_gold=10 priced_by_us=7 | ourpx=+0.21% avg_row=-0.39% Δ=+0.60pp
+   [44] 2026-04-02 n_gold=10 priced_by_us=5 | ourpx=+5.15% avg_row=+3.21% Δ=+1.94pp
+   [45] 2026-04-10 n_gold=10 priced_by_us=6 | ourpx=+4.85% avg_row=+6.84% Δ=-1.99pp
+   [46] 2026-04-17 n_gold=9 priced_by_us=7 | ourpx=-3.19% avg_row=-4.68% Δ=+1.49pp
+   [47] 2026-04-24 n_gold=10 priced_by_us=7 | ourpx=+3.54% avg_row=+2.85% Δ=+0.69pp
+   [48] 2026-04-30 n_gold=9 priced_by_us=7 | ourpx=+2.61% avg_row=+3.73% Δ=-1.12pp
+   [49] 2026-05-08 n_gold=9 priced_by_us=6 | ourpx=-1.08% avg_row=-0.39% Δ=-0.69pp
+   [50] 2026-05-15 n_gold=10 priced_by_us=5 | ourpx=+1.91% avg_row=-2.35% Δ=+4.26pp
+   [52] 2026-05-29 n_gold=10 priced_by_us=7 | ourpx=+1.94% avg_row=+0.49% Δ=+1.45pp
+   [53] 2026-06-05 n_gold=10 priced_by_us=8 | ourpx=-0.23% avg_row=-1.31% Δ=+1.08pp
+
+=== PHASE B (PIT survivorship-free) summary ===
+  PIT universe size=1749 | our-pick overlap vs gold=269/530=51% | OUR-picks NAV=146.0 (+46.0%)
+
+SUMMARY|547994|Pure DVM (weekly, no liquidity floor)|periods=54|overlapA=49%|priceMeanAbs=0.016|goldNAV=174.0|goldOurpx=151.7|ourNAV_A=153.7|ourNAV_B=146.0|overlapB=51%|unpriced=69|thin=10|caFlags=0
+  warnA: survivorship-free Trendlyne layer: 1699 names ever >Rs500cr in-window (live + delisted, blow-ups included); membership i
+  warnA: universe gated to point-in-time Rs500cr membership (survivorship-free).
+
+
+##############################################################################
+# TEST 547995 — Pure DVM (monthly, no liquidity floor)
+# filters: ['tl_durability > 55', 'tl_valuation > 50', 'tl_momentum > 60']
+# rank: tl_momentum desc | freq=monthly floor=500.0 nhold=10
+# window: 2021-07-30 -> 2026-06-12 (59 periods); resolve warmup from 2020-06-05
+##############################################################################
+
+=== 1. SELECTION (name-by-name vs Trendlyne, Phase A current-membership) ===
+periods=59 avg_overlap=3.9/10 total_matches=228/583=39%
+distinct TL-only names=230 slot-misses=355 | most common: [('GAYATRI', 6), ('HAZOOR', 5), ('CIAN', 5), ('AJANTSOY', 4), ('SUNLOC', 4), ('PRITHVISOF', 4), ('ELIXIR', 4), ('RODIUM', 4), ('SURYALA', 3), ('MANAKSTEEL', 3)]
+distinct ours-only names=213 slot-extras=336 | most common: [('CHENNPETRO', 7), ('SANGAMIND', 5), ('GOKULAGRO', 5), ('PGIL', 4), ('ZSARACOM', 4), ('NCC', 4), ('PNB', 4), ('ELECTHERM', 4), ('ARIHANT', 4), ('IMFA', 3)]
+  boundary (first 3 periods, rank #nhold-1..nhold+3):
+   2021-07-30: TL-only=['CTE', 'DEEPAKSPIN', 'HALDER', 'JCT', 'MKEXIM', 'SURYAAMBA', 'SURYALA'] ours-only=['IMFA', 'IZMO', 'MINDTECK', 'MONARCH', 'NITINSPIN', 'POCL', 'PRECOT']
+     our rank #9-13: ['NITINSPIN=78.1', 'IMFA=78.0', 'PASUPTAC=78.0', 'SSWL=77.7', 'USHAMART=77.5']
+   2021-08-31: TL-only=['ALMONDZ', 'BATLIBOI', 'HALDER', 'JAMESWARREN', 'KEERTHI', 'MANAKSTEEL', 'SABOOSOD', 'SANCTRN', 'TRANSWORLD'] ours-only=['ADSL', 'FIEMIND', 'GOODLUCK', 'KAMAHOLD', 'NATIONALUM', 'PRADPME', 'TDPOWERSYS', 'TIRUMALCHM', 'VTMLTD']
+     our rank #9-13: ['PRADPME=72.8', 'NATIONALUM=72.3', 'NAHARSPING=72.1', 'ARIHANTSUP=71.7', 'TINNARUBR=71.6']
+   2021-09-30: TL-only=['ALMONDZ', 'LOHIASEC', 'MARALOVER', 'PWASML', 'SABOOSOD', 'UNISON'] ours-only=['NAHARSPING', 'OIL', 'SANGAMIND', 'SPORTKING', 'SURYAROSNI', 'USHAMART']
+     our rank #9-13: ['USHAMART=75.3', 'SANGAMIND=75.3', 'GHCL=75.2', 'PICCADIL=74.8', 'GTPL=74.8']
+
+=== 2. PRICING (our adj price vs Trendlyne CSV price, per stock-period) ===
+stock-periods=249 mean|Δ|=0.427pp median=0.003pp p95=0.81pp max=44.35pp
+  within 0.5pp=93% within 1pp=96% | gold names unpriceable=213/369
+  CA-adj mismatches (ratio start->end jumped >5%): 3
+    2022-02-28 DYCL         ratio 0.169->0.123 tl_chg=+0.1% our_chg=-27.3%
+    2023-09-29 GVKPIL       ratio 1.0->1.736 tl_chg=-39.8% our_chg=+4.6%
+    2024-09-30 NDL          ratio 9.346->10.767 tl_chg=-13.2% our_chg=+0.0%
+  worst 6 |Δ|: [('2023-09-29', 'GVKPIL', 'tl=-39.75', 'ours=4.6'), ('2022-02-28', 'DYCL', 'tl=0.08', 'ours=-27.3'), ('2024-09-30', 'NDL', 'tl=-13.19', 'ours=0.0'), ('2023-11-30', 'GVKPIL', 'tl=-3.37', 'ours=0.0'), ('2022-12-30', 'DYCL', 'tl=11.87', 'ours=9.2'), ('2022-09-30', 'HAZOOR', 'tl=3.37', 'ours=4.8')]
+  gold names we cannot price at all (213): ['13520889', '16610252', '523874', '524534', '530805', '531399', '540080', 'AARNAV', 'AARVI', 'ABANSENT', 'ACKNIT', 'ACME', 'AISL', 'AJANTSOY', 'AKSPINTEX', 'ALPINEHOU', 'AMBAR', 'ANJANI', 'APMIN', 'APUNKA']
+
+=== 3. RETURN DECOMPOSITION (compounded NAV, ÷nhold fixed slots) ===
+  Trendlyne reported NAV                 : 380.9  (+280.9%)
+  gold picks @ Trendlyne prices (avg_row): 381.0  (+281.0%)
+  gold picks @ OUR prices (PRICING)      : 213.1  (+113.1%)  <- == above => prices reproduce TL
+  OUR picks  @ OUR prices (+ SELECTION)  : 442.0  (+342.0%)
+  (ca_uncertain slot-instances parked as cash in OUR-price recon: 5)
+
+=== 4. THIN PERIODS & CASH DRAG ===
+  gold pick-count distribution: {9: 7, 10: 52}
+  periods with <10 gold names: 7 (Trendlyne parks empty slots in cash)
+  if FULLY invested (÷actual count): 386.7  vs ÷10 380.9  -> cash drag = +6 NAV pts
+
+=== 5. LOCALIZE (per-period gold@ourpx vs avg_row, |Δ|>0.4pp) ===
+   [ 0] 2021-07-30 n_gold=10 priced_by_us=3 | ourpx=+2.19% avg_row=-13.96% Δ=+16.15pp
+   [ 1] 2021-08-31 n_gold=10 priced_by_us=2 | ourpx=+4.90% avg_row=+11.39% Δ=-6.49pp
+   [ 2] 2021-09-30 n_gold=10 priced_by_us=5 | ourpx=+4.22% avg_row=+14.28% Δ=-10.06pp
+   [ 3] 2021-10-29 n_gold=10 priced_by_us=6 | ourpx=-3.73% avg_row=+19.88% Δ=-23.61pp
+   [ 4] 2021-11-30 n_gold=10 priced_by_us=1 | ourpx=+0.45% avg_row=+31.94% Δ=-31.49pp
+   [ 5] 2021-12-31 n_gold=10 priced_by_us=1 | ourpx=+3.04% avg_row=+5.02% Δ=-1.98pp
+   [ 7] 2022-02-28 n_gold=10 priced_by_us=4 | ourpx=-4.33% avg_row=+4.92% Δ=-9.25pp
+   [ 9] 2022-04-29 n_gold=10 priced_by_us=3 | ourpx=-3.88% avg_row=-11.53% Δ=+7.65pp
+   [10] 2022-05-31 n_gold=10 priced_by_us=4 | ourpx=-3.62% avg_row=+0.34% Δ=-3.96pp
+   [11] 2022-06-30 n_gold=10 priced_by_us=5 | ourpx=-0.31% avg_row=-2.79% Δ=+2.48pp
+   [12] 2022-07-29 n_gold=10 priced_by_us=8 | ourpx=+7.29% avg_row=+11.21% Δ=-3.92pp
+   [14] 2022-09-30 n_gold=10 priced_by_us=5 | ourpx=-1.24% avg_row=+5.73% Δ=-6.97pp
+   [15] 2022-10-31 n_gold=10 priced_by_us=4 | ourpx=+5.76% avg_row=+8.21% Δ=-2.45pp
+   [17] 2022-12-30 n_gold=10 priced_by_us=4 | ourpx=-2.15% avg_row=-5.41% Δ=+3.26pp
+   [18] 2023-01-31 n_gold=10 priced_by_us=4 | ourpx=-4.80% avg_row=-19.06% Δ=+14.26pp
+   [19] 2023-02-28 n_gold=9 priced_by_us=3 | ourpx=+2.15% avg_row=+18.72% Δ=-16.57pp
+   [20] 2023-03-31 n_gold=10 priced_by_us=4 | ourpx=+8.42% avg_row=+15.97% Δ=-7.55pp
+   [21] 2023-04-28 n_gold=10 priced_by_us=3 | ourpx=+1.70% avg_row=-2.70% Δ=+4.40pp
+   [22] 2023-05-31 n_gold=10 priced_by_us=6 | ourpx=+2.47% avg_row=+6.71% Δ=-4.24pp
+   [23] 2023-06-30 n_gold=10 priced_by_us=5 | ourpx=+5.73% avg_row=+13.89% Δ=-8.16pp
+   [24] 2023-07-31 n_gold=10 priced_by_us=4 | ourpx=+0.80% avg_row=+8.07% Δ=-7.27pp
+   [25] 2023-08-31 n_gold=10 priced_by_us=7 | ourpx=+10.67% avg_row=+15.62% Δ=-4.95pp
+   [26] 2023-09-29 n_gold=10 priced_by_us=3 | ourpx=+0.27% avg_row=+3.17% Δ=-2.90pp
+   [28] 2023-11-30 n_gold=10 priced_by_us=3 | ourpx=-0.82% avg_row=-7.14% Δ=+6.32pp
+   [29] 2023-12-29 n_gold=10 priced_by_us=5 | ourpx=-4.42% avg_row=-0.89% Δ=-3.53pp
+   [30] 2024-01-31 n_gold=10 priced_by_us=2 | ourpx=-4.53% avg_row=-11.83% Δ=+7.30pp
+   [31] 2024-02-29 n_gold=9 priced_by_us=5 | ourpx=-1.42% avg_row=-3.15% Δ=+1.73pp
+   [32] 2024-03-28 n_gold=10 priced_by_us=6 | ourpx=+8.02% avg_row=+10.85% Δ=-2.83pp
+   [33] 2024-04-30 n_gold=10 priced_by_us=2 | ourpx=-1.81% avg_row=-5.89% Δ=+4.08pp
+   [35] 2024-06-28 n_gold=10 priced_by_us=4 | ourpx=+2.15% avg_row=-1.22% Δ=+3.37pp
+   [37] 2024-08-30 n_gold=10 priced_by_us=4 | ourpx=+3.13% avg_row=+13.20% Δ=-10.07pp
+   [38] 2024-09-30 n_gold=10 priced_by_us=4 | ourpx=-7.03% avg_row=-15.29% Δ=+8.26pp
+   [39] 2024-10-31 n_gold=10 priced_by_us=5 | ourpx=+5.61% avg_row=+1.25% Δ=+4.36pp
+   [40] 2024-11-29 n_gold=10 priced_by_us=5 | ourpx=+8.04% avg_row=+17.71% Δ=-9.67pp
+   [41] 2024-12-31 n_gold=10 priced_by_us=1 | ourpx=-1.18% avg_row=-12.30% Δ=+11.12pp
+   [42] 2025-01-31 n_gold=10 priced_by_us=0 | ourpx=+0.00% avg_row=-12.55% Δ=+12.55pp
+   [43] 2025-02-28 n_gold=9 priced_by_us=2 | ourpx=+2.51% avg_row=+6.09% Δ=-3.58pp
+   [44] 2025-03-28 n_gold=10 priced_by_us=3 | ourpx=-0.07% avg_row=-4.47% Δ=+4.40pp
+   [45] 2025-04-30 n_gold=10 priced_by_us=4 | ourpx=+2.07% avg_row=+9.12% Δ=-7.05pp
+   [46] 2025-05-30 n_gold=10 priced_by_us=4 | ourpx=+3.18% avg_row=-2.10% Δ=+5.28pp
+   [47] 2025-06-30 n_gold=10 priced_by_us=8 | ourpx=+10.01% avg_row=+8.24% Δ=+1.77pp
+   [48] 2025-07-31 n_gold=10 priced_by_us=5 | ourpx=-3.59% avg_row=+5.25% Δ=-8.84pp
+   [49] 2025-08-29 n_gold=10 priced_by_us=2 | ourpx=+0.40% avg_row=+19.25% Δ=-18.85pp
+   [50] 2025-09-30 n_gold=10 priced_by_us=4 | ourpx=+5.47% avg_row=+1.51% Δ=+3.96pp
+   [51] 2025-10-31 n_gold=10 priced_by_us=6 | ourpx=-4.86% avg_row=+2.59% Δ=-7.45pp
+   [52] 2025-11-28 n_gold=9 priced_by_us=6 | ourpx=-0.10% avg_row=+5.41% Δ=-5.51pp
+   [53] 2025-12-31 n_gold=10 priced_by_us=6 | ourpx=-3.42% avg_row=-7.75% Δ=+4.33pp
+   [54] 2026-01-30 n_gold=10 priced_by_us=6 | ourpx=+1.01% avg_row=-3.78% Δ=+4.79pp
+   [55] 2026-02-27 n_gold=9 priced_by_us=5 | ourpx=-8.66% avg_row=-19.80% Δ=+11.14pp
+   [56] 2026-03-30 n_gold=9 priced_by_us=6 | ourpx=+11.35% avg_row=+12.17% Δ=-0.82pp
+   [58] 2026-05-29 n_gold=10 priced_by_us=7 | ourpx=+3.77% avg_row=-0.27% Δ=+4.04pp
+
+=== PHASE B (PIT survivorship-free) summary ===
+  PIT universe size=1790 | our-pick overlap vs gold=203/583=35% | OUR-picks NAV=373.2 (+273.2%)
+
+SUMMARY|547995|Pure DVM (monthly, no liquidity floor)|periods=59|overlapA=39%|priceMeanAbs=0.427|goldNAV=380.9|goldOurpx=213.1|ourNAV_A=442.0|ourNAV_B=373.2|overlapB=35%|unpriced=213|thin=7|caFlags=3
+  warnA: survivorship-free Trendlyne layer: 1699 names ever >Rs500cr in-window (live + delisted, blow-ups included); membership i
+  warnA: universe gated to point-in-time Rs500cr membership (survivorship-free).
+
+

@@ -291,3 +291,13 @@ decisions:
       - curated
       - cat:reliability
     body_path: docs/decisions/adr-031-windfall-silent-delisting.md
+  - id: adr-032-windfall-parity-gross-of-costs
+    project_slug: windfall-labs
+    title: Trendlyne parity is gross-of-costs; net divergence on high-turnover
+      strategies is by design
+    status: accepted
+    date: 2026-06-25T00:00:00.000Z
+    tags:
+      - curated
+      - cat:reliability
+    body_path: docs/decisions/adr-032-windfall-parity-gross-of-costs.md
