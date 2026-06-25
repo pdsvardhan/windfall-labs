@@ -18,7 +18,7 @@ from windfall.data import surveillance
 from windfall.data import trendlyne_store as ts
 from windfall.jsonsafe import clean
 from windfall.data.pipeline import incremental_update
-from windfall.engine.backtest import run_backtest
+from windfall.engine.backtest import run_backtest, resolve_with_warmup
 from windfall.paper import commit_signal, list_positions, mark_to_market, scoreboard
 from windfall.scripts_validation import run_validation
 from windfall.signals_live import generate_signals
@@ -66,6 +66,17 @@ class SweepIn(BaseModel):
     config: dict
     grid: dict = {}
     metric: str = "sharpe"
+
+
+class BatchIn(BaseModel):
+    # Resolve ONCE, simulate the whole grid. Valid only when the grid varies SIM-SIDE params
+    # (n_holdings / rebalance / weighting / stop_loss.* / take_profit.* / max_hold_days /
+    # max_position_adtv_pct / sector_cap / regime_filter.*) — resolve() depends only on
+    # universe/filters/rank/window, so reusing rs gives byte-identical results, ~10x faster.
+    base_config: dict
+    grid: dict = {}            # e.g. {"n_holdings":[10,20], "rebalance":["monthly","quarterly"]}
+    name_template: str = ""    # e.g. "MOM_roc126_{rebalance}_{n_holdings}"; falls back to base name
+    save: bool = True
 
 
 class WalkForwardIn(SweepIn):
@@ -216,6 +227,55 @@ def backtests_run(body: BacktestIn):
     if body.save:
         d["backtest_id"] = store_meta.save_backtest(d, body.strategy_id)
     return d
+
+
+@app.post("/api/backtests/batch")
+def backtests_batch(body: BatchIn):
+    """Resolve ONCE, simulate the whole sim-side grid (n_holdings/rebalance/regime/exits/costs).
+    ~10x faster than N independent backtests and byte-identical (same ResolvedStrategy, same sim)."""
+    import copy as _copy
+    import itertools as _it
+    try:
+        base = StrategyConfig(**body.base_config).model_dump()
+    except ValidationError as exc:
+        raise HTTPException(400, f"invalid base_config: {_cfg_error(exc)}")
+    try:
+        rs = resolve_with_warmup(StrategyConfig(**base))  # the one expensive load, shared by all combos
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(400, f"resolve failed: {_cfg_error(exc)}")
+
+    keys = list(body.grid.keys())
+    combos = ([dict(zip(keys, c)) for c in _it.product(*[body.grid[k] for k in keys])]
+              if keys else [{}])
+
+    def apply(over: dict) -> dict:
+        cfg = _copy.deepcopy(base)
+        for path, val in over.items():           # dotted-path overrides, e.g. "stop_loss.mult"
+            node = cfg
+            parts = path.split(".")
+            for p in parts[:-1]:
+                node = node.setdefault(p, {})
+            node[parts[-1]] = val
+        return cfg
+
+    results = []
+    for over in combos:
+        cfg = apply(over)
+        name = body.name_template.format(**over) if body.name_template else cfg.get("name")
+        if name:
+            cfg["name"] = name
+        try:
+            res = run_backtest(cfg, rs=rs)         # rs reused — no re-resolve
+        except Exception as exc:  # noqa: BLE001
+            results.append({"name": name, "overrides": over, "error": _cfg_error(exc)})
+            continue
+        d = clean(res.model_dump())
+        if body.save and name:
+            store_meta.save_strategy(name, cfg, name)
+            d["backtest_id"] = store_meta.save_backtest(d, name)
+        results.append({"name": name, "overrides": over,
+                        "summary": d.get("summary"), "warnings": d.get("warnings", [])})
+    return clean({"n": len(results), "results": results})
 
 
 @app.get("/api/backtests")

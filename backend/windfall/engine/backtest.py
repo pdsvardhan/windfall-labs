@@ -120,22 +120,28 @@ def _warmup_calendar_days(cfg: StrategyConfig) -> int:
     return (max_n * 2 + 30) if max_n else 0
 
 
-def run_backtest(config, cost_mult: float = 1.0) -> BacktestResult:
-    cfg = config if isinstance(config, StrategyConfig) else StrategyConfig(**config)
-
-    # Warm rolling features before the requested start: resolve over a padded window, then trade only
-    # from `requested_start` (warmup bars warm sma200/roc125/regime but never trade). Without this,
-    # entry_mask.fillna(False) makes every unwarmed name ineligible -> the first ~200 trading days of
-    # any long-MA backtest are a silently empty/thin book. (signals_live already pads; this matches it.)
-    # `cfg` stays the USER's config (identity/hash/reporting); only resolve sees the padded start.
-    requested_start = cfg.start
+def resolve_with_warmup(cfg: StrategyConfig):
+    """Resolve over a warmup-padded window so rolling features are warm at cfg.start, returning the
+    ResolvedStrategy. Exposed so a batch can resolve ONCE and reuse it across sim-side variants:
+    n_holdings / rebalance / regime / exits / costs all live in the simulation, never in resolve().
+    (Warmup bars warm sma200/roc125/regime but never trade.)"""
     pad = _warmup_calendar_days(cfg)
     resolve_cfg = cfg
-    if pad and requested_start:
-        warm_start = str((pd.Timestamp(requested_start) - pd.Timedelta(days=pad)).date())
-        if warm_start < requested_start:
+    if pad and cfg.start:
+        warm_start = str((pd.Timestamp(cfg.start) - pd.Timedelta(days=pad)).date())
+        if warm_start < cfg.start:
             resolve_cfg = cfg.model_copy(update={"start": warm_start})
-    rs = resolve(resolve_cfg)
+    return resolve(resolve_cfg)
+
+
+def run_backtest(config, cost_mult: float = 1.0, rs=None) -> BacktestResult:
+    cfg = config if isinstance(config, StrategyConfig) else StrategyConfig(**config)
+
+    # `cfg` stays the USER's config (identity/hash/reporting). `rs` may be supplied pre-resolved so a
+    # batch reuses one resolve across sim-side variants; when None we resolve with warmup as before.
+    requested_start = cfg.start
+    if rs is None:
+        rs = resolve_with_warmup(cfg)
 
     dates = rs.close_adj.index
     # index of the first trading day on/after the user's requested start; warmup bars are < i0
