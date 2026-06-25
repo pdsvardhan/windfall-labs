@@ -198,3 +198,21 @@ rebuild so membership staleness can't silently recur.
 1. **#83 / Session 2** — backtest re-validation vs Trendlyne. NOW UNBLOCKED; F3/F6 shifted universe membership, so backtests WILL change — re-run against the corrected universe. Owner first fills `C:\Users\pdsva\Downloads\backtest-data` with Trendlyne CSVs + screenshots. Spec: `docs/validation/SESSION-backtest-revalidation.md`.
 2. Audit follow-ups #84–89 (all non-blocking).
 3. Pre-existing anti-gaslight (not this session): `unclaimed-done` on 2 SO1 features (cockpit-dashboard, strategy-editor) lacking feature_claims; `stale-verification` SOFT on 7 engine features — reconciliation gaps from original Stage 3, unaffected by this data session.
+
+## Session 2026-06-25 — Session 2: backtest re-validation vs Trendlyne (round 2)
+
+**Stage:** Stage 4 (validation) — spec-driven, `docs/validation/SESSION-backtest-revalidation.md` (#83)
+**What ran:** all 13 owner Trendlyne backtests re-run on the post-Session-1 data layer via three harnesses — `parity_multi.py` (gross selection/pricing/return decomposition), `gap_analysis.py` (per-miss taxonomy), and new `engine_metrics_round2.py` (real-engine headline metrics, gross vs net of the adr-020 cost model). Gold = owner CSVs (`Downloads/`, picks + NAV) + 60 result screenshots (`Downloads/backtest-data/`, configs + reported metrics; the only source for the 4 deep/no-floor configs).
+
+**Verdict: engine reproduces Trendlyne faithfully; NO new engine bugs.**
+- Parity held/improved on post-audit data: 548042 70→79%, 547994 42→49%, 547995 34→39% overlap; pricing median **0.003pp**. `gap_analysis`: **0 indicator/DVM false-exclusions** across all 13 — every miss is survivorship/coverage/horizon/universe-scope or a correct exclusion.
+- Cost layer (engine gross vs net, same picks): monthly strategies lose **2.2–2.7pp CAGR** to costs, weekly churners **6.5–11.6pp** (548042 breakout +4.6% gross → **−1.9% net** @ 2706% turnover). Founding thesis confirmed in our own numbers.
+
+**Code/data changes:** none to the engine (no bugs). Test-harness only: restored the 4 deep/no-floor configs (547991/992/994/995) to `parity_multi.py` TEST_TABLE (trimmed after round-1, kept in `gap_analysis.py`); re-confirmed vs owner screenshots.
+**Decisions:** adr-032 (curated, cat:reliability) — Trendlyne parity is gross-of-costs; net divergence on high-turnover is by design. Universe-floor / NSE-only differences stay under adr-015 / adr-024.
+**Tracker:** closed #83; created follow-ups #92 (pit_mcap/adtv NaN holes), #93 (ISIN-join numeric-token names). **Commit:** d8ffe98 (report + ADR + harnesses + raw outputs + decisions mirror) — pushed to Gitea.
+
+**Next session pick-up:**
+1. Follow-ups #92/#93 (parity coverage holes) + audit #84–89 — all non-blocking backlog.
+2. If pure-DVM sub-₹500cr microcap exposure is ever wanted, that's a universe-policy change (adr-015), not an engine fix.
+3. Pre-existing anti-gaslight (still open, not this session): `unclaimed-done` on cockpit-dashboard + strategy-editor; `stale-verification` SOFT on engine features.
