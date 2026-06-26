@@ -184,6 +184,46 @@ def run_backtest(config, cost_mult: float = 1.0, rs=None) -> BacktestResult:
             return 1.0  # insufficient history to judge regime — stay invested
         return 1.0 if bv >= bm else rf.below_exposure
 
+    # Factor-timing overlay: self-time on the strategy's OWN equity vs its own MA. The timing signal
+    # is the strategy's REFERENCE equity — the same strategy with factor-timing OFF (regime/costs/
+    # everything else unchanged) — NOT the gated equity. Timing on the gated equity would be
+    # self-referential (de-risking changes the curve that drives the next decision) and would not
+    # match the offline PoC (which timed on the un-timed strategy curve). The reference curve is
+    # itself look-ahead-free and truncation-invariant, and the gate reads it only through t-lag_days,
+    # so the overlay inherits those properties. Mirrors regime_mult, but on the strategy's own equity
+    # instead of the benchmark. Live-tractable: the signals engine produces the book daily, so the
+    # reference equity is observable even while standing in cash.
+    ft = cfg.factor_timing
+    weekly_check = _rebalance_dates(dates, "weekly") if ft.check_weekly else set()
+    ft_nav = ft_ma = None
+    if ft.enabled:
+        ref_cfg = cfg.model_copy(update={
+            "factor_timing": ft.model_copy(update={"enabled": False, "check_weekly": False})})
+        ref = run_backtest(ref_cfg, cost_mult=cost_mult, rs=rs)   # one reference sim (rs reused)
+        ref_s = pd.Series({pd.Timestamp(d): float(v) for d, v in ref.equity_curve})
+        ft_nav = ref_s.reindex(dates).ffill().values
+        ft_ma = (pd.Series(ft_nav, index=dates)
+                 .rolling(ft.ma_period, min_periods=ft.ma_period).mean().values)
+
+    def factor_timing_mult(i: int) -> float:
+        """Exposure multiplier: 1.0 while the strategy's reference equity is at/above its MA, else
+        defensive. Reads the reference curve only at t-lag_days (no look-ahead). 1.0 until the MA is
+        warm — you cannot time on equity you do not yet have (mirrors RegimeFilter's MA min_periods)."""
+        if not ft.enabled:
+            return 1.0
+        k = i - ft.lag_days
+        if k < 0:
+            return 1.0
+        nv, mv = ft_nav[k], ft_ma[k]
+        if math.isnan(nv) or math.isnan(mv):
+            return 1.0  # reference MA not warm yet -> stay invested
+        return 1.0 if nv >= mv else (0.0 if ft.mode == "binary" else ft.below_exposure)
+
+    def overlay_exposure(i: int) -> float:
+        """Combined risk overlay (market-direction regime AND own-equity factor-timing): both must
+        be 'on' for full exposure. Used by the weekly de-risk check to detect a fully-defensive flip."""
+        return regime_mult(i) * factor_timing_mult(i)
+
     # Delisting terminal exit (survivorship-free runs): the last bar a name has a price is its
     # delisting date — a held position must be force-closed there at the last traded (adjusted)
     # price, never marked forward at a stale value. For live names this is just the final bar.
@@ -290,6 +330,12 @@ def run_backtest(config, cost_mult: float = 1.0, rs=None) -> BacktestResult:
             return [], {}
         if mult != 1.0:
             weights = {j: w * mult for j, w in weights.items()}
+        # Factor-timing overlay (own-equity self-timing), applied on top of regime by the same rule.
+        ftm = factor_timing_mult(i)
+        if ftm <= 0.0 and ft.mode == "binary":
+            return [], {}
+        if ftm != 1.0:
+            weights = {j: w * ftm for j, w in weights.items()}
         return chosen, weights
 
     n = len(dates)
@@ -303,10 +349,11 @@ def run_backtest(config, cost_mult: float = 1.0, rs=None) -> BacktestResult:
         # 1) execute scheduled rebalance orders at today's open
         if pending is not None and pending["exec_i"] == i:
             desired = pending["desired"]
+            exit_reason = pending.get("reason", "rebalance")
             for j in list(sim.positions):
                 if j not in desired:
                     px = O[i, j]
-                    close_pos(j, px if not math.isnan(px) else Cmark[i, j], i, "rebalance")
+                    close_pos(j, px if not math.isnan(px) else Cmark[i, j], i, exit_reason)
             nav_now = sim.cash + sum(p.shares * Cmark[i, p.j] for p in sim.positions.values())
             for j, w in pending["weights"].items():
                 if j in sim.positions:
@@ -330,6 +377,18 @@ def run_backtest(config, cost_mult: float = 1.0, rs=None) -> BacktestResult:
         nav = sim.cash + invested
         nav_dates.append(dates[i]); nav_vals.append(nav)
         exposure_vals.append((invested / nav) if nav > 0 else 0.0)
+
+        # 3c) weekly risk-overlay check (de-risk ONLY): on a non-rebalance week, if the combined
+        # overlay has flipped fully defensive, schedule a liquidation to cash at the next fill. The
+        # gate reads NAV through today (just appended); re-entry waits for the next scheduled
+        # rebalance — no weekly re-entry, which avoids whipsaw churn-in (the #99 trailing-stop lesson).
+        if (ft.check_weekly and dates[i] in weekly_check and dates[i] not in rebal
+                and sim.positions and pending is None and overlay_exposure(i) <= 1e-9):
+            if cfg.entry_fill == "close":
+                for j in list(sim.positions):
+                    close_pos(j, C[i, j] if not math.isnan(C[i, j]) else Cmark[i, j], i, "overlay_exit")
+            elif i + 1 < n:
+                pending = {"exec_i": i + 1, "desired": set(), "weights": {}, "reason": "overlay_exit"}
 
         # 4) rebalance decision (data up to & incl today)
         if dates[i] in rebal:
@@ -393,5 +452,7 @@ def run_backtest(config, cost_mult: float = 1.0, rs=None) -> BacktestResult:
                           for d, v in bench_nav.items() if math.isfinite(v)]
                          if bench_nav is not None else []),
         trades=[Trade(**t) for t in sim.trades],
-        warnings=rs.warnings,
+        # dedupe: a factor-timing run shares `rs` with its reference sim, which can append an
+        # identical empty-rebals warning — collapse to unique, order-preserving.
+        warnings=list(dict.fromkeys(rs.warnings)),
     )
