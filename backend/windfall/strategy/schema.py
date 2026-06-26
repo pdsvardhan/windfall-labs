@@ -106,6 +106,9 @@ class FactorTiming(BaseModel):
     below_exposure: float = 0.0               # target exposure while own NAV < its MA (0 = full cash)
     lag_days: int = 1                         # use NAV through t-lag_days for the gate (no look-ahead)
     check_weekly: bool = False                # also evaluate weekly (de-risk only) between rebalances
+    reengage_weekly: bool = False             # weekly check may also RE-ENTER the last monthly target
+                                              # when the overlay flips back on (bidirectional); needs
+                                              # check_weekly. False = iter-16 de-risk-only behavior.
 
     @model_validator(mode="after")
     def _validate(self):
@@ -115,6 +118,8 @@ class FactorTiming(BaseModel):
             raise ValueError("factor_timing lag_days must be at least 0")
         if not 0 <= self.below_exposure <= 1:
             raise ValueError("factor_timing below_exposure must be between 0 and 1")
+        if self.reengage_weekly and not self.check_weekly:
+            raise ValueError("factor_timing reengage_weekly requires check_weekly")
         return self
 
 
