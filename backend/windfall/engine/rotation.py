@@ -35,11 +35,28 @@ def run_rotation(
     capital: float = 1_000_000.0,
     benchmark: str = "NIFTY500",
     name: str = "rotation",
+    weights: list[float] | None = None,
 ) -> dict:
     if len(sleeves) < 2:
         raise ValueError("rotation needs at least 2 sleeves")
     if lookback_days < 2:
         raise ValueError("lookback_days must be at least 2")
+
+    # Fixed-weight (static-blend) mode: when explicit per-sleeve weights are given, the book holds
+    # that allocation rebalanced every `rebalance` period with real switch costs — NO trailing-return
+    # ranking. A 70/30 momentum/low-vol blend is the headline use (adr-035: diversification beats
+    # trailing-return rotation). Weights are normalized; they may sum < 1 to hold a fixed cash sleeve.
+    fixed_mode = weights is not None
+    if fixed_mode:
+        if len(weights) != len(sleeves):
+            raise ValueError("weights must have one entry per sleeve")
+        if any(w < 0 for w in weights):
+            raise ValueError("weights must be non-negative")
+        wsum = float(sum(weights))
+        if wsum <= 0:
+            raise ValueError("weights must sum to a positive value")
+        # sum<=1 -> absolute weights, cash = 1-sum; sum>1 -> relative weights, normalized (no cash)
+        norm_w = [w / wsum for w in weights] if wsum > 1.0 + 1e-9 else list(weights)
 
     # 1) Run each sleeve; collect its daily NAV curve.
     sleeve_names: list[str] = []
@@ -58,8 +75,9 @@ def run_rotation(
             bench_curve = pd.Series({pd.Timestamp(d): float(v) for d, v in res.benchmark_curve})
 
     # 2) Align sleeves to their common window; normalize each to 1.0 at the common start.
+    warm = 0 if fixed_mode else lookback_days   # fixed weights need no trailing-return warmup
     nav_df = pd.DataFrame(nav_cols).sort_index().ffill().dropna()
-    if len(nav_df) < lookback_days + 2:
+    if len(nav_df) < warm + 2:
         raise ValueError("sleeves do not overlap enough to rotate over the lookback window")
     norm = nav_df / nav_df.iloc[0]
     sret = norm.pct_change().fillna(0.0)         # per-sleeve daily returns
@@ -81,30 +99,36 @@ def run_rotation(
             growth = sum(weights[nm] * sret.iloc[t][nm] for nm in sleeve_names)
             cap *= (1.0 + growth)               # cash earns 0 (no rate assumed — conservative)
 
-        # b) rotation decision at the close: rank sleeves by trailing-lookback return, reallocate
-        if day in rotate_on and t >= lookback_days:
-            trailing = {nm: float(norm.iloc[t][nm] / norm.iloc[t - lookback_days][nm] - 1.0)
-                        for nm in sleeve_names}
-            working = sorted([nm for nm, r in trailing.items() if r > momentum_floor],
-                             key=lambda nm: trailing[nm], reverse=True)
-            if top_k is not None:
-                working = working[:top_k]
-            new_w = {nm: 0.0 for nm in sleeve_names}
-            if working:
-                eq = 1.0 / len(working)
-                for nm in working:
-                    new_w[nm] = eq
+        # b) rebalance decision at the close. Fixed mode: re-assert the target weights (turnover is
+        # only drift correction). Rank mode: rank sleeves by trailing-lookback return, reallocate.
+        if day in rotate_on and t >= warm:
+            trailing = None
+            if fixed_mode:
+                new_w = {nm: norm_w[k] for k, nm in enumerate(sleeve_names)}
+            else:
+                trailing = {nm: float(norm.iloc[t][nm] / norm.iloc[t - lookback_days][nm] - 1.0)
+                            for nm in sleeve_names}
+                working = sorted([nm for nm, r in trailing.items() if r > momentum_floor],
+                                 key=lambda nm: trailing[nm], reverse=True)
+                if top_k is not None:
+                    working = working[:top_k]
+                new_w = {nm: 0.0 for nm in sleeve_names}
+                if working:
+                    eq = 1.0 / len(working)
+                    for nm in working:
+                        new_w[nm] = eq
             new_cash = 1.0 - sum(new_w.values())
             # fund-level turnover (incl. the cash leg) -> conservative switch cost
             turn = sum(abs(new_w[nm] - weights[nm]) for nm in sleeve_names) + abs(new_cash - cash_w)
             total_turnover += turn
             cap *= (1.0 - turn * switch_cost_bps / 10_000.0)
             weights, cash_w = new_w, new_cash
-            alloc_log.append({"date": str(day.date()),
-                              "weights": {nm: round(weights[nm], 4) for nm in sleeve_names
-                                          if weights[nm] > 0},
-                              "cash": round(cash_w, 4),
-                              "trailing": {nm: round(trailing[nm], 4) for nm in sleeve_names}})
+            entry = {"date": str(day.date()),
+                     "weights": {nm: round(weights[nm], 4) for nm in sleeve_names if weights[nm] > 0},
+                     "cash": round(cash_w, 4)}
+            if trailing is not None:
+                entry["trailing"] = {nm: round(trailing[nm], 4) for nm in sleeve_names}
+            alloc_log.append(entry)
 
         combined_vals.append(cap)
         cash_weight_hist.append(cash_w)
@@ -122,9 +146,15 @@ def run_rotation(
         ("rotation switch cost is modelled at the FUND level on inter-sleeve turnover and does NOT "
          "net stock-level overlap between sleeves — it is a CONSERVATIVE UPPER BOUND on switching "
          "cost; the realistic floor is each sleeve's own (already cost-laden) NAV."),
-        (f"sleeves rotate {rebalance}; a sleeve is 'working' when its trailing {lookback_days}-day "
-         f"return exceeds {momentum_floor:+.0%}; book holds cash until the lookback window warms."),
     ]
+    if fixed_mode:
+        warnings.append(
+            f"FIXED-WEIGHT static blend: target {dict(zip(sleeve_names, [round(w, 3) for w in norm_w]))}"
+            f" re-asserted every {rebalance} (no trailing-return ranking).")
+    else:
+        warnings.append(
+            f"sleeves rotate {rebalance}; a sleeve is 'working' when its trailing {lookback_days}-day "
+            f"return exceeds {momentum_floor:+.0%}; book holds cash until the lookback window warms.")
 
     return {
         "name": name,
@@ -139,7 +169,9 @@ def run_rotation(
                              if np.isfinite(v)] if bench is not None else []),
         "sleeves": sleeve_summaries,
         "allocations": alloc_log,
-        "config": {"rebalance": rebalance, "lookback_days": lookback_days, "top_k": top_k,
+        "config": {"mode": "fixed-weight" if fixed_mode else "trailing-return",
+                   "weights": (norm_w if fixed_mode else None),
+                   "rebalance": rebalance, "lookback_days": lookback_days, "top_k": top_k,
                    "momentum_floor": momentum_floor, "switch_cost_bps": switch_cost_bps,
                    "capital": capital},
         "warnings": warnings,
