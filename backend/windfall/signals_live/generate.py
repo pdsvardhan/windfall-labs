@@ -104,6 +104,102 @@ def generate_signals(config) -> dict:
             "n_holdings": cfg.n_holdings, "signals": sigs, "warnings": warnings}
 
 
+def generate_blend_signals(sleeves: list, weights: list[float], name: str = "blend") -> dict:
+    """Combine several sleeves' live signals into ONE buy/hold/sell order sheet at fixed blend weights.
+
+    The deployable artifact for the adr-035 70/30 MOM/LV blend. Each sleeve produces its own
+    today's-orders via `generate_signals`; this sums per-name weights at the blend ratio (a name held
+    by both sleeves adds its contributions) and classifies each name against the COMBINED previous
+    book: buy = newly in the combined book, hold = was and still is, sell = dropped out. Per-name
+    provenance (which sleeve(s) and how much) is carried through, as are last_close / stop / target.
+    Output shape matches `generate_signals` so surveillance annotation + CSV export work unchanged.
+    """
+    if len(sleeves) < 2:
+        raise ValueError("blend signals need at least 2 sleeves")
+    if len(weights) != len(sleeves):
+        raise ValueError("weights must have one entry per sleeve")
+    if any(w < 0 for w in weights):
+        raise ValueError("weights must be non-negative")
+    wsum = float(sum(weights))
+    if wsum <= 0:
+        raise ValueError("weights must sum to a positive value")
+    norm_w = [w / wsum for w in weights] if wsum > 1.0 + 1e-9 else list(weights)
+
+    runs, sleeve_meta, used = [], [], set()
+    for idx, (cfg, bw) in enumerate(zip(sleeves, norm_w)):
+        run = generate_signals(cfg)
+        nm = run.get("strategy") or f"sleeve_{idx}"
+        if nm in used:                                          # disambiguate duplicate sleeve names
+            nm = f"{nm}#{idx}"
+        used.add(nm)
+        runs.append((nm, bw, run))
+        sleeve_meta.append({"name": nm, "weight_in_blend": round(bw, 4),
+                            "n_signals": len(run.get("signals", [])), "regime": run.get("regime")})
+
+    # records[ticker] aggregates the name across sleeves
+    records: dict[str, dict] = {}
+    for nm, bw, run in runs:
+        for s in run.get("signals", []):
+            tk = s.get("ticker")
+            rec = records.setdefault(tk, {"ticker": tk, "blend_weight": 0.0, "sleeves": {},
+                                          "in_today": False, "in_prev": False, "last_close": None,
+                                          "stop": None, "target": None, "ext_above_50dma": None,
+                                          "rsi14": None, "_max_contrib": -1.0})
+            if s.get("last_close") is not None:
+                rec["last_close"] = s["last_close"]
+            action = s.get("action")
+            if action in ("buy", "hold"):                      # name is in THIS sleeve's book today
+                contrib = bw * float(s.get("weight", 0.0))
+                rec["blend_weight"] += contrib
+                rec["sleeves"][nm] = round(rec["sleeves"].get(nm, 0.0) + contrib, 4)
+                rec["in_today"] = True
+                if contrib > rec["_max_contrib"]:               # carry detail from the bigger holder
+                    rec["_max_contrib"] = contrib
+                    for k in ("stop", "target", "ext_above_50dma", "rsi14"):
+                        if s.get(k) is not None:
+                            rec[k] = s[k]
+            if action in ("hold", "sell"):                      # name was in the sleeve's PREV book
+                rec["in_prev"] = True
+
+    signals = []
+    for tk, rec in records.items():
+        if rec["in_today"]:
+            action = "hold" if rec["in_prev"] else "buy"
+        elif rec["in_prev"]:
+            action = "sell"
+        else:
+            continue
+        sig = {"ticker": tk, "action": action,
+               "weight": round(rec["blend_weight"], 4) if action != "sell" else 0.0,
+               "last_close": rec["last_close"], "entry_zone": "at next open",
+               "stop": rec["stop"], "target": rec["target"],
+               "ext_above_50dma": rec["ext_above_50dma"], "rsi14": rec["rsi14"],
+               "blend_sleeves": "; ".join(f"{k}:{v}" for k, v in sorted(rec["sleeves"].items()))}
+        if action == "sell":
+            sig["note"] = "dropped out of the combined blend book at this rebalance"
+        signals.append(sig)
+
+    # buys/holds first (by weight desc), then sells
+    order = {"buy": 0, "hold": 0, "sell": 1}
+    signals.sort(key=lambda s: (order[s["action"]], -s["weight"]))
+
+    warnings: list[str] = []
+    for nm, bw, run in runs:
+        for w in run.get("warnings", []):
+            if w not in warnings:
+                warnings.append(w)
+    n_held = sum(1 for s in signals if s["action"] != "sell")
+    invested = round(sum(s["weight"] for s in signals if s["action"] != "sell"), 4)
+    blend_str = "/".join(str(int(round(w * 100))) for w in norm_w)
+    warnings.insert(0, f"blend {blend_str} of [{', '.join(nm for nm, _, _ in runs)}]: combined book "
+                       f"is {invested:.0%} invested across {n_held} names.")
+
+    return {"as_of": runs[0][2].get("as_of"), "data_age_days": runs[0][2].get("data_age_days"),
+            "strategy": name, "blend_weights": [round(w, 4) for w in norm_w],
+            "sleeves": sleeve_meta, "invested_fraction": invested,
+            "signals": signals, "warnings": warnings}
+
+
 def _regime_state(rs: ResolvedStrategy, cfg: StrategyConfig, i: int) -> dict | None:
     """Report whether the regime filter (if enabled) currently permits new exposure."""
     rf = cfg.regime_filter
@@ -120,7 +216,7 @@ def _regime_state(rs: ResolvedStrategy, cfg: StrategyConfig, i: int) -> dict | N
 
 def signals_to_csv(run: dict) -> str:
     """Serialize a signal run's list to CSV text (the exportable order list)."""
-    cols = ["ticker", "action", "rank_value", "weight", "last_close", "entry_zone",
+    cols = ["ticker", "action", "rank_value", "weight", "blend_sleeves", "last_close", "entry_zone",
             "stop", "target", "ext_above_50dma", "rsi14", "surveillance", "note"]
     out = io.StringIO()
     writer = csv.DictWriter(out, fieldnames=cols, extrasaction="ignore")
