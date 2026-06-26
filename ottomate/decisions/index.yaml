@@ -301,3 +301,13 @@ decisions:
       - curated
       - cat:reliability
     body_path: docs/decisions/adr-032-windfall-parity-gross-of-costs.md
+  - id: adr-033-windfall-factor-timing-in-engine
+    project_slug: windfall-labs
+    title: Factor-timing built in-engine on a reference equity curve; the offline
+      PoC s free drawdown protection does not survive real costs
+    status: accepted
+    date: 2026-06-26T00:00:00.000Z
+    tags:
+      - curated
+      - cat:reliability
+    body_path: docs/decisions/adr-033-windfall-factor-timing-in-engine.md
