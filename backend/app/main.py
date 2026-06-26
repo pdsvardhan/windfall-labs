@@ -22,7 +22,7 @@ from windfall.engine.backtest import run_backtest, resolve_with_warmup
 from windfall.engine.rotation import run_rotation
 from windfall.paper import commit_signal, list_positions, mark_to_market, scoreboard
 from windfall.scripts_validation import run_validation
-from windfall.signals_live import generate_signals
+from windfall.signals_live import generate_blend_signals, generate_signals
 from windfall.signals_live.generate import signals_to_csv
 from windfall.strategy.readiness import data_readiness
 from windfall.strategy.schema import StrategyConfig
@@ -112,6 +112,14 @@ class RotationIn(BaseModel):
 class SignalsIn(BaseModel):
     config: dict
     strategy_id: str | None = None
+    save: bool = False
+
+
+class BlendSignalsIn(BaseModel):
+    # Live today's-orders for a fixed-weight blend (the adr-035 70/30 deployable candidate).
+    sleeves: list[dict]                 # each a full StrategyConfig
+    weights: list[float]               # one per sleeve, e.g. [0.7, 0.3]
+    name: str = "blend"
     save: bool = False
 
 
@@ -398,6 +406,30 @@ def signals_export(body: SignalsIn):
     return PlainTextResponse(
         csv_text, media_type="text/csv",
         headers={"Content-Disposition": f'attachment; filename="signals_{out.get("as_of")}.csv"'})
+
+
+@app.post("/api/signals/blend")
+def signals_blend(body: BlendSignalsIn):
+    """Today's combined orders for a fixed-weight blend (adr-035 70/30 MOM/LV): one buy/hold/sell
+    sheet across the sleeves, with sleeve provenance + ASM/GSM surveillance flags."""
+    try:
+        out = surveillance.annotate_signals(
+            clean(generate_blend_signals(body.sleeves, body.weights, name=body.name)))
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(400, f"blend signals failed: {_cfg_error(exc)}")
+    if body.save:
+        out["signal_run_id"] = store_meta.save_signal_run(
+            body.name, out.get("as_of"), out.get("signals", []))
+    return out
+
+
+@app.post("/api/signals/blend/export")
+def signals_blend_export(body: BlendSignalsIn):
+    out = surveillance.annotate_signals(generate_blend_signals(body.sleeves, body.weights, name=body.name))
+    csv_text = signals_to_csv(out)
+    return PlainTextResponse(
+        csv_text, media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="signals_blend_{out.get("as_of")}.csv"'})
 
 
 @app.get("/api/signals/runs")
