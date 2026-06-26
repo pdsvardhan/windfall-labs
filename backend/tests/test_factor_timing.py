@@ -82,6 +82,49 @@ def test_walkforward_sweeps_factor_timing_ma_period():
         assert w["best_overrides"].get("factor_timing.ma_period") in (20, 40)
 
 
+def test_reengage_weekly_requires_check_weekly():
+    """reengage_weekly without check_weekly is a config error (can't re-engage on a cadence you
+    don't evaluate)."""
+    import pytest
+    with pytest.raises(Exception):
+        run_backtest({**BASE, "factor_timing": {"enabled": True, "reengage_weekly": True,
+                                                 "check_weekly": False}})
+
+
+def test_reengage_weekly_holds_more_exposure_than_derisk_only():
+    """Bidirectional weekly re-engagement re-enters after de-risking, so it must hold at least as
+    much average exposure as the de-risk-only weekly check (iter-17 vs iter-16 behavior)."""
+    derisk = run_backtest({**BASE, "factor_timing": {"enabled": True, "ma_period": 20,
+                                                     "check_weekly": True}})
+    reengage = run_backtest({**BASE, "factor_timing": {"enabled": True, "ma_period": 20,
+                                                       "check_weekly": True, "reengage_weekly": True}})
+    assert reengage.summary.exposure >= derisk.summary.exposure - 1e-9
+
+
+def test_reengage_weekly_no_lookahead_truncation_invariant():
+    """Re-engagement is driven by the lagged reference curve + past monthly selections only, so
+    truncating the future must not change the past."""
+    cfg = {**BASE, "factor_timing": {"enabled": True, "ma_period": 20, "lag_days": 1,
+                                      "check_weekly": True, "reengage_weekly": True}}
+    full = run_backtest({**cfg, "end": "2020-12-31"})
+    mid = run_backtest({**cfg, "end": "2020-06-30"})
+    cutoff = pd.Timestamp("2020-03-31")
+    full_nav = {d: v for d, v in full.equity_curve if pd.Timestamp(d) <= cutoff}
+    mid_nav = {d: v for d, v in mid.equity_curve if pd.Timestamp(d) <= cutoff}
+    assert full_nav.keys() == mid_nav.keys() and len(full_nav) > 0
+    for d in full_nav:
+        assert abs(full_nav[d] - mid_nav[d]) < 1e-6, f"past NAV changed at {d} — look-ahead leak"
+
+
+def test_reengage_weekly_is_deterministic():
+    a = run_backtest({**BASE, "factor_timing": {"enabled": True, "ma_period": 20,
+                                                "check_weekly": True, "reengage_weekly": True}})
+    b = run_backtest({**BASE, "factor_timing": {"enabled": True, "ma_period": 20,
+                                                "check_weekly": True, "reengage_weekly": True}})
+    assert a.equity_curve == b.equity_curve
+    assert [t.model_dump() for t in a.trades] == [t.model_dump() for t in b.trades]
+
+
 def test_disabled_factor_timing_is_a_noop():
     """An explicitly-disabled overlay must reproduce the plain run byte-for-byte (no silent drift)."""
     plain = run_backtest(dict(BASE))

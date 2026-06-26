@@ -236,6 +236,7 @@ def run_backtest(config, cost_mult: float = 1.0, rs=None) -> BacktestResult:
 
     nav_dates, nav_vals, exposure_vals = [], [], []
     pending: dict | None = None
+    last_target: dict | None = None   # most recent monthly raw selection, for weekly re-engagement
 
     def close_pos(j: int, price: float, i: int, reason: str):
         pos = sim.positions.pop(j)
@@ -292,7 +293,9 @@ def run_backtest(config, cost_mult: float = 1.0, rs=None) -> BacktestResult:
         if cfg.max_hold_days and (dates[i] - dates[pos.entry_i]).days >= cfg.max_hold_days:
             return close_pos(j, c, i, "time")
 
-    def desired_set(i: int) -> tuple[list[int], dict[int, float]]:
+    def select_raw(i: int) -> tuple[list[int], dict[int, float]]:
+        """The monthly selection: which names + their pre-overlay target weights. No risk overlay
+        here — overlay is applied separately so the weekly check can re-time the SAME selection."""
         mrow, rrow = MASK[i], RANK[i]
         cands = [j for j in range(len(tickers))
                  if mrow[j] and not math.isnan(rrow[j])]
@@ -323,20 +326,35 @@ def run_backtest(config, cost_mult: float = 1.0, rs=None) -> BacktestResult:
         # Per-stock weight cap (Trendlyne "Max Weightage Per Stock"): cap + redistribute.
         if cfg.max_weight_per_stock and cfg.max_weight_per_stock > 0:
             weights = _apply_max_weight(weights, cfg.max_weight_per_stock)
+        return chosen, weights
 
+    def apply_overlay(weights: dict[int, float], i: int) -> dict[int, float]:
+        """Scale a target book by the combined risk overlay. Returns {} when fully defensive."""
+        if not weights:
+            return {}
         # Regime overlay: binary -> go fully to cash; scale -> shrink target exposure.
         mult = regime_mult(i)
         if mult <= 0.0 and rf.mode == "binary":
-            return [], {}
+            return {}
         if mult != 1.0:
             weights = {j: w * mult for j, w in weights.items()}
         # Factor-timing overlay (own-equity self-timing), applied on top of regime by the same rule.
         ftm = factor_timing_mult(i)
         if ftm <= 0.0 and ft.mode == "binary":
-            return [], {}
+            return {}
         if ftm != 1.0:
             weights = {j: w * ftm for j, w in weights.items()}
-        return chosen, weights
+        return weights
+
+    def desired_set(i: int) -> tuple[list[int], dict[int, float]]:
+        nonlocal last_target
+        chosen, base = select_raw(i)
+        if chosen:
+            last_target = {"names": list(chosen), "weights": dict(base)}  # remember pre-overlay book
+        ov = apply_overlay(base, i)
+        if not ov:
+            return [], {}
+        return chosen, ov
 
     n = len(dates)
     # track rebalances that found zero eligible names -> book sits in cash. A run that is mostly empty
@@ -378,17 +396,33 @@ def run_backtest(config, cost_mult: float = 1.0, rs=None) -> BacktestResult:
         nav_dates.append(dates[i]); nav_vals.append(nav)
         exposure_vals.append((invested / nav) if nav > 0 else 0.0)
 
-        # 3c) weekly risk-overlay check (de-risk ONLY): on a non-rebalance week, if the combined
-        # overlay has flipped fully defensive, schedule a liquidation to cash at the next fill. The
-        # gate reads NAV through today (just appended); re-entry waits for the next scheduled
-        # rebalance — no weekly re-entry, which avoids whipsaw churn-in (the #99 trailing-stop lesson).
+        # 3c) weekly risk-overlay check: on a non-rebalance week, re-evaluate the combined overlay.
+        # De-risk (always, when check_weekly): if it has flipped fully defensive while holding, schedule
+        # a liquidation to cash. Re-engage (only when reengage_weekly): if it has flipped back on while
+        # in cash, schedule a re-entry of the MOST RECENT MONTHLY selection (re-sized at the next fill).
+        # The gate reads NAV through today (just appended). De-risk-only (reengage_weekly=False) is the
+        # iter-16 behavior; bidirectional re-engagement (iter-17) is opt-in and catches the post-bottom
+        # recoveries a monthly-only re-entry misses (adr-033).
         if (ft.check_weekly and dates[i] in weekly_check and dates[i] not in rebal
-                and sim.positions and pending is None and overlay_exposure(i) <= 1e-9):
-            if cfg.entry_fill == "close":
-                for j in list(sim.positions):
-                    close_pos(j, C[i, j] if not math.isnan(C[i, j]) else Cmark[i, j], i, "overlay_exit")
-            elif i + 1 < n:
-                pending = {"exec_i": i + 1, "desired": set(), "weights": {}, "reason": "overlay_exit"}
+                and pending is None):
+            ov = overlay_exposure(i)
+            if sim.positions and ov <= 1e-9:                       # de-risk to cash
+                if cfg.entry_fill == "close":
+                    for j in list(sim.positions):
+                        close_pos(j, C[i, j] if not math.isnan(C[i, j]) else Cmark[i, j], i,
+                                  "overlay_exit")
+                elif i + 1 < n:
+                    pending = {"exec_i": i + 1, "desired": set(), "weights": {},
+                               "reason": "overlay_exit"}
+            elif ft.reengage_weekly and not sim.positions and ov > 1e-9 and last_target:
+                rew = apply_overlay(last_target["weights"], i)    # re-time the last monthly book
+                if rew:
+                    if cfg.entry_fill == "close":
+                        for j, w in rew.items():
+                            open_pos(j, w, C[i, j], i, sim.cash)
+                    elif i + 1 < n:
+                        pending = {"exec_i": i + 1, "desired": set(rew.keys()),
+                                   "weights": rew, "reason": "overlay_reenter"}
 
         # 4) rebalance decision (data up to & incl today)
         if dates[i] in rebal:
