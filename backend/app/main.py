@@ -106,6 +106,7 @@ class RotationIn(BaseModel):
     capital: float = 1_000_000.0
     benchmark: str = "NIFTY500"
     name: str = "rotation"
+    weights: list[float] | None = None  # fixed-weight static blend (e.g. [0.7,0.3]); None = rotate
 
 
 class SignalsIn(BaseModel):
@@ -362,14 +363,15 @@ def walkforward_run(body: WalkForwardIn):
 
 @app.post("/api/rotation")
 def rotation_run(body: RotationIn):
-    """Backtest the user's rotation plan: 2-3 self-timed sleeves + cash, rotate monthly to whichever
-    sleeve is working, cash when none are. Returns combined curve + per-sleeve summaries + allocations."""
+    """Backtest the user's multi-sleeve plan. Trailing-return rotation (rotate to whichever sleeve is
+    working, cash when none are) by default; pass `weights` for a FIXED-WEIGHT static blend (e.g.
+    [0.7,0.3] = 70/30, rebalanced monthly with real switch costs — the adr-035 deployable candidate)."""
     try:
         return clean(run_rotation(
             body.sleeves, rebalance=body.rebalance, lookback_days=body.lookback_days,
             top_k=body.top_k, momentum_floor=body.momentum_floor,
             switch_cost_bps=body.switch_cost_bps, capital=body.capital,
-            benchmark=body.benchmark, name=body.name))
+            benchmark=body.benchmark, name=body.name, weights=body.weights))
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(400, f"rotation failed: {_cfg_error(exc)}")
 

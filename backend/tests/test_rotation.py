@@ -48,6 +48,46 @@ def test_rotation_top_k_limits_concentration():
         assert len(a["weights"]) <= 1
 
 
+def test_fixed_weight_blend_runs_and_is_fully_invested():
+    """A 70/30 fixed-weight blend holds both sleeves every month (no trailing-return chasing) and,
+    with weights summing to 1, runs ~fully invested."""
+    out = run_rotation([SLEEVE_A, SLEEVE_B], weights=[0.7, 0.3])
+    assert out["config"]["mode"] == "fixed-weight"
+    assert out["summary"]["exposure"] > 0.95
+    # every rebalance holds BOTH sleeves at the target weights; allocations carry no 'trailing'
+    assert out["allocations"] and all(len(a["weights"]) == 2 for a in out["allocations"])
+    assert all("trailing" not in a for a in out["allocations"])
+    assert any("FIXED-WEIGHT" in w for w in out["warnings"])
+
+
+def test_fixed_weight_blend_respects_target_ratio():
+    """The held weights match the requested ratio (within rounding)."""
+    out = run_rotation([SLEEVE_A, SLEEVE_B], weights=[0.7, 0.3])
+    a = out["allocations"][0]["weights"]
+    assert abs(a["sleeveA"] - 0.7) < 1e-6 and abs(a["sleeveB"] - 0.3) < 1e-6
+
+
+def test_fixed_weight_blend_cash_sleeve_when_sum_below_one():
+    """Weights summing to <1 leave the remainder in cash (lower exposure)."""
+    out = run_rotation([SLEEVE_A, SLEEVE_B], weights=[0.5, 0.2])
+    assert out["summary"]["exposure"] < 0.85
+    assert all(abs(a["cash"] - 0.3) < 1e-6 for a in out["allocations"])
+
+
+def test_fixed_weight_blend_deterministic():
+    a = run_rotation([SLEEVE_A, SLEEVE_B], weights=[0.7, 0.3])
+    b = run_rotation([SLEEVE_A, SLEEVE_B], weights=[0.7, 0.3])
+    assert a["equity_curve"] == b["equity_curve"]
+
+
+def test_fixed_weight_blend_validates_length():
+    try:
+        run_rotation([SLEEVE_A, SLEEVE_B], weights=[1.0])
+        assert False, "expected ValueError for wrong weights length"
+    except ValueError:
+        pass
+
+
 def test_rotation_requires_two_sleeves():
     try:
         run_rotation([SLEEVE_A])
