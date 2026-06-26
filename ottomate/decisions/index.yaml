@@ -321,3 +321,13 @@ decisions:
       - curated
       - cat:reliability
     body_path: docs/decisions/adr-034-windfall-factor-timing-dropped.md
+  - id: adr-035-windfall-diversification-beats-rotation
+    project_slug: windfall-labs
+    title: "Diversification beats rotation: a fixed 70/30 momentum/low-vol blend is
+      the first deployable candidate"
+    status: accepted
+    date: 2026-06-26T00:00:00.000Z
+    tags:
+      - curated
+      - cat:reliability
+    body_path: docs/decisions/adr-035-windfall-diversification-beats-rotation.md
