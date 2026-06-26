@@ -81,6 +81,43 @@ class RegimeFilter(BaseModel):
     below_exposure: float = 0.0              # target exposure while index < its MA (0 = full cash)
 
 
+class FactorTiming(BaseModel):
+    """Meta-momentum self-timing: hold the book only while the strategy's OWN equity (its realized
+    NAV) is at/above its own moving average; otherwise stand in cash (or a reduced exposure).
+
+    Distinct from RegimeFilter, which gates on the BENCHMARK vs its MA (market direction). A
+    market-direction filter cannot protect a *factor-specific* drawdown (the 2024-26 factor winter:
+    indices flat/up while momentum/quality bled) — this gates on the strategy's own equity curve,
+    which is the lever for exactly that. The signal is lagged `lag_days` trading days so the decision
+    at the close of day t only uses NAV through t-lag (no look-ahead). Because going defensive routes
+    through the normal rebalance open/close machinery, the real switching costs (sell + DP + re-buy)
+    and next-open fills are modelled — unlike the offline frictionless PoC this replaces.
+
+    Times on the strategy's OWN realized (overlay-gated) equity — the value you actually observe
+    live — so "live == backtest" holds with no shadow portfolio. Until the strategy has `ma_period`
+    trading days of its own NAV, the gate stays fully invested (you cannot time on equity you do not
+    yet have) — same spirit as RegimeFilter's MA min_periods. `check` cadence lives on the loop, not
+    here: the engine evaluates the combined overlay at every rebalance, and (when check_weekly is on)
+    also weekly to de-risk to cash between rebalances.
+    """
+    enabled: bool = False
+    ma_period: int = 100                      # trading-day MA of the strategy's own NAV
+    mode: Literal["binary", "scale"] = "binary"
+    below_exposure: float = 0.0               # target exposure while own NAV < its MA (0 = full cash)
+    lag_days: int = 1                         # use NAV through t-lag_days for the gate (no look-ahead)
+    check_weekly: bool = False                # also evaluate weekly (de-risk only) between rebalances
+
+    @model_validator(mode="after")
+    def _validate(self):
+        if self.ma_period < 2:
+            raise ValueError("factor_timing ma_period must be at least 2")
+        if self.lag_days < 0:
+            raise ValueError("factor_timing lag_days must be at least 0")
+        if not 0 <= self.below_exposure <= 1:
+            raise ValueError("factor_timing below_exposure must be between 0 and 1")
+        return self
+
+
 class StrategyConfig(BaseModel):
     name: str = "unnamed_strategy"
     # "windfall" = the legacy yfinance/windfall.duckdb store (current-membership, snapshot DVM).
@@ -104,6 +141,7 @@ class StrategyConfig(BaseModel):
     sector_cap: int | None = None              # max holdings per sector (methodology v2.2 used 2)
     max_position_adtv_pct: float = 0.10        # cap a position's notional vs its ADTV
     regime_filter: RegimeFilter = Field(default_factory=RegimeFilter)
+    factor_timing: FactorTiming = Field(default_factory=FactorTiming)  # self-timing on own equity
     costs_bps: Costs = Field(default_factory=Costs)
     capital: float = 1_000_000.0
     start: str = "2015-01-01"

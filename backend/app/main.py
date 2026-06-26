@@ -19,6 +19,7 @@ from windfall.data import trendlyne_store as ts
 from windfall.jsonsafe import clean
 from windfall.data.pipeline import incremental_update
 from windfall.engine.backtest import run_backtest, resolve_with_warmup
+from windfall.engine.rotation import run_rotation
 from windfall.paper import commit_signal, list_positions, mark_to_market, scoreboard
 from windfall.scripts_validation import run_validation
 from windfall.signals_live import generate_signals
@@ -92,6 +93,19 @@ class CostSensitivityIn(BaseModel):
 class CompareIn(BaseModel):
     config_a: dict
     config_b: dict
+
+
+class RotationIn(BaseModel):
+    # Fund-of-funds rotation across self-timed sleeves + cash (the user's 2-3-strategies plan).
+    sleeves: list[dict]                 # each is a full StrategyConfig (ideally with factor_timing)
+    rebalance: str = "monthly"
+    lookback_days: int = 63             # trailing-return window used to rank sleeves (~3 months)
+    top_k: int | None = None           # max sleeves held at once (None = all that clear the floor)
+    momentum_floor: float = 0.0        # a sleeve must beat this trailing return to be "working"
+    switch_cost_bps: float = 20.0      # conservative fund-level switch cost on reallocation
+    capital: float = 1_000_000.0
+    benchmark: str = "NIFTY500"
+    name: str = "rotation"
 
 
 class SignalsIn(BaseModel):
@@ -344,6 +358,20 @@ def walkforward_run(body: WalkForwardIn):
                                   is_years=body.is_years, oos_years=body.oos_years))
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(400, f"walk-forward failed: {_cfg_error(exc)}")
+
+
+@app.post("/api/rotation")
+def rotation_run(body: RotationIn):
+    """Backtest the user's rotation plan: 2-3 self-timed sleeves + cash, rotate monthly to whichever
+    sleeve is working, cash when none are. Returns combined curve + per-sleeve summaries + allocations."""
+    try:
+        return clean(run_rotation(
+            body.sleeves, rebalance=body.rebalance, lookback_days=body.lookback_days,
+            top_k=body.top_k, momentum_floor=body.momentum_floor,
+            switch_cost_bps=body.switch_cost_bps, capital=body.capital,
+            benchmark=body.benchmark, name=body.name))
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(400, f"rotation failed: {_cfg_error(exc)}")
 
 
 # ── signals ──────────────────────────────────────────────────────────────────
