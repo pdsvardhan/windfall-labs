@@ -311,3 +311,13 @@ decisions:
       - curated
       - cat:reliability
     body_path: docs/decisions/adr-033-windfall-factor-timing-in-engine.md
+  - id: adr-034-windfall-factor-timing-dropped
+    project_slug: windfall-labs
+    title: Faster re-engagement tested; own-equity factor-timing still doesn t beat
+      plain momentum, so it is dropped as the primary risk control
+    status: accepted
+    date: 2026-06-26T00:00:00.000Z
+    tags:
+      - curated
+      - cat:reliability
+    body_path: docs/decisions/adr-034-windfall-factor-timing-dropped.md
