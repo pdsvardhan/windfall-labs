@@ -1,5 +1,12 @@
 # Windfall Labs — Handover / Next-Session Brief
 
+> ⚠️ **STALE (flagged 2026-06-30 during the Ottomate deep-dive).** This brief was last
+> updated 2026-06-19 and has drifted: it cites "~34 tests" (now ~157 backend fns / 21+ files),
+> lists **slippage as modelled** (dropped in ADR-020 — delivery costs only, no slippage), and
+> still lists already-shipped/removed work as pending (e.g. the homegrown D/V/M, since **removed**
+> in ADR-019; survivorship-free history, **shipped** in ADR-018). For current state read
+> `docs/iteration-log.md`, `public_docs/`, and `docs/decisions/` (through ADR-036) instead.
+
 *Last updated: 2026-06-19. Read this first; you should not need to re-explain the project from scratch.*
 
 ## What this is

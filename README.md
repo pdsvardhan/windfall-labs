@@ -9,7 +9,7 @@ before risking capital.
 
 ## Principles (baked in)
 
-1. **Realism over optimism** — model costs + slippage; report turnover prominently.
+1. **Realism over optimism** — model real transaction costs (side-aware NSE delivery fees + flat DP charge, per ADR-020; slippage is not modelled for delivery trades by design); report turnover prominently.
 2. **Exits are first-class** — stops, targets, trailing, time-exits, not just rebalance rotation.
 3. **No look-ahead** — point-in-time data, next-open fills, fundamentals lagged to publish date.
 4. **Liquidity-aware** — never "trade" what you couldn't have bought/exited (ADTV filters + caps).
@@ -26,6 +26,13 @@ backend/    FastAPI + the `windfall` quant engine package (data, signals, strate
 frontend/   Next.js (App Router, TypeScript) cockpit dashboard.
 docs/       Architecture decision records (ADRs).
 ```
+
+The backtest engine (`backend/windfall/engine/backtest.py`) is a **from-scratch, hand-rolled
+deterministic rebalance-and-hold simulator** — not `vectorbt`. ADR-004 originally planned to build
+on vectorbt, but it was never adopted (it lives only in `requirements-optional.txt` and is imported
+by no runtime code); see ADR-036. Data sources: Trendlyne (primary history/fundamentals/DVM, manual
+in-browser harvest), screener.in (historical fundamentals), NSE Bhavcopy (survivorship-free EOD,
+nightly cron), and yfinance (legacy path) — all into per-source DuckDB stores.
 
 See `docs/decisions/` for the why behind the stack, data sourcing, and engine choices.
 
@@ -51,6 +58,13 @@ npm run dev    # http://localhost:8500
 ```bash
 docker compose up -d --build      # web on :8500, api on host :8505 (container :8503)
 ```
+
+## Access
+
+Private, single-user. **No in-app authentication** (ADR-005). Reached on the LAN at
+`http://192.168.1.10:8500`, and published at `https://windfall-labs.vault7a.xyz` behind
+**Authentik SSO** via the Cloudflare tunnel — the SSO gate, not app auth, is the access boundary.
+Do not remove the Authentik gate.
 
 ## Status
 

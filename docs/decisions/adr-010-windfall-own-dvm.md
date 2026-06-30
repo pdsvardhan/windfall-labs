@@ -1,6 +1,11 @@
 # ADR-010 — Build our own reproducible D/V/M, validated against Trendlyne
 
-**Status:** accepted · **Date:** 2026-06-19 · **Iteration:** #23
+**Status:** superseded by [ADR-019](adr-019-windfall-remove-own-dvm.md) · **Date:** 2026-06-19 · **Iteration:** #23
+
+> **Superseded (2026-06-21, ADR-019):** the homegrown D/V/M was removed; the platform now
+> uses raw fundamentals + Trendlyne's own DVM directly. The `windfall/scores/` package and the
+> `own_dvm`/`validate` modules this ADR introduced were deleted. (Status restamped 2026-06-30
+> during the Ottomate deep-dive — the file had been left "accepted".)
 
 ## Context
 

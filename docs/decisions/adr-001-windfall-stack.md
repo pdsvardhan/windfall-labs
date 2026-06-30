@@ -4,7 +4,12 @@
 
 ## Context
 Windfall Labs is a private, single-user platform whose hardest work is in Python: the quant
-engine relies on `vectorbt`, `pandas`/`numpy`, and a columnar store. The PRD floated Streamlit/Dash
+engine relies on `pandas`/`numpy` and a columnar store. The PRD floated Streamlit/Dash
+
+<!-- Amendment 2026-06-30: this Context originally listed `vectorbt` in the stack. The
+shipped engine is hand-rolled and does NOT depend on vectorbt — see ADR-004's amendment
+and ADR-036. -->
+
 as the fastest path, but the owner explicitly asked for "the best stack, no shortcuts — this will
 be a huge product with lots of features later."
 

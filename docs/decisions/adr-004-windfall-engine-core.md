@@ -1,6 +1,14 @@
 # ADR-004 — Backtest core: vectorbt over a hand-rolled simulator
 
-**Status:** accepted · **Date:** 2026-06-19
+**Status:** superseded by [ADR-036](adr-036-windfall-engine-hand-rolled.md) · **Date:** 2026-06-19
+
+> **Amendment (2026-06-30):** This decision was NOT followed in practice. The shipped
+> engine (`backend/windfall/engine/backtest.py`) is a from-scratch, hand-rolled
+> deterministic simulator; **`vectorbt` is not a runtime dependency** (it lives only in
+> `requirements-optional.txt` and is imported by no code). See
+> [ADR-036](adr-036-windfall-engine-hand-rolled.md) for the as-built record. The
+> rebalance-and-hold + daily-explicit-exits semantics below still describe the engine;
+> only the "build on top of vectorbt" substrate was dropped.
 
 ## Context
 A home-built simulator is easy to get subtly wrong (fills, cost accounting, corporate actions).
