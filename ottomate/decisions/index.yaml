@@ -30,12 +30,13 @@ decisions:
   - id: adr-004-windfall-engine-core
     project_slug: windfall-labs
     title: "Backtest core: vectorbt over a hand-rolled simulator"
-    status: accepted
+    status: superseded
     date: 2026-06-19T00:00:00.000Z
     tags:
       - curated
       - cat:system
     body_path: docs/decisions/adr-004-windfall-engine-core.md
+    superseded_by: adr-036-windfall-engine-hand-rolled
   - id: adr-005-windfall-no-auth
     project_slug: windfall-labs
     title: "No authentication in v1: private, single-user, tunnel-gated"
@@ -331,3 +332,13 @@ decisions:
       - curated
       - cat:reliability
     body_path: docs/decisions/adr-035-windfall-diversification-beats-rotation.md
+  - id: adr-036-windfall-engine-hand-rolled
+    project_slug: windfall-labs
+    title: Engine shipped hand-rolled; the vectorbt plan (adr-004) was not adopted
+    status: accepted
+    date: 2026-06-30T00:00:00.000Z
+    tags:
+      - curated
+      - cat:system
+      - engine
+    body_path: docs/decisions/adr-036-windfall-engine-hand-rolled.md

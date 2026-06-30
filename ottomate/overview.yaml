@@ -22,8 +22,8 @@ scope_size: large
 target_devices: desktop
 hosting_target: vault7a-docker
 port: 8500
-public_url: http://192.168.1.10:8500
-repository_url: http://192.168.1.10:3300/pdsv/windfall-labs
+public_url: https://windfall-labs.vault7a.xyz
+repository_url: http://git.vault7a.xyz/pdsv/windfall-labs
 problem_statement: "Researching systematic equity strategies on screener tools
   (Trendlyne) hits hard limits: rebalance caps, no realistic costs/slippage, no
   explicit exit modelling, survivorship-biased universes, and look-ahead risk -
@@ -66,7 +66,8 @@ preferences:
     - deterministic, reproducible runs tagged by config hash
     - clean stable JSON contracts between assistant and engine
     - fast columnar data (DuckDB) - download once, reuse
-    - battle-tested vectorized backtest core (vectorbt)
+    - deterministic, hand-rolled vectorized backtest core (vectorbt was the
+      adr-004 plan but was never adopted as a dependency - see adr-036)
   dislikes:
     - curve-fit strategies that only work in-sample
     - look-ahead bias (same-bar close fills, unlagged fundamentals)

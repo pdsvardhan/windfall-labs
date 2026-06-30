@@ -1,4 +1,40 @@
-risks: []
+risks:
+  - id: 82
+    project_slug: windfall-labs
+    risk_type_id: no-tests
+    status: open
+    hidden_by_default: false
+    notes: "Deep-dive 2026-06-30: frontend has ZERO tests (no
+      vitest/jest/playwright). Backend has ~157 test fns across 23 files but 3
+      are FAILING and 12 skipped — the failures are honest debt asserting
+      readiness for the homegrown durability_own/valuation_own scores removed in
+      adr-019 (stale tests, openly documented in public_docs/validation.md).
+      Clean up the stale own-DVM tests + the broken validate_own_dvm.py; add
+      minimal frontend smoke tests."
+    created_at: 2026-06-30T12:05:00.000Z
+  - id: 83
+    project_slug: windfall-labs
+    risk_type_id: third-party-uptime
+    status: open
+    hidden_by_default: false
+    notes: "Deep-dive 2026-06-30: the primary data layer (Trendlyne) is a WAF-gated
+      MANUAL in-browser harvest, not an API — no automated refresh, and it goes
+      stale between pulls (todo #85: ohlcv 7d / index 11d behind bhavcopy).
+      screener.in/NSE/yfinance are also unauthenticated public sources subject
+      to change/blocking. Single point of data fragility; mitigated by the
+      nightly Bhavcopy splice for live prices only."
+    created_at: 2026-06-30T12:05:00.000Z
+  - id: 84
+    project_slug: windfall-labs
+    risk_type_id: hardcoded-credentials
+    status: open
+    hidden_by_default: false
+    notes: "Deep-dive 2026-06-30: the git 'origin' remote embeds a plaintext Gitea
+      push token in .git/config (http://pdsv:TOKEN@192.168.1.10:3300/...). NOT
+      committed (local config only) and LAN-only, so low real exposure, but the
+      token sits in plaintext on disk. Fix: switch origin to tokenless SSH /
+      credential helper (ottomate systemic to-do)."
+    created_at: 2026-06-30T12:05:00.000Z
 policy:
   project_slug: windfall-labs
   exposure: intranet-only
@@ -13,5 +49,80 @@ auth_config:
   strategy: none
   mfa_supported: false
   auth_library: n-a
-third_party_services: []
-secrets: []
+third_party_services:
+  - id: 36
+    project_slug: windfall-labs
+    name: Trendlyne
+    purpose: "Primary data layer (adr-014): full-history OHLCV, fundamentals, DVM
+      scores, valuation ratios, PIT universe membership, delistings. WAF-gated —
+      harvested manually in a logged-in browser tab (in-browser JS), exported to
+      CSV, ingested to trendlyne.duckdb (read-only at runtime). Not a live API
+      call."
+    data_shared: None outbound (read-only ingest of public-after-login equity data)
+    auth_method: anonymous
+    failure_mode: "degraded: survivorship-free path runs on cached data; staleness
+      grows until next manual harvest"
+  - id: 37
+    project_slug: windfall-labs
+    name: screener.in
+    purpose: "Historical fundamentals (adr-013): ROE/ROA/OPM/EPS history,
+      120d-lagged, triangulation-validated. Free public pages, ingested offline
+      to screener_fundamentals.duckdb."
+    data_shared: None outbound
+    auth_method: anonymous
+    failure_mode: "degraded: fundamentals run on last ingest"
+  - id: 38
+    project_slug: windfall-labs
+    name: NSE Bhavcopy
+    purpose: Survivorship-free raw EOD prices (adr-011), ISIN-keyed. Nightly host
+      cron (20:30 IST weekdays, adr-022) ingests recent bars to bhavcopy.duckdb
+      and splices the freshest EOD past the Trendlyne layer for live signals.
+    data_shared: None outbound
+    auth_method: anonymous
+    failure_mode: "degraded: live-signal prices stale by a day; backtests unaffected
+      (Trendlyne history is canonical)"
+  - id: 39
+    project_slug: windfall-labs
+    name: NSE archives (index constituents + ASM/GSM)
+    purpose: Live fetch of Nifty index constituent CSVs (universe.py, bundled
+      fallback) and a daily 9am ASM/GSM surveillance snapshot (adr-012
+      guardrail).
+    data_shared: None outbound
+    auth_method: anonymous
+    failure_mode: "degraded: falls back to bundled constituents; surveillance flag stale"
+  - id: 40
+    project_slug: windfall-labs
+    name: yfinance (Yahoo Finance)
+    purpose: "Legacy/first data path (adr-003): incremental OHLCV update for the
+      data_source=windfall path; nightly incremental_update + POST
+      /api/data/refresh."
+    data_shared: None outbound
+    auth_method: anonymous
+    failure_mode: "degraded: legacy path stale; Trendlyne path is primary"
+  - id: 41
+    project_slug: windfall-labs
+    name: Gitea
+    purpose: Repo hosting on git.vault7a.xyz/pdsv/windfall-labs (origin currently a
+      tokenized HTTP remote on :3300 — see secret + to-do to move to SSH).
+    data_shared: Source code
+    auth_method: basic-auth
+    failure_mode: "degraded: no push; runtime unaffected"
+secrets:
+  - id: 25
+    project_slug: windfall-labs
+    name: Gitea push token
+    where_stored: env-file
+    what_for: Embedded in the git 'origin' remote URL in .git/config
+      (http://pdsv:TOKEN@192.168.1.10:3300/...). Plaintext on disk, NOT
+      committed, LAN-only. Flagged as a risk; to-do to switch origin to
+      tokenless SSH.
+    rotation_cadence: ad-hoc
+  - id: 26
+    project_slug: windfall-labs
+    name: (none) data-vendor credentials
+    where_stored: env-vars
+    what_for: "NOTE: there are intentionally NO data-vendor API keys/cookies in
+      code. Trendlyne/screener are harvested manually in-browser; NSE/yfinance
+      are public. .env.example carries only commented-out, unused deferred
+      placeholders (TELEGRAM_BOT_TOKEN, KITE_API_KEY) for future phases."
+    rotation_cadence: never

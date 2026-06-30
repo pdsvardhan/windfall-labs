@@ -24,9 +24,11 @@ pages:
     components: []
   - id: page-windfall-backtest-results
     title: Backtest Results
-    route: /backtests/[id]
-    purpose: Equity curve, drawdown curve, summary metrics, monthly returns and the
-      full trade log for a backtest.
+    route: /strategies/[id] (inline)
+    purpose: Backtest results (equity/drawdown curves, summary metrics, monthly
+      returns, full trade log) render INLINE on the strategy page via
+      components/BacktestReport.tsx. There is no standalone /backtests/[id]
+      route.
     layout_type: detail
     empty_state: Run a backtest to see results here.
     loading_state: skeleton
@@ -36,8 +38,10 @@ pages:
     components: []
   - id: page-windfall-walk-forward
     title: Walk-Forward Report
-    route: /walk-forward/[id]
-    purpose: In-sample vs out-of-sample degradation and parameter-sweep ranking.
+    route: (API only)
+    purpose: Walk-forward (in-sample vs out-of-sample) + parameter sweep exist as
+      backend APIs (POST /api/walkforward, /api/sweep). No dedicated UI route is
+      built yet.
     layout_type: detail
     empty_state: Launch a walk-forward to see the robustness report.
     loading_state: skeleton
@@ -58,8 +62,9 @@ pages:
     components: []
   - id: page-windfall-paper
     title: Paper Trades
-    route: /paper
-    purpose: Paper-trade scoreboard and open simulated positions per strategy.
+    route: (API only)
+    purpose: Paper-trade scoreboard + open simulated positions exist as backend APIs
+      (/api/paper/*). No dedicated UI route is built yet.
     layout_type: dashboard
     empty_state: No paper trades yet - commit a live signal to start tracking.
     loading_state: skeleton
@@ -69,13 +74,25 @@ pages:
     components: []
   - id: page-windfall-data
     title: Data Status
-    route: /data
-    purpose: Universe coverage, last update, ADTV summary and the Phase-0 data
-      feasibility matrix.
+    route: (API only)
+    purpose: Universe coverage / last-update / ADTV / data-feasibility available via
+      API (/api/data, /api/coverage); surfaced on the Cockpit. No dedicated
+      /data route.
     layout_type: dashboard
     empty_state: No data loaded yet.
     loading_state: skeleton
     permissions: anonymous
     mobile_handling: desktop-only
+    entry_points: []
+    components: []
+  - id: page-windfall-reference
+    title: Reference
+    route: /reference
+    purpose: Reference/catalog page (frontend/src/app/reference) — strategy-config
+      field reference and factor catalog. A real nav destination (Cockpit /
+      Strategies / Signals / Reference) that was missing from the tracker.
+    layout_type: list
+    permissions: anonymous
+    mobile_handling: responsive
     entry_points: []
     components: []

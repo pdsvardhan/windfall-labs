@@ -62,10 +62,13 @@ features:
         linked_test: null
     dependencies: []
   - id: backtest-engine
-    title: Backtesting engine (vectorbt)
-    short_description: "Vectorbt simulation: costs+slippage,
-      stops/targets/trailing/time-exit, ADTV-capped sizing, next-open fills,
-      full metrics + trade log to results.json."
+    title: Backtesting engine (hand-rolled simulator)
+    short_description: "From-scratch deterministic rebalance-and-hold simulator
+      (engine/backtest.py): next-open fills, no look-ahead, explicit daily
+      stops/targets/trailing/time-exit, ADTV-capped sizing, accurate NSE
+      delivery cost model (no slippage, adr-020), full metrics + trade log to
+      results.json. vectorbt was the adr-004 plan but is NOT a dependency
+      (adr-036)."
     type: backend
     status: done
     priority: P0
