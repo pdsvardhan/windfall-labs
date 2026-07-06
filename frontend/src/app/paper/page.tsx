@@ -6,6 +6,10 @@ import type { PaperPosition } from "@/lib/types";
 import { money, pctSigned, num, signClass, dateShort } from "@/lib/format";
 import { Card, Pill } from "@/components/ui";
 
+// Notional capital per strategy — used to surface how much is actually deployed vs. sitting in cash
+// (the ₹1L books are only partly invested when weights × ₹1L round below one share).
+const NOTIONAL = 100000;
+
 // Friendly labels for the tracked strategies (strategy_id -> shown name + one-line what).
 const LABELS: Record<string, { name: string; note: string }> = {
   DVM_user: { name: "DVM (yours)", note: "mcap>500 · avg(D,V,M)≥55 · top-10 by DVM blend" },
@@ -74,8 +78,9 @@ export default function PaperPage() {
         <div>
           <h1 className="text-[34px] font-extrabold tracking-tight">Paper trades</h1>
           <p className="text-muted text-[14px] mt-1.5 max-w-[640px]">
-            A zero-risk live dry-run. Real NSE end-of-day prices and the real cost model — no money at stake.
-            Watch the strategies compete before funding one.
+            A zero-risk live dry-run on real NSE end-of-day prices — no money at stake. Returns are
+            <b> gross of trading costs</b> (brokerage/STT/slippage not yet deducted). Watch the
+            strategies compete before funding one.
           </p>
         </div>
         <button className="btn btn-ink" disabled={busy} onClick={markNow}>{busy ? "marking…" : "↻ Mark to market"}</button>
@@ -86,9 +91,10 @@ export default function PaperPage() {
       {/* honesty / freshness banner */}
       <Card className="px-4 py-3 mb-4 text-[12px] text-muted" style={{ background: "#f7f5fc" }}>
         <b className="text-ink">How this works:</b> prices are NSE Bhavcopy <b>end-of-day</b> (not intraday),
-        refreshed weekday nights; P&amp;L marks to the last trading day{lastMark ? <> — currently <b className="text-ink">{lastMark}</b></> : ""}.
-        Entries were taken as-of the latest bar with a tradeable universe. Monthly rebalances need a fresh
-        Trendlyne data pull. This is a dry-run — you still place every real order yourself.
+        refreshed weekday nights; P&amp;L marks to the last trading day{lastMark ? <> — currently <b className="text-ink">{lastMark}</b></> : ""}
+        {" "}and is <b>gross of costs</b>. Each position enters at the close it was opened on, so day-0 P&amp;L
+        starts at zero. Books are only partly invested when a name&apos;s weight rounds below one share —
+        see <b>cash %</b> per strategy. Monthly rebalances need a fresh Trendlyne pull. You still place every real order yourself.
       </Card>
 
       {positions.length === 0 ? (
@@ -98,8 +104,8 @@ export default function PaperPage() {
           {/* portfolio total */}
           <div className="flex flex-wrap items-center gap-x-6 gap-y-1 mb-4 text-[13px]">
             <span className="text-muted">Across {aggs.length} strategies · {positions.length} positions</span>
-            <span>Invested <b className="tn">{money(totalInvested)}</b></span>
-            <span>Total P&amp;L <b className={`tn ${signClass(totalPnl)}`}>{money(totalPnl)}</b></span>
+            <span>Deployed <b className="tn">{money(totalInvested)}</b> <span className="text-faint">of {money(aggs.length * NOTIONAL)} notional</span></span>
+            <span>Total P&amp;L <b className={`tn ${signClass(totalPnl)}`}>{money(totalPnl)}</b> <span className="text-faint">gross</span></span>
           </div>
 
           {/* leaderboard of strategies */}
@@ -128,9 +134,9 @@ export default function PaperPage() {
                       <div className="text-[13px] font-bold tn">{a.open}</div>
                       <div className="text-[11px] text-faint">open</div>
                     </div>
-                    <div className="text-right w-[74px] hidden md:block">
-                      <div className="text-[13px] font-bold tn">{a.positions.length ? Math.round((a.wins / a.positions.length) * 100) : 0}%</div>
-                      <div className="text-[11px] text-faint">winners</div>
+                    <div className="text-right w-[84px] hidden md:block">
+                      <div className="text-[13px] font-bold tn">{money(a.invested)}</div>
+                      <div className="text-[11px] text-faint">{Math.round(Math.max(0, 1 - a.invested / NOTIONAL) * 100)}% cash</div>
                     </div>
                     <span className="text-faint text-[15px] transition-transform" style={{ transform: isOpen ? "rotate(90deg)" : "none" }}>›</span>
                   </button>

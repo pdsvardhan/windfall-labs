@@ -42,9 +42,16 @@ def _latest_close(ticker: str):
 
 
 def commit_signal(strategy_id: str | None, signal: dict, capital_per_position: float = 15000.0) -> str:
-    entry = signal.get("last_close") or signal.get("entry")
+    # Enter at the latest EXECUTABLE close — what you'd actually pay committing the trade now — not the
+    # signal bar's close. When signals resolve on stale data (as-of an older bar than today), pricing
+    # entry at that older close and then marking to the current close books phantom day-0 P&L for the
+    # gap the account never held (audit 2026-07-06). Fall back to the signal's own close if the store
+    # has no fresh price. entry_date is set to the price's date so entry and first mark share one bar.
+    entry_date, latest = _latest_close(signal["ticker"])
+    entry = latest if (latest and latest > 0) else (signal.get("last_close") or signal.get("entry"))
     if not entry or entry <= 0:
         raise ValueError("signal has no usable entry price")
+    entry_date = entry_date or dt.date.today()
     shares = math.floor(capital_per_position / entry)
     pid = new_id("pp")
     con = _init()
@@ -53,9 +60,9 @@ def commit_signal(strategy_id: str | None, signal: dict, capital_per_position: f
             "INSERT INTO paper_positions (id,strategy_id,ticker,status,entry_date,entry,stop,"
             "target,weight,shares,last_price,last_date,return_pct,r_multiple,reason,created_at) "
             "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-            [pid, strategy_id, signal["ticker"], "open", dt.date.today(), float(entry),
+            [pid, strategy_id, signal["ticker"], "open", entry_date, float(entry),
              signal.get("stop"), signal.get("target"), signal.get("weight", 0.0), float(shares),
-             float(entry), dt.date.today(), 0.0, None, None, dt.datetime.now()])
+             float(entry), entry_date, 0.0, None, None, dt.datetime.now()])
         return pid
     finally:
         con.close()
