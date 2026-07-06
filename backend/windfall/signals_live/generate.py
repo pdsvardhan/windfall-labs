@@ -51,7 +51,14 @@ def generate_signals(config) -> dict:
     if len(dates) < 60:
         return {"as_of": None, "signals": [], "warnings": rs.warnings + ["insufficient history"]}
 
-    last_i = len(dates) - 1
+    # Live data splices prices forward (bhavcopy, adr-022) beyond the trendlyne membership/ohlcv
+    # coverage; on that stale tail the point-in-time eligibility gate empties out (entry_mask all
+    # False), which would collapse today's book to an all-sell list. Resolve as-of the last bar that
+    # actually has an eligible universe, so live orders reflect a real, tradeable book.
+    latest_i = len(dates) - 1
+    last_i = latest_i
+    while last_i > 0 and not bool(rs.entry_mask.iloc[last_i].any()):
+        last_i -= 1
     prev_i = max(0, last_i - _STEP[cfg.rebalance])
     today = _select(rs, last_i, cfg)
     prev = _select(rs, prev_i, cfg)
@@ -99,6 +106,11 @@ def generate_signals(config) -> dict:
     if days_stale > 3:
         warnings.append(f"Latest data is {days_stale} days old (as of {as_of}). Refresh data "
                         f"before trading these signals.")
+    if last_i < latest_i:
+        warnings.append(
+            f"Signals computed as of {as_of}: the latest {latest_i - last_i} price bar(s) "
+            f"(through {dates[latest_i].date()}) had no eligible universe — stale point-in-time "
+            f"membership/data — so orders are taken on the most recent bar with a tradeable book.")
     return {"as_of": str(as_of), "data_age_days": days_stale, "strategy": cfg.name,
             "regime": _regime_state(rs, cfg, last_i),
             "n_holdings": cfg.n_holdings, "signals": sigs, "warnings": warnings}
