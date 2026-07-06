@@ -342,3 +342,14 @@ decisions:
       - cat:system
       - engine
     body_path: docs/decisions/adr-036-windfall-engine-hand-rolled.md
+  - id: adr-037-windfall-live-signals-paper
+    project_slug: windfall-labs
+    title: "Live signals fixed and an honest 5-strategy paper dry-run:
+      last-healthy-bar resolution, real-price marking, day-0 P&L and
+      cost-honesty fixes"
+    status: accepted
+    date: 2026-07-06T00:00:00.000Z
+    tags:
+      - curated
+      - cat:reliability
+    body_path: docs/decisions/adr-037-windfall-live-signals-paper.md
