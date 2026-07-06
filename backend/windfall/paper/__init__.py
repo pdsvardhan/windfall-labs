@@ -1,2 +1,5 @@
-"""Paper-trade book — persist signals as simulated positions, mark-to-market, scoreboard."""
-from .book import commit_signal, list_positions, mark_to_market, scoreboard  # noqa: F401
+"""Paper-trade book — persist signals as simulated positions, mark-to-market, scoreboard, rebalance."""
+from .book import (  # noqa: F401
+    close_position, commit_signal, delete_positions, list_positions, mark_to_market, scoreboard,
+)
+from .rebalance import rebalance_paper  # noqa: F401

@@ -94,6 +94,43 @@ def mark_to_market() -> dict:
         con.close()
 
 
+def close_position(pid: str, reason: str = "rebalance") -> bool:
+    """Close one open position at the latest EOD close (used by the monthly rebalance for drop-outs)."""
+    con = _init()
+    try:
+        row = con.execute(
+            "SELECT ticker, entry, stop FROM paper_positions WHERE id=? AND status='open'", [pid]
+        ).fetchone()
+        if not row:
+            return False
+        ticker, entry, stop = row
+        last_date, last_price = _latest_close(ticker)
+        exit_price = last_price if last_price is not None else entry
+        exit_date = last_date if last_date is not None else dt.date.today()
+        ret_pct = (exit_price / entry - 1.0) if entry else 0.0
+        rmult = ((exit_price - entry) / (entry - stop)) if (stop and entry - stop > 0) else None
+        con.execute(
+            "UPDATE paper_positions SET status='closed', exit=?, exit_date=?, last_price=?, "
+            "last_date=?, return_pct=?, r_multiple=?, reason=? WHERE id=?",
+            [float(exit_price), exit_date, float(exit_price), exit_date, float(ret_pct),
+             (float(rmult) if rmult is not None else None), reason, pid])
+        return True
+    finally:
+        con.close()
+
+
+def delete_positions(strategy_id: str) -> int:
+    """Hard-delete every position for a strategy_id (e.g. purging a stale test book)."""
+    con = _init()
+    try:
+        n = con.execute(
+            "SELECT COUNT(*) FROM paper_positions WHERE strategy_id=?", [strategy_id]).fetchone()[0]
+        con.execute("DELETE FROM paper_positions WHERE strategy_id=?", [strategy_id])
+        return int(n)
+    finally:
+        con.close()
+
+
 def list_positions(strategy_id: str | None = None, status: str | None = None) -> list[dict]:
     con = connect(read_only=True)
     try:

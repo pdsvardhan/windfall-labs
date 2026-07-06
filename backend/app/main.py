@@ -20,7 +20,9 @@ from windfall.jsonsafe import clean
 from windfall.data.pipeline import incremental_update
 from windfall.engine.backtest import run_backtest, resolve_with_warmup
 from windfall.engine.rotation import run_rotation
-from windfall.paper import commit_signal, list_positions, mark_to_market, scoreboard
+from windfall.paper import (
+    commit_signal, delete_positions, list_positions, mark_to_market, rebalance_paper, scoreboard,
+)
 from windfall.scripts_validation import run_validation
 from windfall.signals_live import generate_blend_signals, generate_signals
 from windfall.signals_live.generate import signals_to_csv
@@ -468,6 +470,22 @@ def paper_positions(strategy_id: str | None = None, status: str | None = None):
 @app.get("/api/paper/scoreboard")
 def paper_scoreboard():
     return clean(scoreboard())
+
+
+@app.post("/api/paper/rebalance")
+def paper_rebalance():
+    """Monthly rebalance: sync every tracked paper strategy to its current target book."""
+    return clean(rebalance_paper())
+
+
+class PurgeIn(BaseModel):
+    strategy_id: str
+
+
+@app.post("/api/paper/purge")
+def paper_purge(body: PurgeIn):
+    """Hard-delete every paper position for a strategy_id (e.g. a stale test book)."""
+    return {"deleted": delete_positions(body.strategy_id)}
 
 
 # ── validation ───────────────────────────────────────────────────────────────
