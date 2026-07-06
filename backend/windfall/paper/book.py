@@ -8,11 +8,26 @@ from __future__ import annotations
 import datetime as dt
 import math
 
+from ..data import trendlyne_store as ts
 from ..data.store import connect
 from ..store_meta import _init, new_id
 
 
 def _latest_close(ticker: str):
+    # Primary: the Trendlyne survivorship-free store (bare tickers) with the live Bhavcopy splice —
+    # the SAME adjusted series the signals/backtests use, so entry and mark stay on one basis. Falls
+    # back to the legacy yfinance `prices` table (.NS tickers) for older paper positions.
+    try:
+        panel = ts.adjusted_close_panel(
+            [ticker], start=(dt.date.today() - dt.timedelta(days=40)).isoformat(),
+            end=None, extend_live=True)
+        col = ticker.upper()
+        if col in panel.columns:
+            s = panel[col].dropna()
+            if len(s):
+                return s.index[-1].date(), float(s.iloc[-1])
+    except Exception:
+        pass
     con = connect(read_only=True)
     try:
         r = con.execute(
