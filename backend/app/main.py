@@ -73,16 +73,16 @@ class SweepIn(BaseModel):
 
 class BatchIn(BaseModel):
     # Resolve per distinct stop-panel combo, simulate the whole grid off each.
-    # KNOWN-SAFE grid keys (pure sim-side, share one ResolvedStrategy, ~10x faster than N
-    # independent backtests): n_holdings / rebalance / weighting / stop_loss.mult /
-    # stop_loss.value / take_profit.* / max_hold_days / max_position_adtv_pct / sector_cap.
+    # Grid keys are ENFORCED against _SAFE_GRID_KEYS/_SAFE_GRID_PREFIXES (verified pure-sim-side;
+    # they share one ResolvedStrategy, ~10x faster than N independent backtests).
     # `stop_loss.type` + `stop_loss.atr_period` are handled: they decide whether resolve() builds
     # the ATR panel, so combos are grouped by `_resolve_key` and each group resolves once.
-    # NOT SAFE — do not grid these, they change what resolve() produces and will silently reuse
-    # the base's panels: rank_by / rank_blend / universe.* / entry_filters / start / end /
-    # benchmark / data_source, and regime_filter.* (its MA warmup pad is sized at resolve from
-    # regime_filter.enabled — gridding it on measures ~0.229 CAGR where a direct resolve gives
-    # ~0.235, iter-22). Use separate /api/backtests calls for those. Tracked as a follow-up todo.
+    # Anything else — rank_by / rank_blend / universe.* / entry_filters / start / end / benchmark /
+    # data_source / regime_filter.* (its MA warmup pad is sized at resolve from
+    # regime_filter.enabled: gridding it on measured ~0.229 CAGR where a direct resolve gives
+    # ~0.235, iter-22) — changes what resolve() produces and is refused with 400 (#219): the
+    # resolve-once optimisation would silently reuse the base's panels and label the results as
+    # varied. Use separate /api/backtests calls for those.
     base_config: dict
     grid: dict = {}            # e.g. {"n_holdings":[10,20], "rebalance":["monthly","quarterly"]}
     name_template: str = ""    # e.g. "MOM_roc126_{rebalance}_{n_holdings}"; falls back to base name
@@ -153,11 +153,12 @@ def coverage():
 def data_status():
     cov = store.coverage_summary()
     fcov = fund.coverage()
+    # The survivorship-free Trendlyne layer is what backtests actually use; surface its real
+    # counts so the Reference page stops reporting the legacy yfinance store (755/1505).
+    tl_cov = ts.coverage() if ts.available() else {"available": False}
     return {"coverage": cov, "n_universe": len(store.universe_tickers("niftytotalmarket")),
-            "fundamentals": fcov, "feasibility": _feasibility(cov, fcov),
-            # The survivorship-free Trendlyne layer is what backtests actually use; surface its real
-            # counts so the Reference page stops reporting the legacy yfinance store (755/1505).
-            "trendlyne": ts.coverage() if ts.available() else {"available": False}}
+            "fundamentals": fcov, "feasibility": _feasibility(cov, fcov, tl_cov),
+            "trendlyne": tl_cov}
 
 
 @app.get("/api/fundamentals/status")
@@ -185,11 +186,46 @@ def surveillance_list():
     return surveillance.latest_flags()
 
 
-def _feasibility(cov: dict, fcov: dict | None = None) -> list[dict]:
+def _feasibility(cov: dict, fcov: dict | None = None, tl: dict | None = None) -> list[dict]:
+    """Honest data-capability rows for the Reference page.
+
+    `tl` is the survivorship-free Trendlyne layer backtests actually use (adr-014). This block
+    kept the v1-era wording — survivorship/membership "deferred", corporate actions "partial" —
+    long after all three shipped (adr-015/017/018/030), so the cockpit understated its own data
+    layer for weeks (iter-23 #636). The legacy yfinance rows render only when Trendlyne is absent.
+    """
     have = (cov.get("n_tickers") or 0) > 0
     fcov = fcov or {}
     n_fund = fcov.get("tickers") or 0
     n_snap = fcov.get("snapshots") or 0
+    if tl and tl.get("available"):
+        floor = int(tl.get("floor_cr") or 500)
+        return [
+            {"need": "Daily adjusted OHLCV (20yr)", "source": "Trendlyne + NSE Bhavcopy",
+             "status": "available",
+             "detail": (f"{tl.get('price_tickers')} names {tl.get('date_min')}..{tl.get('date_max')}, "
+                        f"split/bonus-adjusted, spliced to the latest Bhavcopy EOD for live signals "
+                        f"(adr-022); legacy yfinance store retained: {cov.get('n_tickers', 0)} tickers "
+                        f"to {cov.get('date_max')}")},
+            {"need": "Fundamentals + DVM scores (point-in-time)", "source": "Trendlyne Pro",
+             "status": "available",
+             "detail": (f"daily D/V/M + raw fundamentals history {tl.get('date_min')}.."
+                        f"{tl.get('date_max')}, result-lag gated so nothing is visible before it was "
+                        f"published (adr-016/adr-028); live snapshot: {n_fund} stocks, "
+                        f"latest {fcov.get('latest')}")},
+            {"need": "Survivorship-free (delisted) history", "source": "Trendlyne + CA master",
+             "status": "available",
+             "detail": (f"{tl.get('universe_ever')} names ever >Rs{floor}cr in-window incl "
+                        f"{tl.get('delisted')} delisted — dead names ride peak to delisting "
+                        f"(adr-018/adr-030); data refreshes merge, never replace")},
+            {"need": "Corporate actions", "source": "CA master (iter-28)", "status": "available",
+             "detail": ("per-name split/bonus adjustment factors incl. delisted names; unconfirmed "
+                        "cases are flagged (ca_uncertain) in resolve warnings, never silently used")},
+            {"need": "Point-in-time universe membership", "source": "pit_mcap (adr-015)",
+             "status": "available",
+             "detail": (f"Rs{floor}cr market-cap-floor membership panel, point-in-time per date; "
+                        f"live signals gate eligibility on a 14-day lookback")},
+        ]
     return [
         {"need": "Daily adjusted OHLCV (~12yr)", "source": "yfinance",
          "status": "available" if have else "not-loaded",
@@ -200,11 +236,11 @@ def _feasibility(cov: dict, fcov: dict | None = None) -> list[dict]:
                     f"powers live DVM signals; backtest history builds as snapshots accumulate")
                    if n_fund else "DVM/fundamental strategies wait until this is sourced"},
         {"need": "Survivorship-free (delisted) history", "source": "NSE Bhavcopy",
-         "status": "deferred", "detail": "v1 uses current membership; Bhavcopy is a later phase"},
+         "status": "deferred", "detail": "needs the Trendlyne layer (trendlyne.duckdb absent here)"},
         {"need": "Corporate actions", "source": "yfinance/NSE", "status": "partial",
-         "detail": "adjusted prices used; explicit action log is a later phase"},
+         "detail": "adjusted prices used; explicit action log needs the Trendlyne CA master"},
         {"need": "Point-in-time index membership", "source": "NSE", "status": "deferred",
-         "detail": "current membership only in v1"},
+         "detail": "needs the Trendlyne layer's pit_mcap membership panel"},
     ]
 
 
@@ -261,6 +297,25 @@ def backtests_run(body: BacktestIn):
     return d
 
 
+# Grid keys verified to be read only by the SIMULATION (backtest.py: "n_holdings / rebalance /
+# regime / exits / costs all live in the simulation") — with the regime exception below. Everything
+# resolve() or _warmup_calendar_days() reads from config is excluded: data_source, start/end,
+# benchmark, universe.*, entry_filters, rank_by/rank_blend, and regime_filter.* (the regime
+# MULTIPLIER is sim-side, but its MA warmup pad is sized at resolve from regime_filter.enabled +
+# ma_period, so a regime grid off a non-regime base runs with a cold MA — measured 0.2289 vs
+# 0.2350 CAGR, iter-22). stop_loss./take_profit. are prefix-allowed: TakeProfit is pct/r_multiple
+# (no panel), and stop_loss.type/atr_period get their own resolve via _resolve_key grouping.
+_SAFE_GRID_KEYS = {"n_holdings", "rebalance", "weighting", "rank_order", "invest_fully",
+                   "capital", "entry_fill", "max_hold_days", "max_position_adtv_pct", "sector_cap"}
+_SAFE_GRID_PREFIXES = ("stop_loss.", "take_profit.")
+
+
+def _unsafe_grid_keys(keys) -> list[str]:
+    return sorted(k for k in keys
+                  if k not in _SAFE_GRID_KEYS
+                  and not any(k.startswith(p) for p in _SAFE_GRID_PREFIXES))
+
+
 def _resolve_key(cfg: dict) -> tuple:
     """The config values that change what resolve() BUILDS, as opposed to what the sim reads.
 
@@ -305,11 +360,20 @@ def backtests_batch(body: BatchIn):
     the base `rs` across those silently simulated the BASE config's stop — a trailing sweep off a
     no-stop base returned no-stop numbers under a trailing label (iter-22 #210).
 
-    See BatchIn for which keys are safe to grid. Keys outside that list are NOT validated here: the
-    caller is trusted, and a grid on e.g. rank_by will silently reuse the base's rank panel.
+    Grid keys outside the verified sim-side allowlist are refused with 400 (#219): an API consumer
+    cannot read a docstring, and a grid on e.g. rank_by or regime_filter.enabled would silently
+    reuse the base's panels and label the results as though the parameter had varied.
     """
     import copy as _copy
     import itertools as _it
+    # Refuse resolve-affecting grid keys BEFORE paying for the base resolve (#219).
+    if bad := _unsafe_grid_keys(body.grid.keys()):
+        raise HTTPException(400, (
+            f"grid key(s) {bad} change what resolve() builds (or are unverified for batch), so the "
+            f"batch resolve-once optimisation would silently reuse the base config's panels and "
+            f"label the results as varied (#219). Safe grid keys: "
+            f"{sorted(_SAFE_GRID_KEYS)} + prefixes {list(_SAFE_GRID_PREFIXES)}. "
+            f"Run resolve-affecting parameters as separate /api/backtests calls."))
     try:
         base = StrategyConfig(**body.base_config).model_dump()
     except ValidationError as exc:

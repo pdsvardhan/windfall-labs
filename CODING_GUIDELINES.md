@@ -34,6 +34,11 @@ backtesting code that looks right and is silently wrong loses real money.
 - Tests with `pytest`. Every indicator has a unit test against a known value. The no-look-ahead
   and costs rails each have a dedicated test. Run `pytest` green before claiming a feature done.
 - Format with `ruff`/`black` defaults; keep imports tidy.
+- **Long-running host-side scripts** (sweeps, research harnesses, anything alive >5 min) call the
+  API via `scripts/batch_client.py` (`post_json`/`get_json`), never raw urllib/requests: the
+  weekday EOD cron (20:30 IST) stops and rebuilds the api container for its exclusive DuckDB
+  write window (adr-022), and a bare POST dies mid-run with connection refused (#98). The helper
+  waits out the 20:25–20:55 window and retries through the bounce; 4xx still fail fast.
 
 ## TypeScript (frontend)
 

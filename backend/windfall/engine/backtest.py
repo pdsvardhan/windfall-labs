@@ -14,7 +14,7 @@ import numpy as np
 import pandas as pd
 
 from ..strategy.resolve import ResolvedStrategy, resolve
-from ..strategy.schema import StrategyConfig
+from ..strategy.schema import Costs, StrategyConfig
 from . import metrics
 from .results import BacktestResult, Trade
 
@@ -163,6 +163,16 @@ def run_backtest(config, cost_mult: float = 1.0, rs=None) -> BacktestResult:
     ADTV = arr(rs.adtv_value)
 
     sim = _Sim(cfg=cfg, rs=rs, cash=cfg.capital)
+    # Run-local (NOT rs.warnings — a batch shares rs across combos and would leak this between them).
+    run_warnings: list[str] = []
+    # cfg.costs_bps is INERT: adr-020 replaced it with the NSE delivery schedule below, but the field
+    # still validates, so a config that sets it (e.g. zeros, expecting "costs OFF") silently runs at
+    # full costs. Warn whenever it differs from the untouched default — that signals intent to use it.
+    if cfg.costs_bps != Costs():
+        run_warnings.append(
+            "costs_bps is inert/deprecated — the engine charges the NSE delivery schedule "
+            "(side-aware rates + flat DP, adr-020) regardless of it. To scale or disable costs, "
+            "pass cost_mult (0.0 = gross) / use the cost-sensitivity endpoint.")
     # side-aware delivery costs, scaled by cost_mult (the cost-sensitivity card passes 0x/1x/2x)
     buy_rate = NSE_BUY_RATE * cost_mult
     sell_rate = NSE_SELL_RATE * cost_mult
@@ -524,5 +534,5 @@ def run_backtest(config, cost_mult: float = 1.0, rs=None) -> BacktestResult:
         trades=[Trade(**t) for t in sim.trades],
         # dedupe: a factor-timing run shares `rs` with its reference sim, which can append an
         # identical empty-rebals warning — collapse to unique, order-preserving.
-        warnings=list(dict.fromkeys(rs.warnings)),
+        warnings=list(dict.fromkeys(rs.warnings + run_warnings)),
     )

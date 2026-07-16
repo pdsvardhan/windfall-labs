@@ -26,14 +26,16 @@ BREAKOUT_CONFIG = {
     "rank_by": "roc21", "rank_order": "desc",
     "n_holdings": 10, "weighting": "equal", "rebalance": "weekly", "entry_fill": "next_open",
     "stop_loss": {"type": "none"}, "take_profit": {"type": "none"},
-    "costs_bps": {"brokerage": 0, "stt": 0, "slippage": 0},   # costs OFF to match Trendlyne
     "start": "2025-06-01", "end": "2026-06-12", "benchmark": "NIFTY500",
 }
 
 
 def _check_reproduce() -> dict:
     try:
-        res = run_backtest(BREAKOUT_CONFIG)
+        # cost_mult=0.0 = genuinely gross, to match Trendlyne's costless reference. The old
+        # costs_bps zeros here were INERT (adr-020) — this check silently ran NET for weeks,
+        # comparing cost-dragged numbers against a gross reference (iter-23 #637).
+        res = run_backtest(BREAKOUT_CONFIG, cost_mult=0.0)
     except Exception as exc:  # noqa: BLE001
         return {"name": "reproduce_trendlyne_breakout", "status": "error", "error": repr(exc)}
     s = res.summary
