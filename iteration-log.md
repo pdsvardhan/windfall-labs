@@ -44,3 +44,26 @@
 **Decisions:** adr-037 — live signals + honest paper dry-run (accepted, curated, cat:reliability).
 **Friction:** to-do titles >300 chars are rejected silently (curl -f → empty body); the membership/ohlcv staleness is a recurring manual Trendlyne-harvest dependency (data-mismatch).
 **Next session context:** watch the `/paper` scoreboard diverge over ~2 weeks. Remaining audit follow-ups (todo #184): net the NSE cost model into paper P&L; enter at next-open to match the backtest; per-name mark-staleness flag. Monthly: do the Trendlyne pull before the rebalance cron fires. adr-035 70/30 headline (29.5%/1.27) does not reproduce from the saved sleeves — a parity pass is owed.
+
+## Bridge — Sessions 2026-06-25/26 (iters 16–18 + the strategy sweep) — reconstructed 2026-07-16
+
+These sessions were never logged at the time (the only gap in the session record; earlier sessions
+live in `docs/iteration-log.md`, later ones above). Reconstructed in iter-23 (#636) from
+adr-033/034/035/036 and the backtests store — the ADRs carry the full evidence tables.
+
+- **iter-16 (adr-033):** factor-timing (hold the book only while its own equity sits above its
+  MA100) built in-engine on a *reference* equity curve with real switching costs + next-open fills.
+  The offline PoC's "free" drawdown protection did **not** survive execution: CAGR 38.7% → 18.4%,
+  Sharpe 1.26 → 0.83 on the momentum sleeve.
+- **iter-17 (adr-034):** weekly bidirectional re-engagement recovers CAGR (23.5%) and Sharpe (1.04)
+  but hands the drawdown protection straight back (−49.5%, same as plain). No overlay variant beats
+  plain momentum's 1.26 — own-equity factor-timing dropped as the primary risk control.
+- **iter-18 (adr-035):** `LV_atr` defensive sleeve built (CAGR 7.6%, corr 0.42 to MOM, asymmetric in
+  drawdowns). Trailing-return sleeve rotation rejected (every variant worse than plain momentum on
+  Sharpe AND Calmar). A **fixed 70/30 MOM/LV blend** wins: Sharpe 1.27, MaxDD −42.7%, zero tunable
+  degrees of freedom — the first deployable candidate.
+- **The 289-config strategy sweep** (store timestamps 2026-06-25): DVM dv/dm/all × w/m/q ×
+  10/15/20/30 holdings + MOM_roc252 + CMP_valmom variants populated the leaderboard the paper
+  dry-run was later picked from.
+- **adr-036 (2026-06-30, documentation):** recorded during the Ottomate deep-dive — the engine
+  shipped hand-rolled; the adr-004 vectorbt plan was never adopted.

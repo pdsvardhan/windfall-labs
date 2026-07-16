@@ -153,11 +153,12 @@ def coverage():
 def data_status():
     cov = store.coverage_summary()
     fcov = fund.coverage()
+    # The survivorship-free Trendlyne layer is what backtests actually use; surface its real
+    # counts so the Reference page stops reporting the legacy yfinance store (755/1505).
+    tl_cov = ts.coverage() if ts.available() else {"available": False}
     return {"coverage": cov, "n_universe": len(store.universe_tickers("niftytotalmarket")),
-            "fundamentals": fcov, "feasibility": _feasibility(cov, fcov),
-            # The survivorship-free Trendlyne layer is what backtests actually use; surface its real
-            # counts so the Reference page stops reporting the legacy yfinance store (755/1505).
-            "trendlyne": ts.coverage() if ts.available() else {"available": False}}
+            "fundamentals": fcov, "feasibility": _feasibility(cov, fcov, tl_cov),
+            "trendlyne": tl_cov}
 
 
 @app.get("/api/fundamentals/status")
@@ -185,11 +186,46 @@ def surveillance_list():
     return surveillance.latest_flags()
 
 
-def _feasibility(cov: dict, fcov: dict | None = None) -> list[dict]:
+def _feasibility(cov: dict, fcov: dict | None = None, tl: dict | None = None) -> list[dict]:
+    """Honest data-capability rows for the Reference page.
+
+    `tl` is the survivorship-free Trendlyne layer backtests actually use (adr-014). This block
+    kept the v1-era wording — survivorship/membership "deferred", corporate actions "partial" —
+    long after all three shipped (adr-015/017/018/030), so the cockpit understated its own data
+    layer for weeks (iter-23 #636). The legacy yfinance rows render only when Trendlyne is absent.
+    """
     have = (cov.get("n_tickers") or 0) > 0
     fcov = fcov or {}
     n_fund = fcov.get("tickers") or 0
     n_snap = fcov.get("snapshots") or 0
+    if tl and tl.get("available"):
+        floor = int(tl.get("floor_cr") or 500)
+        return [
+            {"need": "Daily adjusted OHLCV (20yr)", "source": "Trendlyne + NSE Bhavcopy",
+             "status": "available",
+             "detail": (f"{tl.get('price_tickers')} names {tl.get('date_min')}..{tl.get('date_max')}, "
+                        f"split/bonus-adjusted, spliced to the latest Bhavcopy EOD for live signals "
+                        f"(adr-022); legacy yfinance store retained: {cov.get('n_tickers', 0)} tickers "
+                        f"to {cov.get('date_max')}")},
+            {"need": "Fundamentals + DVM scores (point-in-time)", "source": "Trendlyne Pro",
+             "status": "available",
+             "detail": (f"daily D/V/M + raw fundamentals history {tl.get('date_min')}.."
+                        f"{tl.get('date_max')}, result-lag gated so nothing is visible before it was "
+                        f"published (adr-016/adr-028); live snapshot: {n_fund} stocks, "
+                        f"latest {fcov.get('latest')}")},
+            {"need": "Survivorship-free (delisted) history", "source": "Trendlyne + CA master",
+             "status": "available",
+             "detail": (f"{tl.get('universe_ever')} names ever >Rs{floor}cr in-window incl "
+                        f"{tl.get('delisted')} delisted — dead names ride peak to delisting "
+                        f"(adr-018/adr-030); data refreshes merge, never replace")},
+            {"need": "Corporate actions", "source": "CA master (iter-28)", "status": "available",
+             "detail": ("per-name split/bonus adjustment factors incl. delisted names; unconfirmed "
+                        "cases are flagged (ca_uncertain) in resolve warnings, never silently used")},
+            {"need": "Point-in-time universe membership", "source": "pit_mcap (adr-015)",
+             "status": "available",
+             "detail": (f"Rs{floor}cr market-cap-floor membership panel, point-in-time per date; "
+                        f"live signals gate eligibility on a 14-day lookback")},
+        ]
     return [
         {"need": "Daily adjusted OHLCV (~12yr)", "source": "yfinance",
          "status": "available" if have else "not-loaded",
@@ -200,11 +236,11 @@ def _feasibility(cov: dict, fcov: dict | None = None) -> list[dict]:
                     f"powers live DVM signals; backtest history builds as snapshots accumulate")
                    if n_fund else "DVM/fundamental strategies wait until this is sourced"},
         {"need": "Survivorship-free (delisted) history", "source": "NSE Bhavcopy",
-         "status": "deferred", "detail": "v1 uses current membership; Bhavcopy is a later phase"},
+         "status": "deferred", "detail": "needs the Trendlyne layer (trendlyne.duckdb absent here)"},
         {"need": "Corporate actions", "source": "yfinance/NSE", "status": "partial",
-         "detail": "adjusted prices used; explicit action log is a later phase"},
+         "detail": "adjusted prices used; explicit action log needs the Trendlyne CA master"},
         {"need": "Point-in-time index membership", "source": "NSE", "status": "deferred",
-         "detail": "current membership only in v1"},
+         "detail": "needs the Trendlyne layer's pit_mcap membership panel"},
     ]
 
 
