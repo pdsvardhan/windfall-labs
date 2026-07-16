@@ -48,9 +48,13 @@ class TakeProfit(BaseModel):
 
 
 class Costs(BaseModel):
-    brokerage: float = 3.0   # basis points per side
-    stt: float = 10.0        # basis points per side
-    slippage: float = 15.0   # basis points per side
+    """DEPRECATED / INERT (adr-020): the engine charges the real NSE delivery schedule
+    (side-aware rates + flat DP in engine/backtest.py), never these bps. The field survives only
+    so the ~289 stored configs that carry it keep validating; setting it to anything non-default
+    draws a warning on the backtest result. Scale/disable costs via run_backtest(cost_mult=...)."""
+    brokerage: float = 3.0   # basis points per side (IGNORED — see class docstring)
+    stt: float = 10.0        # basis points per side (IGNORED)
+    slippage: float = 15.0   # basis points per side (IGNORED)
 
 
 class RankFactor(BaseModel):

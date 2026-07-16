@@ -12,11 +12,29 @@ BASE = {
 }
 
 
-def test_costs_reduce_returns():
-    free = run_backtest({**BASE, "costs_bps": {"brokerage": 0, "stt": 0, "slippage": 0}})
-    costly = run_backtest({**BASE, "costs_bps": {"brokerage": 10, "stt": 20, "slippage": 50}})
-    # With identical selection, costs can only reduce (or equal) the net return.
-    assert costly.summary.total_return <= free.summary.total_return + 1e-9
+def test_cost_mult_reduces_returns_strictly():
+    """The REAL cost lever is cost_mult over the NSE delivery schedule (adr-020). The old version
+    of this test gridded the inert costs_bps field and asserted <=, which two EQUAL runs satisfy —
+    it was green while proving nothing (iter-23 #637). Strict inequality on a trading book."""
+    free = run_backtest(dict(BASE), cost_mult=0.0)
+    costly = run_backtest(dict(BASE), cost_mult=1.0)
+    assert costly.summary.n_trades > 0
+    assert costly.summary.total_return < free.summary.total_return
+
+
+def test_costs_bps_is_inert_and_warned():
+    """costs_bps survives in the schema only for stored-config compat; it must change NOTHING,
+    and deliberately setting it must draw the deprecation warning (adr-020, iter-23 #637)."""
+    a = run_backtest({**BASE, "costs_bps": {"brokerage": 0, "stt": 0, "slippage": 0}})
+    b = run_backtest({**BASE, "costs_bps": {"brokerage": 99, "stt": 99, "slippage": 99}})
+    assert a.summary.total_return == b.summary.total_return
+    assert any("costs_bps is inert" in w for w in a.warnings)
+    assert any("costs_bps is inert" in w for w in b.warnings)
+
+
+def test_default_costs_bps_not_warned():
+    res = run_backtest(dict(BASE))
+    assert not any("costs_bps is inert" in w for w in res.warnings)
 
 
 def test_turnover_reported_and_nonnegative():
