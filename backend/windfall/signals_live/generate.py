@@ -15,7 +15,10 @@ from ..engine.backtest import _stop_target
 from ..strategy.resolve import ResolvedStrategy, resolve
 from ..strategy.schema import StrategyConfig
 
-_STEP = {"daily": 1, "weekly": 5, "fortnightly": 10, "monthly": 21}
+# Trading-day lookback to the PREVIOUS rebalance, per cadence. Must cover every option in
+# StrategyConfig.rebalance — a missing key is a KeyError at line ~62 for any strategy using it
+# (quarterly was absent until iter-22). test_live_signals_step.py pins this to the schema.
+_STEP = {"daily": 1, "weekly": 5, "fortnightly": 10, "monthly": 21, "quarterly": 63}
 
 
 def _select(rs: ResolvedStrategy, i: int, cfg: StrategyConfig) -> dict[str, tuple[float, float]]:
