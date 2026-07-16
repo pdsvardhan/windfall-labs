@@ -72,13 +72,17 @@ class SweepIn(BaseModel):
 
 
 class BatchIn(BaseModel):
-    # Resolve per distinct RESOLVE-AFFECTING combo, simulate the whole grid off each.
-    # Most grid params are pure sim-side (n_holdings / rebalance / weighting / stop_loss.mult /
-    # stop_loss.value / take_profit.* / max_hold_days / max_position_adtv_pct / sector_cap /
-    # regime_filter.*) and share one ResolvedStrategy — byte-identical, ~10x faster than N
-    # independent backtests. `stop_loss.type` and `stop_loss.atr_period` are the exception: they
-    # leak into resolve() (see _resolve_key), so combos are grouped by them and each group gets
-    # its own resolve.
+    # Resolve per distinct stop-panel combo, simulate the whole grid off each.
+    # KNOWN-SAFE grid keys (pure sim-side, share one ResolvedStrategy, ~10x faster than N
+    # independent backtests): n_holdings / rebalance / weighting / stop_loss.mult /
+    # stop_loss.value / take_profit.* / max_hold_days / max_position_adtv_pct / sector_cap.
+    # `stop_loss.type` + `stop_loss.atr_period` are handled: they decide whether resolve() builds
+    # the ATR panel, so combos are grouped by `_resolve_key` and each group resolves once.
+    # NOT SAFE — do not grid these, they change what resolve() produces and will silently reuse
+    # the base's panels: rank_by / rank_blend / universe.* / entry_filters / start / end /
+    # benchmark / data_source, and regime_filter.* (its MA warmup pad is sized at resolve from
+    # regime_filter.enabled — gridding it on measures ~0.229 CAGR where a direct resolve gives
+    # ~0.235, iter-22). Use separate /api/backtests calls for those. Tracked as a follow-up todo.
     base_config: dict
     grid: dict = {}            # e.g. {"n_holdings":[10,20], "rebalance":["monthly","quarterly"]}
     name_template: str = ""    # e.g. "MOM_roc126_{rebalance}_{n_holdings}"; falls back to base name
@@ -271,15 +275,38 @@ def _resolve_key(cfg: dict) -> tuple:
             sl.get("atr_period") if needs_atr else None)
 
 
+def _inert_stop(cfg: dict) -> str | None:
+    """Why this config's stop can never fire, or None if it can.
+
+    StopLoss.mult and .value both default to None and the schema only rejects non-positive values,
+    so `{"type": "trailing"}` with no mult VALIDATES and then silently never arms — _stop_target
+    and check_exit both gate on `and cfg.stop_loss.mult` / `and sl.value`, and None is falsy. A grid
+    that asks for such a stop cannot be honoured, and returning the no-stop numbers under a stop
+    label is precisely the defect this endpoint had (iter-22 #210). Callers get an error instead.
+
+    `type: none` is NOT inert-by-mistake — it honestly says "no stop" and honestly returns no stop.
+    """
+    sl = cfg.get("stop_loss") or {}
+    t = sl.get("type", "none")
+    if t == "pct" and not sl.get("value"):
+        return "stop_loss.type is 'pct' but stop_loss.value is unset"
+    if t in ("atr", "trailing") and not sl.get("mult"):
+        return f"stop_loss.type is '{t}' but stop_loss.mult is unset"
+    return None
+
+
 @app.post("/api/backtests/batch")
 def backtests_batch(body: BatchIn):
-    """Simulate a whole strategy grid, resolving once per distinct resolve-affecting combo.
+    """Simulate a strategy grid, resolving once per distinct stop-panel combo.
 
-    Most grid params are pure sim-side and share a single ResolvedStrategy (~10x faster than N
-    independent backtests, byte-identical). `stop_loss.type` / `stop_loss.atr_period` decide whether
-    resolve() builds the ATR panel at all, so combos are grouped by `_resolve_key` and each group
-    resolves once. Sharing the base `rs` across those silently simulated the BASE config's stop —
-    a trailing sweep off a no-stop base returned no-stop numbers under a trailing label (iter-22).
+    Sim-side grid params share a single ResolvedStrategy (~10x faster than N independent backtests,
+    byte-identical). `stop_loss.type` / `stop_loss.atr_period` decide whether resolve() builds the
+    ATR panel at all, so combos are grouped by `_resolve_key` and each group resolves once. Sharing
+    the base `rs` across those silently simulated the BASE config's stop — a trailing sweep off a
+    no-stop base returned no-stop numbers under a trailing label (iter-22 #210).
+
+    See BatchIn for which keys are safe to grid. Keys outside that list are NOT validated here: the
+    caller is trusted, and a grid on e.g. rank_by will silently reuse the base's rank panel.
     """
     import copy as _copy
     import itertools as _it
@@ -313,6 +340,14 @@ def backtests_batch(body: BatchIn):
         name = body.name_template.format(**over) if body.name_template else cfg.get("name")
         if name:
             cfg["name"] = name
+        # Refuse a stop that cannot arm BEFORE paying for its resolve: returning no-stop numbers
+        # under a stop label is the defect, and a silent one is worse than a loud failure.
+        if (why := _inert_stop(cfg)) and any(k.startswith("stop_loss.") for k in over):
+            results.append({"name": name, "overrides": over,
+                            "error": f"grid asks for a stop that can never fire: {why} — set it on "
+                                     f"base_config or in the grid. Refusing to return no-stop "
+                                     f"numbers under a stop label."})
+            continue
         rkey = _resolve_key(cfg)
         if rkey not in rs_cache:                 # this combo needs a panel the base never built
             try:
@@ -328,9 +363,8 @@ def backtests_batch(body: BatchIn):
             continue
         d = clean(res.model_dump())
         warns = list(d.get("warnings", []))
-        # A stop sized in the grid but switched off by the effective config does nothing. That is
-        # what the config says, but it reads as a stop sweep — say so rather than return N identical
-        # rows under N different labels.
+        # type='none' is honest — it says no stop and returns no stop — but sweeping stop_loss.*
+        # around it still yields N identical rows under N labels. Say so.
         if (any(k.startswith("stop_loss.") for k in over)
                 and (cfg.get("stop_loss") or {}).get("type", "none") == "none"):
             warns.append("stop_loss.* varied in the grid but stop_loss.type is 'none' — no stop was "
