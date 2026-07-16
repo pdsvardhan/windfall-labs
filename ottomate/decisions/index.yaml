@@ -364,3 +364,13 @@ decisions:
       - curated
       - cat:reliability
     body_path: docs/decisions/adr-038-windfall-data-fidelity-honesty.md
+  - id: adr-039-windfall-no-stop-by-measurement
+    project_slug: windfall-labs
+    title: "No stop-loss, by measurement: a swept comparison showed trailing stops
+      destroy the rotation edge, so the monthly re-rank is the only exit"
+    status: accepted
+    date: 2026-07-16T00:00:00.000Z
+    tags:
+      - curated
+      - cat:product
+    body_path: docs/decisions/adr-039-windfall-no-stop-by-measurement.md
