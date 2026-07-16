@@ -72,10 +72,13 @@ class SweepIn(BaseModel):
 
 
 class BatchIn(BaseModel):
-    # Resolve ONCE, simulate the whole grid. Valid only when the grid varies SIM-SIDE params
-    # (n_holdings / rebalance / weighting / stop_loss.* / take_profit.* / max_hold_days /
-    # max_position_adtv_pct / sector_cap / regime_filter.*) — resolve() depends only on
-    # universe/filters/rank/window, so reusing rs gives byte-identical results, ~10x faster.
+    # Resolve per distinct RESOLVE-AFFECTING combo, simulate the whole grid off each.
+    # Most grid params are pure sim-side (n_holdings / rebalance / weighting / stop_loss.mult /
+    # stop_loss.value / take_profit.* / max_hold_days / max_position_adtv_pct / sector_cap /
+    # regime_filter.*) and share one ResolvedStrategy — byte-identical, ~10x faster than N
+    # independent backtests. `stop_loss.type` and `stop_loss.atr_period` are the exception: they
+    # leak into resolve() (see _resolve_key), so combos are grouped by them and each group gets
+    # its own resolve.
     base_config: dict
     grid: dict = {}            # e.g. {"n_holdings":[10,20], "rebalance":["monthly","quarterly"]}
     name_template: str = ""    # e.g. "MOM_roc126_{rebalance}_{n_holdings}"; falls back to base name
@@ -254,10 +257,30 @@ def backtests_run(body: BacktestIn):
     return d
 
 
+def _resolve_key(cfg: dict) -> tuple:
+    """The config values that change what resolve() BUILDS, as opposed to what the sim reads.
+
+    resolve() constructs the ATR stop panel only when the config handed to it already asks for an
+    atr/trailing stop, and sizes it by atr_period. Two configs differing in either therefore need
+    their own ResolvedStrategy; everything else in a batch grid is sim-side and can share one.
+    `pct` and `none` need no panel, so they collapse to the same key.
+    """
+    sl = cfg.get("stop_loss") or {}
+    needs_atr = sl.get("type") in ("atr", "trailing")
+    return (sl.get("type") if needs_atr else "no-atr-panel",
+            sl.get("atr_period") if needs_atr else None)
+
+
 @app.post("/api/backtests/batch")
 def backtests_batch(body: BatchIn):
-    """Resolve ONCE, simulate the whole sim-side grid (n_holdings/rebalance/regime/exits/costs).
-    ~10x faster than N independent backtests and byte-identical (same ResolvedStrategy, same sim)."""
+    """Simulate a whole strategy grid, resolving once per distinct resolve-affecting combo.
+
+    Most grid params are pure sim-side and share a single ResolvedStrategy (~10x faster than N
+    independent backtests, byte-identical). `stop_loss.type` / `stop_loss.atr_period` decide whether
+    resolve() builds the ATR panel at all, so combos are grouped by `_resolve_key` and each group
+    resolves once. Sharing the base `rs` across those silently simulated the BASE config's stop —
+    a trailing sweep off a no-stop base returned no-stop numbers under a trailing label (iter-22).
+    """
     import copy as _copy
     import itertools as _it
     try:
@@ -265,9 +288,10 @@ def backtests_batch(body: BatchIn):
     except ValidationError as exc:
         raise HTTPException(400, f"invalid base_config: {_cfg_error(exc)}")
     try:
-        rs = resolve_with_warmup(StrategyConfig(**base))  # the one expensive load, shared by all combos
+        base_rs = resolve_with_warmup(StrategyConfig(**base))
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(400, f"resolve failed: {_cfg_error(exc)}")
+    rs_cache = {_resolve_key(base): base_rs}
 
     keys = list(body.grid.keys())
     combos = ([dict(zip(keys, c)) for c in _it.product(*[body.grid[k] for k in keys])]
@@ -289,18 +313,34 @@ def backtests_batch(body: BatchIn):
         name = body.name_template.format(**over) if body.name_template else cfg.get("name")
         if name:
             cfg["name"] = name
+        rkey = _resolve_key(cfg)
+        if rkey not in rs_cache:                 # this combo needs a panel the base never built
+            try:
+                rs_cache[rkey] = resolve_with_warmup(StrategyConfig(**cfg))
+            except Exception as exc:  # noqa: BLE001
+                results.append({"name": name, "overrides": over,
+                                "error": f"resolve failed: {_cfg_error(exc)}"})
+                continue
         try:
-            res = run_backtest(cfg, rs=rs)         # rs reused — no re-resolve
+            res = run_backtest(cfg, rs=rs_cache[rkey])
         except Exception as exc:  # noqa: BLE001
             results.append({"name": name, "overrides": over, "error": _cfg_error(exc)})
             continue
         d = clean(res.model_dump())
+        warns = list(d.get("warnings", []))
+        # A stop sized in the grid but switched off by the effective config does nothing. That is
+        # what the config says, but it reads as a stop sweep — say so rather than return N identical
+        # rows under N different labels.
+        if (any(k.startswith("stop_loss.") for k in over)
+                and (cfg.get("stop_loss") or {}).get("type", "none") == "none"):
+            warns.append("stop_loss.* varied in the grid but stop_loss.type is 'none' — no stop was "
+                         "simulated for this combo; set stop_loss.type to pct/atr/trailing.")
         if body.save and name:
             store_meta.save_strategy(name, cfg, name)
             d["backtest_id"] = store_meta.save_backtest(d, name)
         results.append({"name": name, "overrides": over,
-                        "summary": d.get("summary"), "warnings": d.get("warnings", [])})
-    return clean({"n": len(results), "results": results})
+                        "summary": d.get("summary"), "warnings": warns})
+    return clean({"n": len(results), "n_resolves": len(rs_cache), "results": results})
 
 
 @app.get("/api/backtests")
