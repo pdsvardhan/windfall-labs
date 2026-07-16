@@ -374,3 +374,25 @@ decisions:
       - curated
       - cat:product
     body_path: docs/decisions/adr-039-windfall-no-stop-by-measurement.md
+  - id: adr-040-windfall-walkforward-gate-passed
+    project_slug: windfall-labs
+    title: "Walk-forward gate cleared: all five live strategies prove out-of-sample
+      robust (OOS/IS 0.71-0.94, incl a 2007-2016 decade with the 2008 crash),
+      and the 70/30 blend headline reproduces"
+    status: accepted
+    date: 2026-07-17T00:00:00.000Z
+    tags:
+      - curated
+      - cat:reliability
+    body_path: docs/decisions/adr-040-windfall-walkforward-gate-passed.md
+  - id: adr-041-windfall-regime-gate-candidate
+    project_slug: windfall-labs
+    title: "Index MA100 regime gate: first risk overlay to survive measurement -
+      12-24pp less drawdown at near-zero Sharpe cost; recorded as candidate, not
+      yet adopted"
+    status: accepted
+    date: 2026-07-17T00:00:00.000Z
+    tags:
+      - curated
+      - cat:product
+    body_path: docs/decisions/adr-041-windfall-regime-gate-candidate.md
