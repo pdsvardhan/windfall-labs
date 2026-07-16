@@ -1,0 +1,253 @@
+regime-overlay study 2026-07-17 (iter-23 item 635)
+adoption bar: MaxDD cut >= 10pp at Sharpe cost <= 0.10 vs off
+
+DVM_user
+  variant           cagr  sharpe   maxdd  calmar  expo  vs-off
+  off              0.339    1.17  -0.747    0.00  0.98  
+  ma200_bin        0.224    0.96  -0.571    0.00  0.74  dd+17.6pp sh-0.20
+  ma200_half       0.316    1.19  -0.652    0.00  0.88  dd+9.5pp sh+0.02
+  ma100_bin        0.256    1.12  -0.568    0.00  0.67  dd+18.0pp sh-0.05  << CLEARS BAR
+  ma200_scale      0.316    1.19  -0.652    0.00  0.88  dd+9.5pp sh+0.02
+
+DVM_dm_m_20
+  variant           cagr  sharpe   maxdd  calmar  expo  vs-off
+  off              0.305    1.23  -0.564    0.00  0.98  
+  ma200_bin        0.227    1.11  -0.433    0.00  0.73  dd+13.1pp sh-0.12
+  ma200_half       0.277    1.23  -0.511    0.00  0.87  dd+5.2pp sh+0.00
+  ma100_bin        0.263    1.33  -0.445    0.00  0.66  dd+11.8pp sh+0.10  << CLEARS BAR
+  ma200_scale      0.277    1.23  -0.511    0.00  0.87  dd+5.2pp sh+0.00
+
+MOM_roc252_m_20
+  variant           cagr  sharpe   maxdd  calmar  expo  vs-off
+  off              0.309    1.16  -0.550    0.00  0.99  
+  ma200_bin        0.203    0.97  -0.310    0.00  0.74  dd+24.0pp sh-0.18
+  ma200_half       0.292    1.19  -0.491    0.00  0.90  dd+5.9pp sh+0.03
+  ma100_bin        0.245    1.20  -0.309    0.00  0.66  dd+24.1pp sh+0.04  << CLEARS BAR
+  ma200_scale      0.292    1.19  -0.491    0.00  0.90  dd+5.9pp sh+0.03
+
+CMP_valmom_m_20
+  variant           cagr  sharpe   maxdd  calmar  expo  vs-off
+  off              0.251    0.99  -0.645    0.00  0.99  
+  ma200_bin        0.145    0.74  -0.548    0.00  0.74  dd+9.7pp sh-0.25
+  ma200_half       0.193    0.87  -0.645    0.00  0.89  dd+0.0pp sh-0.13
+  ma100_bin        0.193    0.98  -0.470    0.00  0.66  dd+17.5pp sh-0.01  << CLEARS BAR
+  ma200_scale      0.192    0.86  -0.641    0.00  0.90  dd+0.4pp sh-0.13
+
+
+=== raw ===
+{
+ "DVM_user": [
+  {
+   "tag": "DVM_user/off",
+   "cagr": 0.339458,
+   "sharpe": 1.1678,
+   "max_drawdown": -0.747473,
+   "calmar": null,
+   "exposure": 0.9799,
+   "annual_turnover": 6.6543,
+   "warnings": []
+  },
+  {
+   "tag": "DVM_user/ma200_bin",
+   "cagr": 0.224017,
+   "sharpe": 0.9632,
+   "max_drawdown": -0.571483,
+   "calmar": null,
+   "exposure": 0.741,
+   "annual_turnover": 5.4743,
+   "warnings": []
+  },
+  {
+   "tag": "DVM_user/ma200_half",
+   "cagr": 0.315863,
+   "sharpe": 1.19,
+   "max_drawdown": -0.652068,
+   "calmar": null,
+   "exposure": 0.8847,
+   "annual_turnover": 5.9562,
+   "warnings": []
+  },
+  {
+   "tag": "DVM_user/ma100_bin",
+   "cagr": 0.256176,
+   "sharpe": 1.1157,
+   "max_drawdown": -0.567519,
+   "calmar": null,
+   "exposure": 0.6669,
+   "annual_turnover": 4.9681,
+   "warnings": []
+  },
+  {
+   "tag": "DVM_user/ma200_scale",
+   "cagr": 0.315863,
+   "sharpe": 1.19,
+   "max_drawdown": -0.652068,
+   "calmar": null,
+   "exposure": 0.8847,
+   "annual_turnover": 5.9562,
+   "warnings": []
+  }
+ ],
+ "DVM_dm_m_20": [
+  {
+   "tag": "DVM_dm_m_20/off",
+   "cagr": 0.305357,
+   "sharpe": 1.2318,
+   "max_drawdown": -0.563716,
+   "calmar": null,
+   "exposure": 0.9771,
+   "annual_turnover": 7.4524,
+   "warnings": []
+  },
+  {
+   "tag": "DVM_dm_m_20/ma200_bin",
+   "cagr": 0.226999,
+   "sharpe": 1.1093,
+   "max_drawdown": -0.433123,
+   "calmar": null,
+   "exposure": 0.7332,
+   "annual_turnover": 6.0517,
+   "warnings": []
+  },
+  {
+   "tag": "DVM_dm_m_20/ma200_half",
+   "cagr": 0.276703,
+   "sharpe": 1.2326,
+   "max_drawdown": -0.511319,
+   "calmar": null,
+   "exposure": 0.8737,
+   "annual_turnover": 6.7003,
+   "warnings": []
+  },
+  {
+   "tag": "DVM_dm_m_20/ma100_bin",
+   "cagr": 0.262721,
+   "sharpe": 1.331,
+   "max_drawdown": -0.445332,
+   "calmar": null,
+   "exposure": 0.6589,
+   "annual_turnover": 5.4144,
+   "warnings": []
+  },
+  {
+   "tag": "DVM_dm_m_20/ma200_scale",
+   "cagr": 0.276703,
+   "sharpe": 1.2326,
+   "max_drawdown": -0.511319,
+   "calmar": null,
+   "exposure": 0.8737,
+   "annual_turnover": 6.7003,
+   "warnings": []
+  }
+ ],
+ "MOM_roc252_m_20": [
+  {
+   "tag": "MOM_roc252_m_20/off",
+   "cagr": 0.309118,
+   "sharpe": 1.1589,
+   "max_drawdown": -0.549644,
+   "calmar": null,
+   "exposure": 0.986,
+   "annual_turnover": 4.7749,
+   "warnings": []
+  },
+  {
+   "tag": "MOM_roc252_m_20/ma200_bin",
+   "cagr": 0.203262,
+   "sharpe": 0.9747,
+   "max_drawdown": -0.309827,
+   "calmar": null,
+   "exposure": 0.7358,
+   "annual_turnover": 4.0994,
+   "warnings": []
+  },
+  {
+   "tag": "MOM_roc252_m_20/ma200_half",
+   "cagr": 0.29188,
+   "sharpe": 1.1876,
+   "max_drawdown": -0.49083,
+   "calmar": null,
+   "exposure": 0.9031,
+   "annual_turnover": 4.3554,
+   "warnings": []
+  },
+  {
+   "tag": "MOM_roc252_m_20/ma100_bin",
+   "cagr": 0.245485,
+   "sharpe": 1.2013,
+   "max_drawdown": -0.308735,
+   "calmar": null,
+   "exposure": 0.6611,
+   "annual_turnover": 3.748,
+   "warnings": []
+  },
+  {
+   "tag": "MOM_roc252_m_20/ma200_scale",
+   "cagr": 0.29188,
+   "sharpe": 1.1876,
+   "max_drawdown": -0.49083,
+   "calmar": null,
+   "exposure": 0.9031,
+   "annual_turnover": 4.3554,
+   "warnings": []
+  }
+ ],
+ "CMP_valmom_m_20": [
+  {
+   "tag": "CMP_valmom_m_20/off",
+   "cagr": 0.251431,
+   "sharpe": 0.9913,
+   "max_drawdown": -0.64488,
+   "calmar": null,
+   "exposure": 0.9859,
+   "annual_turnover": 4.969,
+   "warnings": []
+  },
+  {
+   "tag": "CMP_valmom_m_20/ma200_bin",
+   "cagr": 0.145107,
+   "sharpe": 0.7383,
+   "max_drawdown": -0.547792,
+   "calmar": null,
+   "exposure": 0.7369,
+   "annual_turnover": 4.3696,
+   "warnings": []
+  },
+  {
+   "tag": "CMP_valmom_m_20/ma200_half",
+   "cagr": 0.192775,
+   "sharpe": 0.8662,
+   "max_drawdown": -0.644622,
+   "calmar": null,
+   "exposure": 0.8944,
+   "annual_turnover": 4.6393,
+   "warnings": []
+  },
+  {
+   "tag": "CMP_valmom_m_20/ma100_bin",
+   "cagr": 0.19299,
+   "sharpe": 0.9834,
+   "max_drawdown": -0.469841,
+   "calmar": null,
+   "exposure": 0.6606,
+   "annual_turnover": 4.0813,
+   "warnings": []
+  },
+  {
+   "tag": "CMP_valmom_m_20/ma200_scale",
+   "cagr": 0.192089,
+   "sharpe": 0.8627,
+   "max_drawdown": -0.640507,
+   "calmar": null,
+   "exposure": 0.8968,
+   "annual_turnover": 4.6487,
+   "warnings": []
+  }
+ ]
+}
+
+=== follow-up: ma150_bin period-robustness ===
+DVM_user/ma150_bin              cagr=0.246 sharpe=1.06 maxdd=-0.570 expo=0.70
+DVM_dm_m_20/ma150_bin           cagr=0.254 sharpe=1.25 maxdd=-0.424 expo=0.69
+MOM_roc252_m_20/ma150_bin       cagr=0.217 sharpe=1.06 maxdd=-0.327 expo=0.69
+CMP_valmom_m_20/ma150_bin       cagr=0.151 sharpe=0.78 maxdd=-0.567 expo=0.69

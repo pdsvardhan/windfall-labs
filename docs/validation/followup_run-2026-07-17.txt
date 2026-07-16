@@ -1,0 +1,63 @@
+A_MOM_bar_direct                cagr=0.407 sharpe=1.31 maxdd=-0.510 expo=0.98
+F_LV_alone_direct               cagr=0.056 sharpe=0.53 maxdd=-0.353 expo=0.90
+DVM_user/ma150_bin              cagr=0.246 sharpe=1.06 maxdd=-0.570 expo=0.70
+DVM_dm_m_20/ma150_bin           cagr=0.254 sharpe=1.25 maxdd=-0.424 expo=0.69
+MOM_roc252_m_20/ma150_bin       cagr=0.217 sharpe=1.06 maxdd=-0.327 expo=0.69
+CMP_valmom_m_20/ma150_bin       cagr=0.151 sharpe=0.78 maxdd=-0.567 expo=0.69
+
+[
+ {
+  "tag": "A_MOM_bar_direct",
+  "cagr": 0.406883,
+  "sharpe": 1.3052,
+  "max_drawdown": -0.509529,
+  "calmar": null,
+  "exposure": 0.9792,
+  "annual_turnover": 5.2276
+ },
+ {
+  "tag": "F_LV_alone_direct",
+  "cagr": 0.056331,
+  "sharpe": 0.5294,
+  "max_drawdown": -0.353101,
+  "calmar": null,
+  "exposure": 0.9036,
+  "annual_turnover": 5.0113
+ },
+ {
+  "tag": "DVM_user/ma150_bin",
+  "cagr": 0.245843,
+  "sharpe": 1.0579,
+  "max_drawdown": -0.570079,
+  "calmar": null,
+  "exposure": 0.6982,
+  "annual_turnover": 5.2577
+ },
+ {
+  "tag": "DVM_dm_m_20/ma150_bin",
+  "cagr": 0.253585,
+  "sharpe": 1.2493,
+  "max_drawdown": -0.423655,
+  "calmar": null,
+  "exposure": 0.6915,
+  "annual_turnover": 5.6943
+ },
+ {
+  "tag": "MOM_roc252_m_20/ma150_bin",
+  "cagr": 0.216719,
+  "sharpe": 1.0566,
+  "max_drawdown": -0.326876,
+  "calmar": null,
+  "exposure": 0.6927,
+  "annual_turnover": 3.9679
+ },
+ {
+  "tag": "CMP_valmom_m_20/ma150_bin",
+  "cagr": 0.151487,
+  "sharpe": 0.7817,
+  "max_drawdown": -0.567354,
+  "calmar": null,
+  "exposure": 0.6931,
+  "annual_turnover": 4.2402
+ }
+]
