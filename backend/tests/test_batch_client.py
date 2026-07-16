@@ -65,6 +65,21 @@ def test_4xx_raises_immediately_no_retry(monkeypatch):
     assert calls["n"] == 1
 
 
+def test_5xx_retries_then_succeeds(monkeypatch):
+    """iter-23 verifier nit: the 5xx path deserves its own pin, not just conn-errors."""
+    calls = {"n": 0}
+
+    def flaky_5xx(url, payload, timeout):
+        calls["n"] += 1
+        if calls["n"] < 3:
+            raise urllib.error.HTTPError(url, 503, "api rebuilding", None, None)
+        return {"ok": True}
+
+    monkeypatch.setattr(bc, "_request", flaky_5xx)
+    out = bc.post_json("http://x/api/backtests", {}, tries=5, backoff=0.0, sleep=lambda s: None)
+    assert out == {"ok": True} and calls["n"] == 3
+
+
 def test_exhausted_retries_raise_runtime_error(monkeypatch):
     monkeypatch.setattr(bc, "_request",
                         lambda u, p, t: (_ for _ in ()).throw(ConnectionRefusedError()))
