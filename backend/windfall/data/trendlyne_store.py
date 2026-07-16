@@ -355,7 +355,11 @@ def valuation_panel(metric: str, symbols) -> pd.DataFrame:
 # All have the long (pk, metric, date, value) shape and a quarterly/annual period_end that joins
 # result_lag, so raw_fundamental_panel handles every one identically (iter-32 widened the set).
 _RAW_FUND = {"tl_roe": ("ratios_annual", "ROE_A"), "tl_roce": ("ratios_annual", "ROCE_A"),
-             "tl_de": ("ratios_annual", "DEBT_CE_A"), "tl_opm": ("ratios_annual", "OPM_A"),
+             "tl_de": ("ratios_annual", "DEBT_CE_A"),
+             # tl_opm: OPM_A is a broken Trendlyne export column — only 40/1962 names, negative median
+             # (audit #94). PBDITMargin_A (PBDIT/EBITDA margin, the standard operating-margin proxy) has
+             # 1924/1962 names and a sane +15.9% median, so tl_opm resolves that instead.
+             "tl_opm": ("ratios_annual", "PBDITMargin_A"),
              "tl_eps": ("pnl_annual", "EPS_A"),
              # iter-32 curated factor library:
              "tl_roic": ("ratios_annual", "ROIC_A"), "tl_eyield": ("ratios_annual", "EYield_A"),

@@ -18,6 +18,7 @@ import re
 
 from ..data import fundamentals as fund
 from ..data import store
+from .resolve import _TL_FEATURES as _TL   # single source of truth for the Trendlyne feature set
 from .safe_eval import feature_names
 from .schema import StrategyConfig
 
@@ -30,11 +31,12 @@ _FUND = set(fund.NUMERIC_FIELDS) | {"pe_to_sector"}  # fundamental-derived
 # strategy using only these IS backtestable.
 _HIST_FUND = set(fund.SCREENER_HISTORY_FIELDS)
 # Trendlyne full-history features (data_source="trendlyne"): DVM scores + valuation multiples are
-# published daily (point-in-time by construction); raw fundamentals are result-lag-gated. All carry
-# real history from 2016-06, so a trendlyne strategy is backtestable — never snapshot-gated.
-_TL_DAILY = {"tl_durability", "tl_valuation", "tl_momentum", "tl_pe", "tl_peg", "tl_pbv"}
-_TL_LAGGED = {"tl_roe", "tl_roce", "tl_de", "tl_opm", "tl_eps"}
-_TL = _TL_DAILY | _TL_LAGGED
+# published daily (point-in-time by construction); raw fundamentals + shareholding + PIT market cap
+# are result-lag-gated. All carry real history from 2016-06, so a trendlyne strategy is backtestable —
+# never snapshot-gated. `_TL` is imported from resolve (_TL_FEATURES) so the two never drift again:
+# resolve computes mcap / tl_roic / tl_ps / tl_eyield / tl_int_cover / tl_piotroski / tl_np_growth /
+# tl_rev_growth / tl_pledge / tl_fii / tl_dii, and readiness must not mislabel them as "will be skipped"
+# (audit #96).
 TL_HISTORY_FROM = "2016-06-10"
 
 

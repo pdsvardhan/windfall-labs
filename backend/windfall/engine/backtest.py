@@ -276,6 +276,13 @@ def run_backtest(config, cost_mult: float = 1.0, rs=None) -> BacktestResult:
 
     def check_exit(j: int, i: int):
         pos = sim.positions[j]
+        # Same-bar entry-stop guard (audit #99): a next-open fill lands in step 1 of bar i, then the
+        # step-2 daily exit check runs on the SAME bar — a name could be entered at the open and stopped
+        # out that very day (0-hold, entry-day intrabar noise). A position's first exit check is the bar
+        # AFTER it opens; skip its entry bar. (Close-fill entries open after the step-2 check, so they
+        # are unaffected either way.)
+        if pos.entry_i == i:
+            return
         o, hi, lo, c = O[i, j], H[i, j], L[i, j], C[i, j]
         if any(math.isnan(x) for x in (hi, lo, c)):
             return
@@ -455,6 +462,35 @@ def run_backtest(config, cost_mult: float = 1.0, rs=None) -> BacktestResult:
     avg_nav = float(nav.mean()) or cfg.capital
     annual_turnover = (sim.traded_notional / (2 * avg_nav)) / years if avg_nav else 0.0
     exposure = float(np.mean(exposure_vals)) if exposure_vals else 0.0
+
+    # Transparency (audit #86): surface extreme one-day moves and multi-month price gaps on names WHILE
+    # HELD. These are usually REAL (special auctions like Elcid, multi-month suspensions like Indosolar/
+    # WAAREEINDO), but a silent 40% jump or a 3-year gap marked forward is indistinguishable from a data
+    # error unless it is flagged. Scans each trade's held window on the adjusted close.
+    big_moves, susp_gaps = [], []
+    for t in sim.trades:
+        tk = t["ticker"]
+        if tk not in rs.close_adj.columns:
+            continue
+        s = rs.close_adj.loc[t["entry_date"]:t["exit_date"], tk].dropna()
+        if len(s) < 2:
+            continue
+        rr = s.pct_change().abs()
+        if float(rr.max()) >= 0.40:
+            big_moves.append(f"{tk} {float(rr.max())*100:.0f}% on {rr.idxmax().date()}")
+        gap = s.index.to_series().diff().dt.days.max()
+        if gap and int(gap) >= 60:
+            susp_gaps.append(f"{tk} {int(gap)}d")
+    if big_moves:
+        rs.warnings.append(
+            "held names had >40% one-day moves (verify these are real events — special auctions, "
+            "resumptions — not price errors): " + ", ".join(big_moves[:8])
+            + (f" +{len(big_moves) - 8} more" if len(big_moves) > 8 else ""))
+    if susp_gaps:
+        rs.warnings.append(
+            "held names had multi-month price gaps (suspension/illiquidity — marked forward at the last "
+            "close, so interim P&L is held flat): " + ", ".join(susp_gaps[:8])
+            + (f" +{len(susp_gaps) - 8} more" if len(susp_gaps) > 8 else ""))
 
     if empty_rebals and n_rebals:
         rs.warnings.append(

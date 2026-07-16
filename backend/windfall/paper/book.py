@@ -6,11 +6,15 @@ for every open position, updates P&L, and closes positions whose stop or target 
 from __future__ import annotations
 
 import datetime as dt
+import logging
 import math
 
 from ..data import trendlyne_store as ts
 from ..data.store import connect
+from ..engine.backtest import DP_FLAT, NSE_BUY_RATE, NSE_SELL_RATE
 from ..store_meta import _init, new_id
+
+_log = logging.getLogger(__name__)
 
 
 def _latest_close(ticker: str):
@@ -26,8 +30,10 @@ def _latest_close(ticker: str):
             s = panel[col].dropna()
             if len(s):
                 return s.index[-1].date(), float(s.iloc[-1])
-    except Exception:
-        pass
+    except Exception as exc:  # noqa: BLE001
+        # Don't hide data errors behind a bare pass (audit #184): log and fall through to the legacy
+        # prices table, so a Trendlyne-store failure is visible instead of silently zero-marking.
+        _log.warning("paper mark: trendlyne price lookup failed for %s: %r", ticker, exc)
     con = connect(read_only=True)
     try:
         r = con.execute(
@@ -160,6 +166,14 @@ def list_positions(strategy_id: str | None = None, status: str | None = None) ->
         for k in ("entry_date", "last_date", "exit_date"):
             d[k] = str(d[k]) if d[k] is not None else None
         out.append(d)
+    # Per-name mark-staleness flag (audit #184): the mark cron prices every open name to the latest bar
+    # it can find; a name the store could not refresh lags the freshest mark. Flag any open position whose
+    # last_date is behind the newest last_date among open positions, so a stale mark can't masquerade as
+    # a live one. (ISO date strings compare lexically.)
+    open_dates = [d["last_date"] for d in out if d["status"] == "open" and d["last_date"]]
+    ref = max(open_dates) if open_dates else None
+    for d in out:
+        d["stale_mark"] = bool(ref and d["status"] == "open" and d["last_date"] and d["last_date"] < ref)
     return out
 
 
@@ -176,13 +190,31 @@ def scoreboard() -> list[dict]:
         rmults = [p["r_multiple"] for p in closed if p["r_multiple"] is not None]
         pnl = sum(((p["exit"] or p["last_price"] or p["entry"]) - p["entry"]) * (p["shares"] or 0)
                   for p in ps)
+        # Net P&L after the modelled NSE delivery costs (same side-aware rates + flat DP the backtest
+        # deducts, adr-020): buy cost is already spent, sell cost is what you'd pay to exit the mark now.
+        # So paper P&L is reported net-of-costs, not just gross (audit #184).
+        net_pnl = sum(_net_pnl(p) for p in ps)
         wins = [r for r in rets if r > 0]
         board.append({
             "strategy_id": sid, "open": len(open_), "closed": len(closed),
-            "total_pnl": round(pnl, 2),
+            "total_pnl": round(pnl, 2), "net_pnl": round(net_pnl, 2),
             "win_rate": round(len(wins) / len(rets), 3) if rets else 0.0,
             "avg_return_pct": round(sum(rets) / len(rets), 4) if rets else 0.0,
             "avg_r_multiple": round(sum(rmults) / len(rmults), 3) if rmults else None,
             "unrealized_open": len(open_),
         })
     return board
+
+
+def _net_pnl(p: dict) -> float:
+    """Position P&L net of modelled NSE delivery costs (round-trip: buy paid at entry, sell to exit the
+    current mark). Mirrors engine.backtest's cost model so paper and backtest report on one basis."""
+    entry = p["entry"] or 0.0
+    shares = p["shares"] or 0.0
+    mark = p["exit"] or p["last_price"] or entry
+    if entry <= 0 or shares <= 0:
+        return 0.0
+    gross = (mark - entry) * shares
+    buy_cost = shares * entry * NSE_BUY_RATE
+    sell_cost = shares * mark * NSE_SELL_RATE + DP_FLAT
+    return gross - buy_cost - sell_cost

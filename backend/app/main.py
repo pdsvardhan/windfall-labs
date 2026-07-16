@@ -304,8 +304,10 @@ def backtests_batch(body: BatchIn):
 
 
 @app.get("/api/backtests")
-def backtests_list(strategy_id: str | None = None):
-    return store_meta.list_backtests(strategy_id)
+def backtests_list(strategy_id: str | None = None, limit: int | None = None, offset: int = 0):
+    # limit omitted → prior behavior (global capped at 200, per-strategy uncapped); limit=0 → no cap;
+    # limit>0 with offset → pagination (audit #97).
+    return store_meta.list_backtests(strategy_id, limit=limit, offset=offset)
 
 
 @app.get("/api/backtests/{bid}")

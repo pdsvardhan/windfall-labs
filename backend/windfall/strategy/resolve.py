@@ -124,10 +124,18 @@ def resolve(cfg: StrategyConfig) -> ResolvedStrategy:
         tv = ts.traded_value_panel(tickers, cfg.start, cfg.end).reindex(
             index=close.index, columns=tickers)
         raw_close, raw_vol = close, None        # traded value handled via tv; ADTV is split-invariant
-        benchmark = ts.benchmark_series(cfg.benchmark, cfg.start, cfg.end).reindex(close.index).ffill()
+        bench_raw = ts.benchmark_series(cfg.benchmark, cfg.start, cfg.end)
+        benchmark = bench_raw.reindex(close.index).ffill()
         if benchmark.dropna().empty:
             benchmark = close.mean(axis=1)
             warnings.append("benchmark index not in trendlyne — equal-weight average fallback.")
+        elif not bench_raw.empty and bench_raw.index.min() > close.index.min():
+            # e.g. Nifty Smallcap 250 begins 2019-01-14 (audit #87): dates before the index's first bar
+            # have nothing to compare against, so regime overlay + active-return are blind there.
+            warnings.append(
+                f"benchmark '{cfg.benchmark}' history starts {bench_raw.index.min().date()}; dates before "
+                f"it have no index to compare against, so regime/active-return are blind over that early "
+                f"window (source a longer index history to extend it).")
         membership_mask = ts.membership_panel(tickers, close.index)
         n_uncertain = len(set(tickers) & ts.ca_uncertain_symbols())
         warnings.append(
@@ -203,6 +211,13 @@ def resolve(cfg: StrategyConfig) -> ResolvedStrategy:
         elif name == "macd_hist":
             df = ind.macd(close)[2]
         elif name == "pe_to_sector":
+            # sector_pe is snapshot-only (no historical sector-PE feed), so pe_to_sector is all-NaN
+            # before the snapshot and a backtest using it trades nothing over history (audit #95).
+            # Honest surface here rather than a silent empty book; use it on /signals or rank on tl_pe/pe.
+            warnings.append(
+                "pe_to_sector uses sector_pe, which is snapshot-only (no historical sector-PE data) — it "
+                "is NaN before the snapshot, so a historical backtest holds nothing. Use it on live "
+                "signals, or rank on tl_pe / pe instead.")
             df = feat("pe") / feat("sector_pe").replace(0.0, np.nan)
         elif name == "peg":
             # P/E ÷ EPS-growth% — growth-adjusted cheapness, guarded to profitable & growing names.

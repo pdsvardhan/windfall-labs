@@ -121,17 +121,28 @@ def get_backtest(bid: str) -> dict | None:
     return json.loads(r[0]) if r else None
 
 
-def list_backtests(strategy_id: str | None = None) -> list[dict]:
+def list_backtests(strategy_id: str | None = None, limit: int | None = None,
+                   offset: int = 0) -> list[dict]:
+    # limit/offset paginate the global list so a leaderboard can page past the newest rows instead of
+    # fetching per-strategy (audit #97). Defaults preserve the prior behavior EXACTLY: limit=None →
+    # global list capped at 200, per-strategy list uncapped. An explicit limit>0 paginates either path;
+    # limit<=0 means "no cap".
+    offset = max(0, int(offset))
+    if limit is None:
+        lim_clause = "" if strategy_id else " LIMIT 200"
+    else:
+        limit = int(limit)
+        lim_clause = "" if limit <= 0 else f" LIMIT {limit} OFFSET {offset}"
     con = connect(read_only=True)
     try:
         if strategy_id:
             rows = con.execute(
                 "SELECT id,strategy_id,name,config_hash,created_at,summary_json FROM backtests "
-                "WHERE strategy_id=? ORDER BY created_at DESC", [strategy_id]).fetchall()
+                "WHERE strategy_id=? ORDER BY created_at DESC" + lim_clause, [strategy_id]).fetchall()
         else:
             rows = con.execute(
                 "SELECT id,strategy_id,name,config_hash,created_at,summary_json FROM backtests "
-                "ORDER BY created_at DESC LIMIT 200").fetchall()
+                "ORDER BY created_at DESC" + lim_clause).fetchall()
     finally:
         con.close()
     return [{"id": r[0], "strategy_id": r[1], "name": r[2], "config_hash": r[3],
