@@ -1,11 +1,11 @@
 slug: windfall-labs
 display_name: Windfall Labs
 summary:
-  tagline: Backtest, validate & act on Indian equity strategies
-  short_description: "A private quant cockpit for Indian (NSE) equities: define a
-    strategy once, backtest it over long history with realistic costs, prove it
-    isn't curve-fit with walk-forward, generate today's exact orders, and
-    paper-trade it before risking capital."
+  tagline: Prove a trading strategy works before risking a rupee
+  short_description: A private research cockpit for systematic stock trading on
+    Indian markets. Define a strategy once, test it against 10+ years of history
+    with realistic costs, prove it isn't curve-fit, then paper-trade it live —
+    so only strategies that survive evidence ever touch real money.
   core_idea: "Windfall Labs is a personal, web-hosted quant research & execution
     platform for systematic Indian equity strategies. The loop: define a
     declarative strategy config -> backtest over 10+ years with modelled costs,

@@ -353,3 +353,14 @@ decisions:
       - curated
       - cat:reliability
     body_path: docs/decisions/adr-037-windfall-live-signals-paper.md
+  - id: adr-038-windfall-data-fidelity-honesty
+    project_slug: windfall-labs
+    title: "Data-fidelity and cost-honesty hardening: automated NSE index feed,
+      corrected operating-margin factor, net-of-cost paper P&L, held-name
+      transparency"
+    status: accepted
+    date: 2026-07-16T00:00:00.000Z
+    tags:
+      - curated
+      - cat:reliability
+    body_path: docs/decisions/adr-038-windfall-data-fidelity-honesty.md
