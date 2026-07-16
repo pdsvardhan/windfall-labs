@@ -73,16 +73,16 @@ class SweepIn(BaseModel):
 
 class BatchIn(BaseModel):
     # Resolve per distinct stop-panel combo, simulate the whole grid off each.
-    # KNOWN-SAFE grid keys (pure sim-side, share one ResolvedStrategy, ~10x faster than N
-    # independent backtests): n_holdings / rebalance / weighting / stop_loss.mult /
-    # stop_loss.value / take_profit.* / max_hold_days / max_position_adtv_pct / sector_cap.
+    # Grid keys are ENFORCED against _SAFE_GRID_KEYS/_SAFE_GRID_PREFIXES (verified pure-sim-side;
+    # they share one ResolvedStrategy, ~10x faster than N independent backtests).
     # `stop_loss.type` + `stop_loss.atr_period` are handled: they decide whether resolve() builds
     # the ATR panel, so combos are grouped by `_resolve_key` and each group resolves once.
-    # NOT SAFE — do not grid these, they change what resolve() produces and will silently reuse
-    # the base's panels: rank_by / rank_blend / universe.* / entry_filters / start / end /
-    # benchmark / data_source, and regime_filter.* (its MA warmup pad is sized at resolve from
-    # regime_filter.enabled — gridding it on measures ~0.229 CAGR where a direct resolve gives
-    # ~0.235, iter-22). Use separate /api/backtests calls for those. Tracked as a follow-up todo.
+    # Anything else — rank_by / rank_blend / universe.* / entry_filters / start / end / benchmark /
+    # data_source / regime_filter.* (its MA warmup pad is sized at resolve from
+    # regime_filter.enabled: gridding it on measured ~0.229 CAGR where a direct resolve gives
+    # ~0.235, iter-22) — changes what resolve() produces and is refused with 400 (#219): the
+    # resolve-once optimisation would silently reuse the base's panels and label the results as
+    # varied. Use separate /api/backtests calls for those.
     base_config: dict
     grid: dict = {}            # e.g. {"n_holdings":[10,20], "rebalance":["monthly","quarterly"]}
     name_template: str = ""    # e.g. "MOM_roc126_{rebalance}_{n_holdings}"; falls back to base name
@@ -261,6 +261,25 @@ def backtests_run(body: BacktestIn):
     return d
 
 
+# Grid keys verified to be read only by the SIMULATION (backtest.py: "n_holdings / rebalance /
+# regime / exits / costs all live in the simulation") — with the regime exception below. Everything
+# resolve() or _warmup_calendar_days() reads from config is excluded: data_source, start/end,
+# benchmark, universe.*, entry_filters, rank_by/rank_blend, and regime_filter.* (the regime
+# MULTIPLIER is sim-side, but its MA warmup pad is sized at resolve from regime_filter.enabled +
+# ma_period, so a regime grid off a non-regime base runs with a cold MA — measured 0.2289 vs
+# 0.2350 CAGR, iter-22). stop_loss./take_profit. are prefix-allowed: TakeProfit is pct/r_multiple
+# (no panel), and stop_loss.type/atr_period get their own resolve via _resolve_key grouping.
+_SAFE_GRID_KEYS = {"n_holdings", "rebalance", "weighting", "rank_order", "invest_fully",
+                   "capital", "entry_fill", "max_hold_days", "max_position_adtv_pct", "sector_cap"}
+_SAFE_GRID_PREFIXES = ("stop_loss.", "take_profit.")
+
+
+def _unsafe_grid_keys(keys) -> list[str]:
+    return sorted(k for k in keys
+                  if k not in _SAFE_GRID_KEYS
+                  and not any(k.startswith(p) for p in _SAFE_GRID_PREFIXES))
+
+
 def _resolve_key(cfg: dict) -> tuple:
     """The config values that change what resolve() BUILDS, as opposed to what the sim reads.
 
@@ -305,11 +324,20 @@ def backtests_batch(body: BatchIn):
     the base `rs` across those silently simulated the BASE config's stop — a trailing sweep off a
     no-stop base returned no-stop numbers under a trailing label (iter-22 #210).
 
-    See BatchIn for which keys are safe to grid. Keys outside that list are NOT validated here: the
-    caller is trusted, and a grid on e.g. rank_by will silently reuse the base's rank panel.
+    Grid keys outside the verified sim-side allowlist are refused with 400 (#219): an API consumer
+    cannot read a docstring, and a grid on e.g. rank_by or regime_filter.enabled would silently
+    reuse the base's panels and label the results as though the parameter had varied.
     """
     import copy as _copy
     import itertools as _it
+    # Refuse resolve-affecting grid keys BEFORE paying for the base resolve (#219).
+    if bad := _unsafe_grid_keys(body.grid.keys()):
+        raise HTTPException(400, (
+            f"grid key(s) {bad} change what resolve() builds (or are unverified for batch), so the "
+            f"batch resolve-once optimisation would silently reuse the base config's panels and "
+            f"label the results as varied (#219). Safe grid keys: "
+            f"{sorted(_SAFE_GRID_KEYS)} + prefixes {list(_SAFE_GRID_PREFIXES)}. "
+            f"Run resolve-affecting parameters as separate /api/backtests calls."))
     try:
         base = StrategyConfig(**body.base_config).model_dump()
     except ValidationError as exc:
