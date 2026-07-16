@@ -83,8 +83,9 @@ def test_pct_without_value_is_inert():
 
 
 def test_zero_mult_is_inert():
-    """0 is falsy in the same gate that None is — schema allows it through .mult validation only
-    because that validator fires on `mult is not None`."""
+    """Defence in depth: StrategyConfig would reject mult=0 (schema.py rejects mult <= 0), but
+    _inert_stop runs on raw dicts before that construction, and 0 is falsy in the same arming gate
+    that None is. Refuse it here rather than rely on validation order."""
     assert _inert_stop(_cfg(type="trailing", mult=0, atr_period=14)) is not None
 
 
