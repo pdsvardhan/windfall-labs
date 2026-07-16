@@ -1,5 +1,29 @@
 # Windfall Labs — Iteration Log
 
+## Session 2026-07-17 — Stage 4 iter-23: comprehensive analysis + autonomous todo sweep + validation trilogy
+
+**Stage:** Stage 4 iterate (9 items locked, 9/9 independent-verifier APPROVE — reports 516-521, 533-534 + item 634's)
+**Context:** owner asked for a full project analysis/critique plus "complete all todos you can do alone; improve what you see fit" (first Fable-5 session on this project). Analysis delivered in-chat; its top gaps became locked items.
+
+**Fixes (all verified, committed e36ee71..d19c0ac):**
+- **#219 (629):** `/api/backtests/batch` now ENFORCES the sim-side grid-key allowlist — resolve-affecting keys (regime_filter.*/rank/universe/window) 400 before the base resolve, naming offenders. 19 tests.
+- **#84 (630):** 5 renamed-but-dead names linked in rename_map with bhavcopy ISINs. Verifier root-caused TATAMOTORS `live_in_tl=false`: the 2024/25 demerger split it into TMCV/TMPV (chain gap → todo 246).
+- **#88 (631):** 64 inconsistent OHLC rows clamped to 0; index_ohlcv o/h/l/volume VARCHAR→DOUBLE (3,232-5,785 literal 'null' strings per column became real NULLs).
+- **#98 (632):** `scripts/batch_client.py` — long runners wait out the 20:25-20:55 IST EOD window, retry conn/5xx, fail 4xx fast. 7 tests.
+- **637:** `costs_bps` proven INERT since adr-020 yet still validating — the validation harness had silently run NET against Trendlyne's gross reference, and the old cost test asserted <= on two equal runs (vacuous). Now: deprecation warning on non-default use (run-local, batch-safe), `_check_reproduce` at cost_mult=0, strict tests.
+- **636:** honesty drift purged — `/api/data/status` no longer claims survivorship "deferred" (shipped adr-018/030); validation.md refreshed (186/12 tests, live paper run, round-2 overlap 79-91%); iters 16-18 bridge reconstructed in this log (below-dated sessions were never logged).
+
+**Validation trilogy (adr-040 + adr-041):**
+- **Walk-forward gate (633):** ALL five deployed strategies robust — OOS/IS Sharpe 0.71-0.94 over 8 rolling 3y/1y folds. Untouched 2007-2016 decade (2008 included, zero design decisions fitted on it): MOM_roc252 22.0% CAGR / 1.03 Sharpe / -30.1% MaxDD at 67% exposure. The adr-006 gate debt on the live paper run is cleared.
+- **Blend parity (634):** adr-035's 29.5%/1.27/-42.7 headline REPRODUCES from stored sleeves (30.1%/1.29/-45.3). The twice-flagged iter-20 "non-reproduction" was a holdings mismatch — n=20 sleeves give exactly the 23.1%/1.13 iter-20 saw. Debt closed.
+- **Regime study (635):** the index MA100 binary gate is the FIRST risk overlay to survive measurement — DD cut 11.8-24.1pp on all four paper strategies at Sharpe cost -0.10..+0.05 (two strategies IMPROVE), vs stops (all destructive, adr-039) and own-equity timing (halves CAGR, adr-033/034). Cost: 5-8pp CAGR, ~1/3 time in cash. Recorded as CANDIDATE (adr-041) — zero live-config changes (verifier confirmed zero footprint across all 289 stored configs); adoption path = walk-forward the gated configs (todo 249) + owner decision before 1 Aug.
+
+**Session interruption (00:55-01:40 IST):** a parallel session's ext4 deleted-file recovery (extundelete, media/music/telugu) remounted /mnt/storage READ-ONLY mid-build and quiesced containers; a third (portfolio) session bulk-restarted them unaware. Not disk failure (SMART PASSED, fs clean, administrative remount in auth.log). This session verified 6 items read-only during the freeze, coordinated via cross-session message, and resumed on a restore watcher. Lesson: verification is freeze-compatible (pytest -p no:cacheprovider; DuckDB read_only opens fine with the api down).
+
+**Ledger:** claims 157-164, 170-171 + 634's, all reconciled; iter-21's missing rows backfilled (explicitly labelled, report 522) closing #207. Todos closed: 84 88 98 103(rewritten) 182 184 200 207 219. Created: 246 (TATAMOTORS chain), 248 (next-open at 1 Aug), 249 (gated WF + adoption), 250 (rotation endpoint: single-sleeve 400, calmar=0, PLUS a transient NoneType 400 on valid multi-sleeve payloads caught by the 634 verifier), 251 (down-weight truncated WF folds).
+**Friction:** ottomate `/lock` 400s on a missing JSON body — send `{}` (tooling). `/api/rotation` single-sleeve weights=[1.0] 400s; also one transient `'NoneType' has no attribute 'empty'` 400 on a valid call that succeeded on retry (todo 250). DuckDB read-only opens print a progress bar that polluted 144KB of captured stdout — pipe through a filter (tooling). A parallel-session fs freeze mid-iteration is survivable: batch Ottomate writes are NVMe-side, verification is read-only (env).
+**Next session context:** **#220 HARD DEADLINE unchanged — owner harvest 30-31 Jul.** 1 Aug = first rebalance + first closed trades + the natural adoption point for next-open entries (248) and, if the gated walk-forward passes and the owner signs off, the MA100 gate (249, adr-041). Drawdown blocker (#103) now has a measured mitigation on the table.
+
 ## Session 2026-07-16 (2) — Stage 4 iter-22: no-stop decision + batch/quarterly bugfixes + Trendlyne refresh
 
 **Stage:** Stage 4 iterate (decision + 2 verified bugfixes + the manual data refresh)

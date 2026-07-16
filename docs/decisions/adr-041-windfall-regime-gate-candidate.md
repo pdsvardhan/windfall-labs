@@ -15,8 +15,10 @@ path (#103). The one built-in lever never measured on the deployables was the en
 **index-based** `regime_filter`: benchmark (NIFTY500) vs its own moving average — a market-level
 gate, not the self-referential equity gate adr-033 rejected. iter-23 measured it, full costs,
 direct per-variant resolves (the batch endpoint rightly refuses regime grids since #219).
-Adoption bar declared before running, same bar stops faced: **MaxDD cut ≥ 10pp at Sharpe cost
-≤ 0.10.** Harness: `docs/validation/regime_study_iter23.py` + `regime_study_run-2026-07-17.txt`.
+Adoption bar declared before running (single-commit provenance, verifier-confirmed): **MaxDD cut
+≥ 10pp at Sharpe cost ≤ 0.10** — at least as strict as the implicit standard stops faced (adr-039
+rejected an 8pp cut at 0.02 Sharpe cost as "a drawdown preference, not an improvement"; it never
+wrote a numeric bar, so this one is stated explicitly here). Harness: `docs/validation/regime_study_iter23.py` + `regime_study_run-2026-07-17.txt`.
 
 ## Finding — MA100 binary (de-risk to cash below the MA) clears the bar on ALL FOUR strategies
 
