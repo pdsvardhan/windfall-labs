@@ -4,7 +4,9 @@ Sync (`def`) handlers run in the threadpool so a long backtest never blocks the 
 """
 from __future__ import annotations
 
+import json
 import os
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -21,7 +23,8 @@ from windfall.data.pipeline import incremental_update
 from windfall.engine.backtest import run_backtest, resolve_with_warmup
 from windfall.engine.rotation import run_rotation
 from windfall.paper import (
-    commit_signal, delete_positions, list_positions, mark_to_market, rebalance_paper, scoreboard,
+    book_equity, commit_signal, delete_positions, list_positions, mark_to_market, rebalance_paper,
+    scoreboard,
 )
 from windfall.scripts_validation import run_validation
 from windfall.signals_live import generate_blend_signals, generate_signals
@@ -612,6 +615,22 @@ def paper_scoreboard():
     return clean(scoreboard())
 
 
+@app.get("/api/paper/equity")
+def paper_equity():
+    """Per-book daily equity vs benchmark, rebuilt from positions + the adjusted-close panel."""
+    return clean(book_equity())
+
+
+@app.get("/api/paper/sim")
+def paper_sim():
+    """The labeled 'entries from 2026-06-29' simulation (scripts/build_paper_sim.py).
+    Kept strictly separate from the live book — SIM data never enters live P&L."""
+    p = Path(__file__).resolve().parents[1] / "data" / "paper_sim.json"
+    if not p.exists():
+        raise HTTPException(404, "paper sim not generated — run scripts/build_paper_sim.py")
+    return json.loads(p.read_text())
+
+
 @app.post("/api/paper/rebalance")
 def paper_rebalance():
     """Monthly rebalance: sync every tracked paper strategy to its current target book."""
@@ -626,6 +645,18 @@ class PurgeIn(BaseModel):
 def paper_purge(body: PurgeIn):
     """Hard-delete every paper position for a strategy_id (e.g. a stale test book)."""
     return {"deleted": delete_positions(body.strategy_id)}
+
+
+# ── leaderboards ─────────────────────────────────────────────────────────────
+@app.get("/api/leaderboards")
+def leaderboards():
+    """Curated multi-board leaderboards (overall 10y, post-COVID 5y, pre-COVID, families,
+    robustness verdicts). Served from the persisted dataset written by
+    scripts/curate_leaderboards.py — rerun that script after new studies, not this endpoint."""
+    p = Path(__file__).resolve().parents[1] / "data" / "leaderboards.json"
+    if not p.exists():
+        raise HTTPException(404, "leaderboards dataset not generated — run scripts/curate_leaderboards.py")
+    return json.loads(p.read_text())
 
 
 # ── validation ───────────────────────────────────────────────────────────────

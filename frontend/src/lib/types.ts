@@ -115,9 +115,30 @@ export interface ScoreRow {
   open: number;
   closed: number;
   total_pnl: number;
+  net_pnl?: number | null;
   win_rate: number;
   avg_return_pct: number;
   avg_r_multiple: number | null;
+}
+
+export interface PaperEquity {
+  benchmark: string;
+  books: Record<string, {
+    start: string;
+    points: [string, number][]; // [date, return since book start] — gross of costs
+    benchmark: [string, number][]; // same dates, benchmark return since book start
+  }>;
+}
+
+export interface PaperSim {
+  generated_at: string;
+  sim_start: string;
+  label: string;
+  books: Record<string, {
+    points: [string, number][];
+    ret?: number | null;
+    error?: string;
+  }>;
 }
 
 export interface Coverage {
@@ -244,4 +265,56 @@ export interface SweepResult {
   maximize: boolean;
   n_variants: number;
   ranked: SweepRow[];
+}
+
+// ── leaderboards (curated dataset from scripts/curate_leaderboards.py) ──
+export interface BoardMetrics {
+  cagr: number | null;
+  sharpe: number | null;
+  maxdd: number | null;
+}
+export interface LeaderboardRow extends BoardMetrics {
+  sid: string;
+  family: string;
+  src?: string; // postcovid board: "slice" (warm, flattered) | "fresh" (cold start)
+  maxdd_dates?: [string, string] | null;
+}
+export interface VerdictRow {
+  sid: string;
+  family: string;
+  verdict: "survivor" | "regime-bet" | "noise" | "incumbent" | "incumbent-flag" | "finalist";
+  note: string;
+  cagr_5y: number | null;
+  sharpe_5y: number | null;
+  maxdd_5y: number | null;
+  h1_cagr: number | null;
+  h2_cagr: number | null;
+  pre_cagr: number | null;
+  pre_sharpe: number | null;
+  seg_beat: number;
+  seg_total: number;
+}
+export interface FamilyRow {
+  family: string;
+  desc: string;
+  median_cagr: number;
+  best_cagr: number;
+  n: number;
+}
+export interface Board {
+  title: string;
+  window: string;
+  caption: string;
+  benchmark?: BoardMetrics | null;
+  rows: (LeaderboardRow | VerdictRow | FamilyRow)[];
+}
+export interface LeaderboardsData {
+  generated_at: string;
+  boards: {
+    overall: Board;
+    postcovid: Board;
+    precovid: Board;
+    families: Board;
+    verdicts: Board;
+  };
 }

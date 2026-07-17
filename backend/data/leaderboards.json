@@ -1,0 +1,4853 @@
+{
+ "generated_at": "2026-07-17T11:53:13.717872+00:00",
+ "boards": {
+  "overall": {
+   "title": "Overall (10 years)",
+   "window": "2016-06-10 \u2192 2026-06-16",
+   "caption": "Every stored sweep run, full window, net of costs, survivorship-free. High CAGR with a deep MaxDD is not a free lunch \u2014 sort by Sharpe too.",
+   "benchmark": {
+    "cagr": -0.0011,
+    "sharpe": 0.066,
+    "maxdd": -0.1884
+   },
+   "rows": [
+    {
+     "sid": "DVM_all_w_10",
+     "family": "DVM",
+     "cagr": 0.428906,
+     "sharpe": 1.3613,
+     "maxdd": -0.719615,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "DVM_all_m_10",
+     "family": "DVM",
+     "cagr": 0.362179,
+     "sharpe": 1.2147,
+     "maxdd": -0.739147,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-23"
+     ]
+    },
+    {
+     "sid": "DVM_dm_m_15",
+     "family": "DVM",
+     "cagr": 0.337281,
+     "sharpe": 1.2796,
+     "maxdd": -0.548114,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "DVM_all_w_15",
+     "family": "DVM",
+     "cagr": 0.334794,
+     "sharpe": 1.1797,
+     "maxdd": -0.712912,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "DVM_dm_m_10",
+     "family": "DVM",
+     "cagr": 0.319396,
+     "sharpe": 1.1736,
+     "maxdd": -0.547877,
+     "maxdd_dates": [
+      "2017-11-09",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "DVM_dm_m_20",
+     "family": "DVM",
+     "cagr": 0.319111,
+     "sharpe": 1.2738,
+     "maxdd": -0.546308,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "DVM_all_m_15",
+     "family": "DVM",
+     "cagr": 0.308208,
+     "sharpe": 1.1281,
+     "maxdd": -0.724578,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-23"
+     ]
+    },
+    {
+     "sid": "DVM_all_m_20",
+     "family": "DVM",
+     "cagr": 0.297821,
+     "sharpe": 1.1381,
+     "maxdd": -0.67655,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-23"
+     ]
+    },
+    {
+     "sid": "DVM_dm_q_20",
+     "family": "DVM",
+     "cagr": 0.294234,
+     "sharpe": 1.2224,
+     "maxdd": -0.428067,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "CMP_valmom_q_15",
+     "family": "CMP",
+     "cagr": 0.292794,
+     "sharpe": 1.1015,
+     "maxdd": -0.616405,
+     "maxdd_dates": [
+      "2018-01-11",
+      "2020-03-23"
+     ]
+    },
+    {
+     "sid": "DVM_all_w_20",
+     "family": "DVM",
+     "cagr": 0.29248,
+     "sharpe": 1.0935,
+     "maxdd": -0.719271,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-23"
+     ]
+    },
+    {
+     "sid": "GRO_revg_w_10",
+     "family": "GRO",
+     "cagr": 0.287806,
+     "sharpe": 1.125,
+     "maxdd": -0.652664,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-23"
+     ]
+    },
+    {
+     "sid": "DVM_dm_m_30",
+     "family": "DVM",
+     "cagr": 0.286966,
+     "sharpe": 1.2129,
+     "maxdd": -0.547257,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "DVM_dm_q_15",
+     "family": "DVM",
+     "cagr": 0.286937,
+     "sharpe": 1.1797,
+     "maxdd": -0.420305,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-23"
+     ]
+    },
+    {
+     "sid": "DVM_all_q_15",
+     "family": "DVM",
+     "cagr": 0.284658,
+     "sharpe": 1.0873,
+     "maxdd": -0.672419,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-23"
+     ]
+    },
+    {
+     "sid": "DVM_dm_q_10",
+     "family": "DVM",
+     "cagr": 0.283032,
+     "sharpe": 1.0946,
+     "maxdd": -0.551936,
+     "maxdd_dates": [
+      "2018-01-08",
+      "2020-03-23"
+     ]
+    },
+    {
+     "sid": "DVM_all_w_30",
+     "family": "DVM",
+     "cagr": 0.280672,
+     "sharpe": 1.0964,
+     "maxdd": -0.701873,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-23"
+     ]
+    },
+    {
+     "sid": "DVM_dm_w_15",
+     "family": "DVM",
+     "cagr": 0.27835,
+     "sharpe": 1.0902,
+     "maxdd": -0.599107,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "DVM_all_q_20",
+     "family": "DVM",
+     "cagr": 0.275075,
+     "sharpe": 1.0966,
+     "maxdd": -0.658236,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-23"
+     ]
+    },
+    {
+     "sid": "GRO_revg_m_10",
+     "family": "GRO",
+     "cagr": 0.272988,
+     "sharpe": 1.0687,
+     "maxdd": -0.640417,
+     "maxdd_dates": [
+      "2017-11-13",
+      "2020-03-23"
+     ]
+    },
+    {
+     "sid": "GRO_revg_m_15",
+     "family": "GRO",
+     "cagr": 0.272485,
+     "sharpe": 1.1236,
+     "maxdd": -0.645133,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-23"
+     ]
+    },
+    {
+     "sid": "DVM_dm_w_20",
+     "family": "DVM",
+     "cagr": 0.272255,
+     "sharpe": 1.1074,
+     "maxdd": -0.607046,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "DVM_dm_w_10",
+     "family": "DVM",
+     "cagr": 0.270453,
+     "sharpe": 1.0229,
+     "maxdd": -0.612143,
+     "maxdd_dates": [
+      "2018-01-11",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "CMP_valmom_m_15",
+     "family": "CMP",
+     "cagr": 0.269202,
+     "sharpe": 1.0198,
+     "maxdd": -0.641063,
+     "maxdd_dates": [
+      "2018-01-11",
+      "2020-03-23"
+     ]
+    },
+    {
+     "sid": "GRO_revg_w_15",
+     "family": "GRO",
+     "cagr": 0.268747,
+     "sharpe": 1.1136,
+     "maxdd": -0.611531,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "DVM_all_q_30",
+     "family": "DVM",
+     "cagr": 0.266259,
+     "sharpe": 1.1019,
+     "maxdd": -0.6418,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "DVM_dm_w_30",
+     "family": "DVM",
+     "cagr": 0.263682,
+     "sharpe": 1.1323,
+     "maxdd": -0.591395,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "CMP_valmom_m_10",
+     "family": "CMP",
+     "cagr": 0.263467,
+     "sharpe": 0.9652,
+     "maxdd": -0.632288,
+     "maxdd_dates": [
+      "2018-01-10",
+      "2020-03-23"
+     ]
+    },
+    {
+     "sid": "VAL_ownpe_w_10",
+     "family": "VAL",
+     "cagr": 0.261061,
+     "sharpe": 1.013,
+     "maxdd": -0.778602,
+     "maxdd_dates": [
+      "2018-01-11",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "DVM_dm_q_30",
+     "family": "DVM",
+     "cagr": 0.258358,
+     "sharpe": 1.1461,
+     "maxdd": -0.460566,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "CMP_valmom_m_20",
+     "family": "CMP",
+     "cagr": 0.257418,
+     "sharpe": 1.0098,
+     "maxdd": -0.649892,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-23"
+     ]
+    },
+    {
+     "sid": "CMP_valmom_q_10",
+     "family": "CMP",
+     "cagr": 0.256454,
+     "sharpe": 0.9653,
+     "maxdd": -0.605568,
+     "maxdd_dates": [
+      "2018-01-11",
+      "2020-03-23"
+     ]
+    },
+    {
+     "sid": "DVM_dv_m_10",
+     "family": "DVM",
+     "cagr": 0.253858,
+     "sharpe": 1.0014,
+     "maxdd": -0.734563,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "DVM_all_q_10",
+     "family": "DVM",
+     "cagr": 0.25365,
+     "sharpe": 0.9549,
+     "maxdd": -0.706439,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "VAL_ownpe_m_10",
+     "family": "VAL",
+     "cagr": 0.25253,
+     "sharpe": 0.9966,
+     "maxdd": -0.776451,
+     "maxdd_dates": [
+      "2018-01-11",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "CMP_valmom_q_20",
+     "family": "CMP",
+     "cagr": 0.250939,
+     "sharpe": 0.9908,
+     "maxdd": -0.646969,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "DVM_all_m_30",
+     "family": "DVM",
+     "cagr": 0.250015,
+     "sharpe": 1.0212,
+     "maxdd": -0.670041,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-23"
+     ]
+    },
+    {
+     "sid": "CMP_qmj_m_20",
+     "family": "CMP",
+     "cagr": 0.249562,
+     "sharpe": 1.0635,
+     "maxdd": -0.490085,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "SZ_small_m_15",
+     "family": "SZ",
+     "cagr": 0.249477,
+     "sharpe": 0.9876,
+     "maxdd": -0.868807,
+     "maxdd_dates": [
+      "2018-01-09",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "DVM_dv_q_20",
+     "family": "DVM",
+     "cagr": 0.248778,
+     "sharpe": 1.0443,
+     "maxdd": -0.716811,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "VAL_ownpe_w_15",
+     "family": "VAL",
+     "cagr": 0.248313,
+     "sharpe": 1.0432,
+     "maxdd": -0.756375,
+     "maxdd_dates": [
+      "2018-01-10",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "DVM_dv_q_15",
+     "family": "DVM",
+     "cagr": 0.245539,
+     "sharpe": 1.0138,
+     "maxdd": -0.712466,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "CMP_valmom_w_10",
+     "family": "CMP",
+     "cagr": 0.245066,
+     "sharpe": 0.9054,
+     "maxdd": -0.712304,
+     "maxdd_dates": [
+      "2017-10-31",
+      "2020-03-23"
+     ]
+    },
+    {
+     "sid": "SZ_small_m_20",
+     "family": "SZ",
+     "cagr": 0.240196,
+     "sharpe": 0.9875,
+     "maxdd": -0.84591,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "DVM_dv_w_20",
+     "family": "DVM",
+     "cagr": 0.240104,
+     "sharpe": 1.0112,
+     "maxdd": -0.732343,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "CMP_valmom_w_15",
+     "family": "CMP",
+     "cagr": 0.236599,
+     "sharpe": 0.926,
+     "maxdd": -0.703233,
+     "maxdd_dates": [
+      "2018-01-11",
+      "2020-03-23"
+     ]
+    },
+    {
+     "sid": "DVM_dv_m_15",
+     "family": "DVM",
+     "cagr": 0.236038,
+     "sharpe": 0.9752,
+     "maxdd": -0.731917,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "DVM_dv_w_15",
+     "family": "DVM",
+     "cagr": 0.235629,
+     "sharpe": 0.9771,
+     "maxdd": -0.720026,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "CMP_valmom_w_20",
+     "family": "CMP",
+     "cagr": 0.235375,
+     "sharpe": 0.9374,
+     "maxdd": -0.715452,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "GRO_revg_q_20",
+     "family": "GRO",
+     "cagr": 0.232394,
+     "sharpe": 1.0402,
+     "maxdd": -0.598832,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-04-03"
+     ]
+    },
+    {
+     "sid": "CMP_valmom_m_30",
+     "family": "CMP",
+     "cagr": 0.231526,
+     "sharpe": 0.9486,
+     "maxdd": -0.678815,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-23"
+     ]
+    },
+    {
+     "sid": "CMP_qmj_w_30",
+     "family": "CMP",
+     "cagr": 0.230774,
+     "sharpe": 1.0273,
+     "maxdd": -0.533591,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "DVM_dv_m_20",
+     "family": "DVM",
+     "cagr": 0.230484,
+     "sharpe": 0.9755,
+     "maxdd": -0.72981,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "DVM_dv_w_10",
+     "family": "DVM",
+     "cagr": 0.230131,
+     "sharpe": 0.9332,
+     "maxdd": -0.756684,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-23"
+     ]
+    },
+    {
+     "sid": "VAL_ownpe_q_10",
+     "family": "VAL",
+     "cagr": 0.230084,
+     "sharpe": 0.9255,
+     "maxdd": -0.829939,
+     "maxdd_dates": [
+      "2018-01-11",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "DVM_dv_q_30",
+     "family": "DVM",
+     "cagr": 0.229841,
+     "sharpe": 1.0024,
+     "maxdd": -0.744969,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "DVM_dv_q_10",
+     "family": "DVM",
+     "cagr": 0.229293,
+     "sharpe": 0.9313,
+     "maxdd": -0.751023,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "VAL_tlpbv_w_10",
+     "family": "VAL",
+     "cagr": 0.22819,
+     "sharpe": 0.8893,
+     "maxdd": -0.776483,
+     "maxdd_dates": [
+      "2018-01-05",
+      "2020-03-25"
+     ]
+    },
+    {
+     "sid": "VAL_ownpe_w_20",
+     "family": "VAL",
+     "cagr": 0.227782,
+     "sharpe": 1.018,
+     "maxdd": -0.715644,
+     "maxdd_dates": [
+      "2018-01-10",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "SZ_small_m_30",
+     "family": "SZ",
+     "cagr": 0.227354,
+     "sharpe": 0.9692,
+     "maxdd": -0.815869,
+     "maxdd_dates": [
+      "2018-01-08",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "CMP_qmj_w_15",
+     "family": "CMP",
+     "cagr": 0.226844,
+     "sharpe": 0.9546,
+     "maxdd": -0.543461,
+     "maxdd_dates": [
+      "2018-01-10",
+      "2020-04-03"
+     ]
+    },
+    {
+     "sid": "CMP_qmj_m_30",
+     "family": "CMP",
+     "cagr": 0.225255,
+     "sharpe": 1.0094,
+     "maxdd": -0.528288,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "GRO_revg_q_15",
+     "family": "GRO",
+     "cagr": 0.224909,
+     "sharpe": 0.9887,
+     "maxdd": -0.601433,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-04-03"
+     ]
+    },
+    {
+     "sid": "CMP_valmom_q_30",
+     "family": "CMP",
+     "cagr": 0.223928,
+     "sharpe": 0.9323,
+     "maxdd": -0.658707,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "VAL_tlpbv_w_15",
+     "family": "VAL",
+     "cagr": 0.222567,
+     "sharpe": 0.9072,
+     "maxdd": -0.747227,
+     "maxdd_dates": [
+      "2018-01-08",
+      "2020-03-25"
+     ]
+    },
+    {
+     "sid": "GRO_revg_w_20",
+     "family": "GRO",
+     "cagr": 0.222052,
+     "sharpe": 0.971,
+     "maxdd": -0.67005,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "CMP_qvm_m_30",
+     "family": "CMP",
+     "cagr": 0.221091,
+     "sharpe": 0.9448,
+     "maxdd": -0.689374,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "GRO_revg_q_10",
+     "family": "GRO",
+     "cagr": 0.221088,
+     "sharpe": 0.932,
+     "maxdd": -0.599091,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-04-03"
+     ]
+    },
+    {
+     "sid": "SZ_small_m_10",
+     "family": "SZ",
+     "cagr": 0.220398,
+     "sharpe": 0.8709,
+     "maxdd": -0.869535,
+     "maxdd_dates": [
+      "2018-01-09",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "DVM_dv_m_30",
+     "family": "DVM",
+     "cagr": 0.22015,
+     "sharpe": 0.9603,
+     "maxdd": -0.750394,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "VAL_tlpe_q_30",
+     "family": "VAL",
+     "cagr": 0.218707,
+     "sharpe": 0.9849,
+     "maxdd": -0.67872,
+     "maxdd_dates": [
+      "2018-01-11",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "CMP_valmom_w_30",
+     "family": "CMP",
+     "cagr": 0.218439,
+     "sharpe": 0.9076,
+     "maxdd": -0.720646,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-23"
+     ]
+    },
+    {
+     "sid": "QUA_piotroski_w_15",
+     "family": "QUA",
+     "cagr": 0.218058,
+     "sharpe": 1.0144,
+     "maxdd": -0.545263,
+     "maxdd_dates": [
+      "2018-04-23",
+      "2020-03-23"
+     ]
+    },
+    {
+     "sid": "SZ_small_q_10",
+     "family": "SZ",
+     "cagr": 0.216975,
+     "sharpe": 0.8838,
+     "maxdd": -0.778389,
+     "maxdd_dates": [
+      "2018-01-09",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "GRO_revg_m_30",
+     "family": "GRO",
+     "cagr": 0.21645,
+     "sharpe": 0.9892,
+     "maxdd": -0.670654,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "VAL_ownpe_q_15",
+     "family": "VAL",
+     "cagr": 0.216157,
+     "sharpe": 0.9317,
+     "maxdd": -0.784988,
+     "maxdd_dates": [
+      "2018-01-11",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "SZ_small_q_30",
+     "family": "SZ",
+     "cagr": 0.2146,
+     "sharpe": 0.9455,
+     "maxdd": -0.762429,
+     "maxdd_dates": [
+      "2018-01-09",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "DVM_dv_w_30",
+     "family": "DVM",
+     "cagr": 0.213676,
+     "sharpe": 0.9385,
+     "maxdd": -0.743231,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "GRO_revg_m_20",
+     "family": "GRO",
+     "cagr": 0.213281,
+     "sharpe": 0.942,
+     "maxdd": -0.702657,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "SZ_small_q_15",
+     "family": "SZ",
+     "cagr": 0.210847,
+     "sharpe": 0.895,
+     "maxdd": -0.791232,
+     "maxdd_dates": [
+      "2018-01-09",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "VAL_ownpe_m_15",
+     "family": "VAL",
+     "cagr": 0.210681,
+     "sharpe": 0.9243,
+     "maxdd": -0.744063,
+     "maxdd_dates": [
+      "2018-01-11",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "VAL_ownpe_m_20",
+     "family": "VAL",
+     "cagr": 0.20667,
+     "sharpe": 0.9382,
+     "maxdd": -0.731354,
+     "maxdd_dates": [
+      "2018-01-11",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "CMP_qmj_q_20",
+     "family": "CMP",
+     "cagr": 0.206263,
+     "sharpe": 0.9358,
+     "maxdd": -0.56468,
+     "maxdd_dates": [
+      "2018-01-10",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "CMP_qmj_w_20",
+     "family": "CMP",
+     "cagr": 0.205743,
+     "sharpe": 0.9056,
+     "maxdd": -0.527446,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "CMP_qmj_q_30",
+     "family": "CMP",
+     "cagr": 0.204433,
+     "sharpe": 0.9471,
+     "maxdd": -0.527509,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "SZ_small_q_20",
+     "family": "SZ",
+     "cagr": 0.203532,
+     "sharpe": 0.8923,
+     "maxdd": -0.795429,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "VAL_tlpbv_m_15",
+     "family": "VAL",
+     "cagr": 0.203425,
+     "sharpe": 0.8465,
+     "maxdd": -0.709134,
+     "maxdd_dates": [
+      "2018-01-09",
+      "2020-03-23"
+     ]
+    },
+    {
+     "sid": "QUA_piotroski_w_20",
+     "family": "QUA",
+     "cagr": 0.203128,
+     "sharpe": 0.9857,
+     "maxdd": -0.56557,
+     "maxdd_dates": [
+      "2018-04-23",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "GRO_revg_w_30",
+     "family": "GRO",
+     "cagr": 0.202351,
+     "sharpe": 0.9381,
+     "maxdd": -0.68797,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-23"
+     ]
+    },
+    {
+     "sid": "VAL_tlpe_m_30",
+     "family": "VAL",
+     "cagr": 0.201619,
+     "sharpe": 0.9109,
+     "maxdd": -0.717366,
+     "maxdd_dates": [
+      "2018-01-11",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "VAL_tlpe_q_20",
+     "family": "VAL",
+     "cagr": 0.201101,
+     "sharpe": 0.8865,
+     "maxdd": -0.698783,
+     "maxdd_dates": [
+      "2018-01-11",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "VAL_tlpbv_m_10",
+     "family": "VAL",
+     "cagr": 0.198929,
+     "sharpe": 0.8005,
+     "maxdd": -0.770424,
+     "maxdd_dates": [
+      "2018-01-05",
+      "2020-03-23"
+     ]
+    },
+    {
+     "sid": "QUA_piotroski_m_15",
+     "family": "QUA",
+     "cagr": 0.197919,
+     "sharpe": 0.9447,
+     "maxdd": -0.575908,
+     "maxdd_dates": [
+      "2018-04-23",
+      "2020-03-23"
+     ]
+    },
+    {
+     "sid": "QUA_piotroski_m_20",
+     "family": "QUA",
+     "cagr": 0.197468,
+     "sharpe": 0.9697,
+     "maxdd": -0.609196,
+     "maxdd_dates": [
+      "2018-04-23",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "CMP_qmj_m_15",
+     "family": "CMP",
+     "cagr": 0.19738,
+     "sharpe": 0.8638,
+     "maxdd": -0.547566,
+     "maxdd_dates": [
+      "2018-01-10",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "GRO_revg_q_30",
+     "family": "GRO",
+     "cagr": 0.19673,
+     "sharpe": 0.9216,
+     "maxdd": -0.646712,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-04-03"
+     ]
+    },
+    {
+     "sid": "VAL_ownpe_w_30",
+     "family": "VAL",
+     "cagr": 0.193949,
+     "sharpe": 0.9391,
+     "maxdd": -0.701824,
+     "maxdd_dates": [
+      "2018-01-11",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "VAL_tlpbv_q_30",
+     "family": "VAL",
+     "cagr": 0.191945,
+     "sharpe": 0.8803,
+     "maxdd": -0.740333,
+     "maxdd_dates": [
+      "2018-01-11",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "VAL_tlpe_q_15",
+     "family": "VAL",
+     "cagr": 0.190208,
+     "sharpe": 0.822,
+     "maxdd": -0.668707,
+     "maxdd_dates": [
+      "2018-01-11",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "VAL_ownpe_m_30",
+     "family": "VAL",
+     "cagr": 0.190159,
+     "sharpe": 0.9222,
+     "maxdd": -0.69868,
+     "maxdd_dates": [
+      "2018-01-11",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "VAL_tlpbv_q_20",
+     "family": "VAL",
+     "cagr": 0.188028,
+     "sharpe": 0.8198,
+     "maxdd": -0.762613,
+     "maxdd_dates": [
+      "2018-01-11",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "QUA_piotroski_w_30",
+     "family": "QUA",
+     "cagr": 0.187134,
+     "sharpe": 0.9563,
+     "maxdd": -0.568744,
+     "maxdd_dates": [
+      "2018-01-12",
+      "2020-03-23"
+     ]
+    },
+    {
+     "sid": "VAL_ownpe_q_30",
+     "family": "VAL",
+     "cagr": 0.182929,
+     "sharpe": 0.8792,
+     "maxdd": -0.733117,
+     "maxdd_dates": [
+      "2018-01-10",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "VAL_tlpbv_m_20",
+     "family": "VAL",
+     "cagr": 0.182069,
+     "sharpe": 0.7948,
+     "maxdd": -0.73274,
+     "maxdd_dates": [
+      "2018-01-11",
+      "2020-03-25"
+     ]
+    },
+    {
+     "sid": "VAL_ownpe_q_20",
+     "family": "VAL",
+     "cagr": 0.178831,
+     "sharpe": 0.828,
+     "maxdd": -0.760627,
+     "maxdd_dates": [
+      "2018-01-10",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "SZ_small_w_30",
+     "family": "SZ",
+     "cagr": 0.178213,
+     "sharpe": 0.7964,
+     "maxdd": -0.830775,
+     "maxdd_dates": [
+      "2018-01-11",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "VAL_tlpbv_m_30",
+     "family": "VAL",
+     "cagr": 0.175042,
+     "sharpe": 0.8092,
+     "maxdd": -0.728363,
+     "maxdd_dates": [
+      "2018-01-11",
+      "2020-03-25"
+     ]
+    },
+    {
+     "sid": "QUA_tlroce_q_20",
+     "family": "QUA",
+     "cagr": 0.174635,
+     "sharpe": 0.988,
+     "maxdd": -0.386543,
+     "maxdd_dates": [
+      "2018-01-11",
+      "2020-03-23"
+     ]
+    },
+    {
+     "sid": "CMP_qvm_m_15",
+     "family": "CMP",
+     "cagr": 0.171998,
+     "sharpe": 0.7389,
+     "maxdd": -0.744648,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "CMP_qvm_m_20",
+     "family": "CMP",
+     "cagr": 0.171329,
+     "sharpe": 0.7582,
+     "maxdd": -0.722597,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "VAL_tlpbv_w_20",
+     "family": "VAL",
+     "cagr": 0.170503,
+     "sharpe": 0.7603,
+     "maxdd": -0.778839,
+     "maxdd_dates": [
+      "2018-01-11",
+      "2020-03-25"
+     ]
+    },
+    {
+     "sid": "QUA_piotroski_m_30",
+     "family": "QUA",
+     "cagr": 0.170406,
+     "sharpe": 0.8944,
+     "maxdd": -0.593679,
+     "maxdd_dates": [
+      "2018-01-12",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "CMP_qvm_q_30",
+     "family": "CMP",
+     "cagr": 0.168057,
+     "sharpe": 0.7632,
+     "maxdd": -0.693987,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "CMP_qmj_q_15",
+     "family": "CMP",
+     "cagr": 0.16666,
+     "sharpe": 0.7715,
+     "maxdd": -0.542443,
+     "maxdd_dates": [
+      "2018-01-10",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "CMP_qvm_w_10",
+     "family": "CMP",
+     "cagr": 0.165944,
+     "sharpe": 0.6949,
+     "maxdd": -0.756654,
+     "maxdd_dates": [
+      "2017-11-24",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "CMP_qvm_q_15",
+     "family": "CMP",
+     "cagr": 0.164561,
+     "sharpe": 0.7167,
+     "maxdd": -0.741434,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "CMP_qvm_w_30",
+     "family": "CMP",
+     "cagr": 0.164451,
+     "sharpe": 0.7544,
+     "maxdd": -0.733038,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "QUA_piotroski_q_15",
+     "family": "QUA",
+     "cagr": 0.164425,
+     "sharpe": 0.8317,
+     "maxdd": -0.567202,
+     "maxdd_dates": [
+      "2018-01-12",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "VAL_tlpbv_q_15",
+     "family": "VAL",
+     "cagr": 0.159564,
+     "sharpe": 0.7027,
+     "maxdd": -0.800187,
+     "maxdd_dates": [
+      "2018-01-09",
+      "2020-03-25"
+     ]
+    },
+    {
+     "sid": "CMP_qmj_m_10",
+     "family": "CMP",
+     "cagr": 0.154538,
+     "sharpe": 0.6852,
+     "maxdd": -0.524032,
+     "maxdd_dates": [
+      "2018-01-10",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "GRO_npg_q_15",
+     "family": "GRO",
+     "cagr": 0.154185,
+     "sharpe": 0.7448,
+     "maxdd": -0.645163,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-23"
+     ]
+    },
+    {
+     "sid": "VAL_tlpe_q_10",
+     "family": "VAL",
+     "cagr": 0.153203,
+     "sharpe": 0.6621,
+     "maxdd": -0.718428,
+     "maxdd_dates": [
+      "2018-01-11",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "GRO_npg_q_20",
+     "family": "GRO",
+     "cagr": 0.152085,
+     "sharpe": 0.7464,
+     "maxdd": -0.635523,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-23"
+     ]
+    },
+    {
+     "sid": "QUA_piotroski_w_10",
+     "family": "QUA",
+     "cagr": 0.150939,
+     "sharpe": 0.7382,
+     "maxdd": -0.64062,
+     "maxdd_dates": [
+      "2018-04-23",
+      "2020-03-23"
+     ]
+    },
+    {
+     "sid": "QUA_piotroski_q_20",
+     "family": "QUA",
+     "cagr": 0.150919,
+     "sharpe": 0.7914,
+     "maxdd": -0.612388,
+     "maxdd_dates": [
+      "2018-01-08",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "GRO_npg_m_30",
+     "family": "GRO",
+     "cagr": 0.150489,
+     "sharpe": 0.7445,
+     "maxdd": -0.717769,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "GRO_npg_m_15",
+     "family": "GRO",
+     "cagr": 0.148373,
+     "sharpe": 0.7072,
+     "maxdd": -0.749446,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "QUA_tlroce_q_15",
+     "family": "QUA",
+     "cagr": 0.147465,
+     "sharpe": 0.843,
+     "maxdd": -0.432761,
+     "maxdd_dates": [
+      "2018-01-11",
+      "2020-03-23"
+     ]
+    },
+    {
+     "sid": "VAL_tlpbv_w_30",
+     "family": "VAL",
+     "cagr": 0.146524,
+     "sharpe": 0.698,
+     "maxdd": -0.769555,
+     "maxdd_dates": [
+      "2018-01-11",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "QUA_tlroce_w_20",
+     "family": "QUA",
+     "cagr": 0.146455,
+     "sharpe": 0.8375,
+     "maxdd": -0.498872,
+     "maxdd_dates": [
+      "2018-01-11",
+      "2020-03-23"
+     ]
+    },
+    {
+     "sid": "GRO_npg_w_30",
+     "family": "GRO",
+     "cagr": 0.146053,
+     "sharpe": 0.7263,
+     "maxdd": -0.700612,
+     "maxdd_dates": [
+      "2018-01-09",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "QUA_tlroce_m_20",
+     "family": "QUA",
+     "cagr": 0.145139,
+     "sharpe": 0.8379,
+     "maxdd": -0.465923,
+     "maxdd_dates": [
+      "2018-01-11",
+      "2020-03-23"
+     ]
+    },
+    {
+     "sid": "CMP_qvm_q_20",
+     "family": "CMP",
+     "cagr": 0.144357,
+     "sharpe": 0.6582,
+     "maxdd": -0.7252,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "GRO_npg_m_20",
+     "family": "GRO",
+     "cagr": 0.142754,
+     "sharpe": 0.6967,
+     "maxdd": -0.717367,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "GRO_npg_q_30",
+     "family": "GRO",
+     "cagr": 0.1411,
+     "sharpe": 0.7219,
+     "maxdd": -0.627223,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "CMP_qvm_q_10",
+     "family": "CMP",
+     "cagr": 0.139298,
+     "sharpe": 0.6206,
+     "maxdd": -0.762171,
+     "maxdd_dates": [
+      "2018-01-10",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "CMP_qvm_w_15",
+     "family": "CMP",
+     "cagr": 0.137326,
+     "sharpe": 0.6296,
+     "maxdd": -0.734914,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "QUA_piotroski_m_10",
+     "family": "QUA",
+     "cagr": 0.137292,
+     "sharpe": 0.6873,
+     "maxdd": -0.657253,
+     "maxdd_dates": [
+      "2018-04-23",
+      "2020-03-23"
+     ]
+    },
+    {
+     "sid": "QUA_ownroe_w_30",
+     "family": "QUA",
+     "cagr": 0.13608,
+     "sharpe": 0.7904,
+     "maxdd": -0.614246,
+     "maxdd_dates": [
+      "2018-01-10",
+      "2020-03-23"
+     ]
+    },
+    {
+     "sid": "QUA_tlroce_q_30",
+     "family": "QUA",
+     "cagr": 0.135366,
+     "sharpe": 0.8043,
+     "maxdd": -0.503494,
+     "maxdd_dates": [
+      "2018-01-11",
+      "2020-03-23"
+     ]
+    },
+    {
+     "sid": "CMP_qvm_m_10",
+     "family": "CMP",
+     "cagr": 0.134525,
+     "sharpe": 0.6004,
+     "maxdd": -0.754375,
+     "maxdd_dates": [
+      "2018-01-10",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "SZ_small_w_20",
+     "family": "SZ",
+     "cagr": 0.134341,
+     "sharpe": 0.6267,
+     "maxdd": -0.850234,
+     "maxdd_dates": [
+      "2018-01-11",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "VAL_tlpbv_q_10",
+     "family": "VAL",
+     "cagr": 0.134076,
+     "sharpe": 0.5883,
+     "maxdd": -0.856685,
+     "maxdd_dates": [
+      "2018-01-05",
+      "2020-03-25"
+     ]
+    },
+    {
+     "sid": "CMP_qmj_w_10",
+     "family": "CMP",
+     "cagr": 0.132759,
+     "sharpe": 0.6061,
+     "maxdd": -0.617678,
+     "maxdd_dates": [
+      "2018-01-10",
+      "2020-04-03"
+     ]
+    },
+    {
+     "sid": "QUA_piotroski_q_30",
+     "family": "QUA",
+     "cagr": 0.131843,
+     "sharpe": 0.7406,
+     "maxdd": -0.574371,
+     "maxdd_dates": [
+      "2018-01-12",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "GRO_npg_q_10",
+     "family": "GRO",
+     "cagr": 0.13052,
+     "sharpe": 0.6238,
+     "maxdd": -0.628731,
+     "maxdd_dates": [
+      "2018-01-04",
+      "2020-03-23"
+     ]
+    },
+    {
+     "sid": "CMP_qvm_w_20",
+     "family": "CMP",
+     "cagr": 0.128556,
+     "sharpe": 0.6101,
+     "maxdd": -0.764334,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "QUA_tlroce_w_30",
+     "family": "QUA",
+     "cagr": 0.128253,
+     "sharpe": 0.7636,
+     "maxdd": -0.523077,
+     "maxdd_dates": [
+      "2018-01-11",
+      "2020-03-23"
+     ]
+    },
+    {
+     "sid": "DVM_user",
+     "family": "DVM",
+     "cagr": 0.124952,
+     "sharpe": 0.5654,
+     "maxdd": -0.270113,
+     "maxdd_dates": [
+      "2024-12-16",
+      "2025-03-03"
+     ]
+    },
+    {
+     "sid": "CMP_qmj_q_10",
+     "family": "CMP",
+     "cagr": 0.124398,
+     "sharpe": 0.5953,
+     "maxdd": -0.576398,
+     "maxdd_dates": [
+      "2018-01-10",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "QUA_ownroe_m_30",
+     "family": "QUA",
+     "cagr": 0.124151,
+     "sharpe": 0.7313,
+     "maxdd": -0.597287,
+     "maxdd_dates": [
+      "2018-01-11",
+      "2020-03-23"
+     ]
+    },
+    {
+     "sid": "QUA_tlroce_w_15",
+     "family": "QUA",
+     "cagr": 0.116939,
+     "sharpe": 0.6964,
+     "maxdd": -0.477911,
+     "maxdd_dates": [
+      "2018-01-11",
+      "2020-03-23"
+     ]
+    },
+    {
+     "sid": "QUA_piotroski_q_10",
+     "family": "QUA",
+     "cagr": 0.11687,
+     "sharpe": 0.6144,
+     "maxdd": -0.625969,
+     "maxdd_dates": [
+      "2018-04-23",
+      "2020-03-23"
+     ]
+    },
+    {
+     "sid": "QUA_ownroe_q_30",
+     "family": "QUA",
+     "cagr": 0.116538,
+     "sharpe": 0.6971,
+     "maxdd": -0.570567,
+     "maxdd_dates": [
+      "2018-01-11",
+      "2020-03-23"
+     ]
+    },
+    {
+     "sid": "GRO_npg_m_10",
+     "family": "GRO",
+     "cagr": 0.116015,
+     "sharpe": 0.5629,
+     "maxdd": -0.72958,
+     "maxdd_dates": [
+      "2018-01-04",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "GRO_npg_w_20",
+     "family": "GRO",
+     "cagr": 0.114005,
+     "sharpe": 0.5856,
+     "maxdd": -0.713804,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-23"
+     ]
+    },
+    {
+     "sid": "QUA_tlroce_q_10",
+     "family": "QUA",
+     "cagr": 0.113559,
+     "sharpe": 0.6587,
+     "maxdd": -0.42717,
+     "maxdd_dates": [
+      "2024-09-23",
+      "2026-03-30"
+     ]
+    },
+    {
+     "sid": "GRO_npg_w_15",
+     "family": "GRO",
+     "cagr": 0.112761,
+     "sharpe": 0.5716,
+     "maxdd": -0.745768,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-23"
+     ]
+    },
+    {
+     "sid": "QUA_tlroce_m_15",
+     "family": "QUA",
+     "cagr": 0.110999,
+     "sharpe": 0.6692,
+     "maxdd": -0.49456,
+     "maxdd_dates": [
+      "2018-01-11",
+      "2020-03-23"
+     ]
+    },
+    {
+     "sid": "QUA_tlroce_m_30",
+     "family": "QUA",
+     "cagr": 0.108144,
+     "sharpe": 0.6647,
+     "maxdd": -0.554996,
+     "maxdd_dates": [
+      "2018-01-11",
+      "2020-03-23"
+     ]
+    },
+    {
+     "sid": "QUA_ownroe_w_20",
+     "family": "QUA",
+     "cagr": 0.106437,
+     "sharpe": 0.6212,
+     "maxdd": -0.647921,
+     "maxdd_dates": [
+      "2018-01-10",
+      "2020-03-23"
+     ]
+    },
+    {
+     "sid": "SZ_small_w_15",
+     "family": "SZ",
+     "cagr": 0.105878,
+     "sharpe": 0.5204,
+     "maxdd": -0.865553,
+     "maxdd_dates": [
+      "2018-01-11",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "QUA_tlroce_m_10",
+     "family": "QUA",
+     "cagr": 0.101077,
+     "sharpe": 0.6001,
+     "maxdd": -0.454529,
+     "maxdd_dates": [
+      "2024-09-23",
+      "2026-03-30"
+     ]
+    },
+    {
+     "sid": "QUA_ownroe_w_15",
+     "family": "QUA",
+     "cagr": 0.097784,
+     "sharpe": 0.5846,
+     "maxdd": -0.587568,
+     "maxdd_dates": [
+      "2018-01-10",
+      "2020-03-23"
+     ]
+    },
+    {
+     "sid": "QUA_lowde_margin_m_10",
+     "family": "QUA",
+     "cagr": 0.097711,
+     "sharpe": 0.4865,
+     "maxdd": -0.747067,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "QUA_tlroce_w_10",
+     "family": "QUA",
+     "cagr": 0.097153,
+     "sharpe": 0.579,
+     "maxdd": -0.44841,
+     "maxdd_dates": [
+      "2017-12-20",
+      "2020-03-23"
+     ]
+    },
+    {
+     "sid": "LV_atr_q_30",
+     "family": "LV",
+     "cagr": 0.094917,
+     "sharpe": 0.9373,
+     "maxdd": -0.249153,
+     "maxdd_dates": [
+      "2020-02-13",
+      "2020-03-23"
+     ]
+    },
+    {
+     "sid": "QUA_ownroe_q_20",
+     "family": "QUA",
+     "cagr": 0.093542,
+     "sharpe": 0.5587,
+     "maxdd": -0.614601,
+     "maxdd_dates": [
+      "2018-01-11",
+      "2020-03-23"
+     ]
+    },
+    {
+     "sid": "QUA_lowde_margin_w_10",
+     "family": "QUA",
+     "cagr": 0.091075,
+     "sharpe": 0.4613,
+     "maxdd": -0.78598,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "GRO_npg_w_10",
+     "family": "GRO",
+     "cagr": 0.090016,
+     "sharpe": 0.4723,
+     "maxdd": -0.749985,
+     "maxdd_dates": [
+      "2018-01-04",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "QUA_ownroe_m_20",
+     "family": "QUA",
+     "cagr": 0.083231,
+     "sharpe": 0.5104,
+     "maxdd": -0.628379,
+     "maxdd_dates": [
+      "2018-01-11",
+      "2020-03-23"
+     ]
+    },
+    {
+     "sid": "QUA_ownroe_w_10",
+     "family": "QUA",
+     "cagr": 0.08214,
+     "sharpe": 0.4628,
+     "maxdd": -0.710992,
+     "maxdd_dates": [
+      "2018-01-09",
+      "2020-03-23"
+     ]
+    },
+    {
+     "sid": "LV_atr_q_15",
+     "family": "LV",
+     "cagr": 0.0768,
+     "sharpe": 0.7008,
+     "maxdd": -0.344061,
+     "maxdd_dates": [
+      "2018-08-31",
+      "2020-03-23"
+     ]
+    },
+    {
+     "sid": "LV_atr_q_10",
+     "family": "LV",
+     "cagr": 0.076737,
+     "sharpe": 0.6712,
+     "maxdd": -0.354622,
+     "maxdd_dates": [
+      "2018-07-27",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "LV_atr_q_20",
+     "family": "LV",
+     "cagr": 0.074875,
+     "sharpe": 0.7289,
+     "maxdd": -0.291346,
+     "maxdd_dates": [
+      "2020-02-12",
+      "2020-03-23"
+     ]
+    },
+    {
+     "sid": "LV_atr_w_10",
+     "family": "LV",
+     "cagr": 0.067232,
+     "sharpe": 0.6631,
+     "maxdd": -0.32934,
+     "maxdd_dates": [
+      "2018-05-31",
+      "2020-03-23"
+     ]
+    },
+    {
+     "sid": "LV_atr_w_20",
+     "family": "LV",
+     "cagr": 0.062274,
+     "sharpe": 0.6923,
+     "maxdd": -0.298048,
+     "maxdd_dates": [
+      "2018-08-28",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "LV_atr_m_30",
+     "family": "LV",
+     "cagr": 0.058931,
+     "sharpe": 0.6479,
+     "maxdd": -0.280064,
+     "maxdd_dates": [
+      "2018-08-31",
+      "2020-03-23"
+     ]
+    },
+    {
+     "sid": "QUA_ownroe_m_10",
+     "family": "QUA",
+     "cagr": 0.058312,
+     "sharpe": 0.3651,
+     "maxdd": -0.660675,
+     "maxdd_dates": [
+      "2018-01-08",
+      "2020-03-23"
+     ]
+    },
+    {
+     "sid": "QUA_lowde_margin_w_15",
+     "family": "QUA",
+     "cagr": 0.056959,
+     "sharpe": 0.3529,
+     "maxdd": -0.748691,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "LV_atr_m_10",
+     "family": "LV",
+     "cagr": 0.055994,
+     "sharpe": 0.5266,
+     "maxdd": -0.353101,
+     "maxdd_dates": [
+      "2018-05-31",
+      "2020-03-23"
+     ]
+    },
+    {
+     "sid": "LV_atr_w_15",
+     "family": "LV",
+     "cagr": 0.051965,
+     "sharpe": 0.562,
+     "maxdd": -0.312604,
+     "maxdd_dates": [
+      "2018-08-01",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "LV_atr_m_20",
+     "family": "LV",
+     "cagr": 0.049735,
+     "sharpe": 0.5385,
+     "maxdd": -0.311975,
+     "maxdd_dates": [
+      "2018-05-31",
+      "2020-03-23"
+     ]
+    },
+    {
+     "sid": "QUA_lowde_margin_w_20",
+     "family": "QUA",
+     "cagr": 0.047862,
+     "sharpe": 0.3224,
+     "maxdd": -0.743698,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "SZ_small_w_10",
+     "family": "SZ",
+     "cagr": 0.047821,
+     "sharpe": 0.3103,
+     "maxdd": -0.886189,
+     "maxdd_dates": [
+      "2018-01-09",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "LV_atr_m_15",
+     "family": "LV",
+     "cagr": 0.041522,
+     "sharpe": 0.4356,
+     "maxdd": -0.334855,
+     "maxdd_dates": [
+      "2018-05-31",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "LV_atr_w_30",
+     "family": "LV",
+     "cagr": 0.040552,
+     "sharpe": 0.4903,
+     "maxdd": -0.318829,
+     "maxdd_dates": [
+      "2018-08-28",
+      "2020-03-23"
+     ]
+    },
+    {
+     "sid": "QUA_lowde_margin_w_30",
+     "family": "QUA",
+     "cagr": 0.035108,
+     "sharpe": 0.2734,
+     "maxdd": -0.718984,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "QUA_lowde_margin_m_30",
+     "family": "QUA",
+     "cagr": 0.033495,
+     "sharpe": 0.2667,
+     "maxdd": -0.700711,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "QUA_ownroe_q_15",
+     "family": "QUA",
+     "cagr": 0.032752,
+     "sharpe": 0.2638,
+     "maxdd": -0.622379,
+     "maxdd_dates": [
+      "2018-01-11",
+      "2020-03-23"
+     ]
+    },
+    {
+     "sid": "QUA_lowde_margin_m_15",
+     "family": "QUA",
+     "cagr": 0.030989,
+     "sharpe": 0.2503,
+     "maxdd": -0.738445,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "QUA_ownroe_m_15",
+     "family": "QUA",
+     "cagr": 0.025188,
+     "sharpe": 0.2265,
+     "maxdd": -0.64977,
+     "maxdd_dates": [
+      "2018-01-11",
+      "2020-03-23"
+     ]
+    },
+    {
+     "sid": "QUA_lowde_margin_m_20",
+     "family": "QUA",
+     "cagr": 0.013983,
+     "sharpe": 0.178,
+     "maxdd": -0.726018,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "QUA_lowde_margin_q_10",
+     "family": "QUA",
+     "cagr": 0.013588,
+     "sharpe": 0.1883,
+     "maxdd": -0.783886,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "QUA_ownroe_q_10",
+     "family": "QUA",
+     "cagr": 0.010303,
+     "sharpe": 0.1596,
+     "maxdd": -0.653719,
+     "maxdd_dates": [
+      "2017-04-06",
+      "2020-03-23"
+     ]
+    },
+    {
+     "sid": "QUA_lowde_margin_q_30",
+     "family": "QUA",
+     "cagr": 0.001789,
+     "sharpe": 0.1138,
+     "maxdd": -0.714111,
+     "maxdd_dates": [
+      "2018-01-15",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "QUA_lowde_margin_q_20",
+     "family": "QUA",
+     "cagr": -0.002565,
+     "sharpe": 0.1068,
+     "maxdd": -0.740789,
+     "maxdd_dates": [
+      "2017-11-06",
+      "2020-03-24"
+     ]
+    },
+    {
+     "sid": "QUA_lowde_margin_q_15",
+     "family": "QUA",
+     "cagr": -0.007883,
+     "sharpe": 0.0974,
+     "maxdd": -0.744765,
+     "maxdd_dates": [
+      "2018-01-08",
+      "2020-03-24"
+     ]
+    }
+   ]
+  },
+  "postcovid": {
+   "title": "Post-COVID (5 years)",
+   "window": "2021-07-01 \u2192 2026-06-16",
+   "caption": "All 289 configs on the last five years. 'slice' rows are warm-start slices of stored curves and read ~4-8pp CAGR high; 'fresh' rows are cold-start re-runs on the current data layer.",
+   "benchmark": {
+    "cagr": 0.112,
+    "sharpe": 0.81,
+    "maxdd": -0.188
+   },
+   "rows": [
+    {
+     "sid": "DVM_all_w_10",
+     "family": "DVM",
+     "cagr": 0.4154891801287297,
+     "sharpe": 1.297030478406184,
+     "maxdd": -0.32461569742235274,
+     "src": "slice"
+    },
+    {
+     "sid": "DVM_all_m_10",
+     "family": "DVM",
+     "cagr": 0.404800984228191,
+     "sharpe": 1.2802180747652385,
+     "maxdd": -0.3285412253203155,
+     "src": "slice"
+    },
+    {
+     "sid": "MOM_relstr_m_10",
+     "family": "MOM",
+     "cagr": 0.389379,
+     "sharpe": 1.2946,
+     "maxdd": -0.336317,
+     "src": "fresh"
+    },
+    {
+     "sid": "MOM_roc252_m_10",
+     "family": "MOM",
+     "cagr": 0.389379,
+     "sharpe": 1.2946,
+     "maxdd": -0.336317,
+     "src": "fresh"
+    },
+    {
+     "sid": "SZ_small_m_15",
+     "family": "SZ",
+     "cagr": 0.38286767768611085,
+     "sharpe": 1.3954705591268783,
+     "maxdd": -0.3545195342629024,
+     "src": "slice"
+    },
+    {
+     "sid": "TRD_golden_m_10",
+     "family": "TRD",
+     "cagr": 0.379909,
+     "sharpe": 1.2279,
+     "maxdd": -0.396006,
+     "src": "fresh"
+    },
+    {
+     "sid": "DVM_all_w_15",
+     "family": "DVM",
+     "cagr": 0.36875209818570176,
+     "sharpe": 1.2316396050550864,
+     "maxdd": -0.3455166595540772,
+     "src": "slice"
+    },
+    {
+     "sid": "SZ_small_m_20",
+     "family": "SZ",
+     "cagr": 0.3409297123615527,
+     "sharpe": 1.3234114835826896,
+     "maxdd": -0.33148681523614976,
+     "src": "slice"
+    },
+    {
+     "sid": "DVM_all_w_20",
+     "family": "DVM",
+     "cagr": 0.328530800434631,
+     "sharpe": 1.1639771775436272,
+     "maxdd": -0.3315463684847276,
+     "src": "slice"
+    },
+    {
+     "sid": "GRO_revg_w_10",
+     "family": "GRO",
+     "cagr": 0.3273474260561191,
+     "sharpe": 1.2261835217062784,
+     "maxdd": -0.3166052233010128,
+     "src": "slice"
+    },
+    {
+     "sid": "SZ_small_w_30",
+     "family": "SZ",
+     "cagr": 0.3270416477834961,
+     "sharpe": 1.3179926123339063,
+     "maxdd": -0.2914273721331604,
+     "src": "slice"
+    },
+    {
+     "sid": "DVM_dm_m_15",
+     "family": "DVM",
+     "cagr": 0.32412557960811217,
+     "sharpe": 1.1579138829605489,
+     "maxdd": -0.32570555570826587,
+     "src": "slice"
+    },
+    {
+     "sid": "VAL_ownpe_w_10",
+     "family": "VAL",
+     "cagr": 0.3190136256341711,
+     "sharpe": 1.262153734877134,
+     "maxdd": -0.3682357823993624,
+     "src": "slice"
+    },
+    {
+     "sid": "MOM_roc126_m_10",
+     "family": "MOM",
+     "cagr": 0.314992,
+     "sharpe": 1.0784,
+     "maxdd": -0.410998,
+     "src": "fresh"
+    },
+    {
+     "sid": "MOM_relstr_m_30",
+     "family": "MOM",
+     "cagr": 0.312213,
+     "sharpe": 1.198,
+     "maxdd": -0.338961,
+     "src": "fresh"
+    },
+    {
+     "sid": "MOM_roc252_m_30",
+     "family": "MOM",
+     "cagr": 0.312213,
+     "sharpe": 1.198,
+     "maxdd": -0.338961,
+     "src": "fresh"
+    },
+    {
+     "sid": "DVM_all_w_30",
+     "family": "DVM",
+     "cagr": 0.30995663850839894,
+     "sharpe": 1.155535288286366,
+     "maxdd": -0.31390565497290923,
+     "src": "slice"
+    },
+    {
+     "sid": "VAL_tlpbv_m_10",
+     "family": "VAL",
+     "cagr": 0.30859826730603124,
+     "sharpe": 1.1109956410586044,
+     "maxdd": -0.42762202818865036,
+     "src": "slice"
+    },
+    {
+     "sid": "SZ_small_m_30",
+     "family": "SZ",
+     "cagr": 0.3050600741482239,
+     "sharpe": 1.2452386157827209,
+     "maxdd": -0.2762733797519187,
+     "src": "slice"
+    },
+    {
+     "sid": "DVM_dm_m_10",
+     "family": "DVM",
+     "cagr": 0.3040714212686786,
+     "sharpe": 1.06351241849735,
+     "maxdd": -0.3566046258596274,
+     "src": "slice"
+    },
+    {
+     "sid": "TRD_golden_m_15",
+     "family": "TRD",
+     "cagr": 0.301576,
+     "sharpe": 1.0863,
+     "maxdd": -0.407313,
+     "src": "fresh"
+    },
+    {
+     "sid": "CMP_qvm_w_10",
+     "family": "CMP",
+     "cagr": 0.299632199996815,
+     "sharpe": 1.0578471671088834,
+     "maxdd": -0.3395260375490792,
+     "src": "slice"
+    },
+    {
+     "sid": "DVM_all_m_20",
+     "family": "DVM",
+     "cagr": 0.2992101121938684,
+     "sharpe": 1.1033003991931567,
+     "maxdd": -0.3400880326195508,
+     "src": "slice"
+    },
+    {
+     "sid": "SZ_small_m_10",
+     "family": "SZ",
+     "cagr": 0.294312996380532,
+     "sharpe": 1.0999906759650515,
+     "maxdd": -0.4264270079837018,
+     "src": "slice"
+    },
+    {
+     "sid": "DVM_dm_m_20",
+     "family": "DVM",
+     "cagr": 0.2939200579963679,
+     "sharpe": 1.1162134900729956,
+     "maxdd": -0.33133818784027835,
+     "src": "slice"
+    },
+    {
+     "sid": "CMP_qvm_m_30",
+     "family": "CMP",
+     "cagr": 0.2901301004953172,
+     "sharpe": 1.1448518879136937,
+     "maxdd": -0.2765561857006662,
+     "src": "slice"
+    },
+    {
+     "sid": "VAL_ownpe_w_15",
+     "family": "VAL",
+     "cagr": 0.28970580981712146,
+     "sharpe": 1.2671441277205457,
+     "maxdd": -0.3493326196836166,
+     "src": "slice"
+    },
+    {
+     "sid": "CMP_qvm_m_15",
+     "family": "CMP",
+     "cagr": 0.28772709803545093,
+     "sharpe": 1.0690153537031777,
+     "maxdd": -0.31821744852712797,
+     "src": "slice"
+    },
+    {
+     "sid": "DVM_all_m_15",
+     "family": "DVM",
+     "cagr": 0.2859378080284243,
+     "sharpe": 1.0349295784456083,
+     "maxdd": -0.33327262120044676,
+     "src": "slice"
+    },
+    {
+     "sid": "TRD_golden_m_20",
+     "family": "TRD",
+     "cagr": 0.283835,
+     "sharpe": 1.064,
+     "maxdd": -0.331791,
+     "src": "fresh"
+    },
+    {
+     "sid": "GRO_revg_w_15",
+     "family": "GRO",
+     "cagr": 0.2833085042127168,
+     "sharpe": 1.1574455631667726,
+     "maxdd": -0.355872245853055,
+     "src": "slice"
+    },
+    {
+     "sid": "MOM_roc126_m_15",
+     "family": "MOM",
+     "cagr": 0.282458,
+     "sharpe": 1.0354,
+     "maxdd": -0.394326,
+     "src": "fresh"
+    },
+    {
+     "sid": "MOM_relstr_m_15",
+     "family": "MOM",
+     "cagr": 0.282,
+     "sharpe": 1.058,
+     "maxdd": -0.414789,
+     "src": "fresh"
+    },
+    {
+     "sid": "MOM_roc252_m_15",
+     "family": "MOM",
+     "cagr": 0.282,
+     "sharpe": 1.058,
+     "maxdd": -0.414789,
+     "src": "fresh"
+    },
+    {
+     "sid": "SZ_small_w_20",
+     "family": "SZ",
+     "cagr": 0.28004420972866195,
+     "sharpe": 1.1364912752073326,
+     "maxdd": -0.35560542506645787,
+     "src": "slice"
+    },
+    {
+     "sid": "VAL_tlpbv_q_10",
+     "family": "VAL",
+     "cagr": 0.2773070182036541,
+     "sharpe": 1.0398103016440643,
+     "maxdd": -0.43627733764968446,
+     "src": "slice"
+    },
+    {
+     "sid": "VAL_ownpe_m_10",
+     "family": "VAL",
+     "cagr": 0.27376975816222937,
+     "sharpe": 1.1088346347860336,
+     "maxdd": -0.40952066297193,
+     "src": "slice"
+    },
+    {
+     "sid": "VAL_ownpe_w_20",
+     "family": "VAL",
+     "cagr": 0.27327927855646883,
+     "sharpe": 1.2603956921175379,
+     "maxdd": -0.29366745573041975,
+     "src": "slice"
+    },
+    {
+     "sid": "MOM_relstr_m_20",
+     "family": "MOM",
+     "cagr": 0.272011,
+     "sharpe": 1.0605,
+     "maxdd": -0.377568,
+     "src": "fresh"
+    },
+    {
+     "sid": "MOM_roc252_m_20",
+     "family": "MOM",
+     "cagr": 0.272011,
+     "sharpe": 1.0605,
+     "maxdd": -0.377568,
+     "src": "fresh"
+    },
+    {
+     "sid": "VAL_ownpe_q_30",
+     "family": "VAL",
+     "cagr": 0.27174594751613546,
+     "sharpe": 1.276317687707252,
+     "maxdd": -0.23372827940815966,
+     "src": "slice"
+    },
+    {
+     "sid": "SZ_small_q_15",
+     "family": "SZ",
+     "cagr": 0.26942037351976933,
+     "sharpe": 1.0778653035210162,
+     "maxdd": -0.33150349254536615,
+     "src": "slice"
+    },
+    {
+     "sid": "VAL_tlpbv_q_30",
+     "family": "VAL",
+     "cagr": 0.26536255325982006,
+     "sharpe": 1.154418263269071,
+     "maxdd": -0.30576683387486525,
+     "src": "slice"
+    },
+    {
+     "sid": "GRO_revg_m_30",
+     "family": "GRO",
+     "cagr": 0.2652384312333145,
+     "sharpe": 1.1358029976739685,
+     "maxdd": -0.35813011430464137,
+     "src": "slice"
+    },
+    {
+     "sid": "CMP_qvm_w_20",
+     "family": "CMP",
+     "cagr": 0.26319337265771203,
+     "sharpe": 1.0196760213546436,
+     "maxdd": -0.30613230649143575,
+     "src": "slice"
+    },
+    {
+     "sid": "GRO_revg_w_30",
+     "family": "GRO",
+     "cagr": 0.2631338197484252,
+     "sharpe": 1.1366748488142808,
+     "maxdd": -0.3231055228017443,
+     "src": "slice"
+    },
+    {
+     "sid": "VAL_tlpbv_w_10",
+     "family": "VAL",
+     "cagr": 0.26154995911353374,
+     "sharpe": 1.0093502268328671,
+     "maxdd": -0.38772774251289543,
+     "src": "slice"
+    },
+    {
+     "sid": "DVM_dm_q_10",
+     "family": "DVM",
+     "cagr": 0.26133805938559806,
+     "sharpe": 0.990055899380185,
+     "maxdd": -0.35521963406170276,
+     "src": "slice"
+    },
+    {
+     "sid": "VAL_ownpe_q_20",
+     "family": "VAL",
+     "cagr": 0.2588670528089838,
+     "sharpe": 1.1788975999462503,
+     "maxdd": -0.28519346170798876,
+     "src": "slice"
+    },
+    {
+     "sid": "GRO_revg_m_10",
+     "family": "GRO",
+     "cagr": 0.25813309589374533,
+     "sharpe": 1.0066601594705713,
+     "maxdd": -0.4511491641244557,
+     "src": "slice"
+    },
+    {
+     "sid": "VAL_ownpe_q_15",
+     "family": "VAL",
+     "cagr": 0.25733334058581137,
+     "sharpe": 1.1271403200578995,
+     "maxdd": -0.3683350028296517,
+     "src": "slice"
+    },
+    {
+     "sid": "VAL_ownpe_m_20",
+     "family": "VAL",
+     "cagr": 0.2565019237428572,
+     "sharpe": 1.1837613087589927,
+     "maxdd": -0.3125758437172814,
+     "src": "slice"
+    },
+    {
+     "sid": "CMP_qvm_w_15",
+     "family": "CMP",
+     "cagr": 0.25531672729152777,
+     "sharpe": 0.9711864284005105,
+     "maxdd": -0.31561483831121484,
+     "src": "slice"
+    },
+    {
+     "sid": "GRO_revg_m_15",
+     "family": "GRO",
+     "cagr": 0.25465448239884525,
+     "sharpe": 1.0614524889999746,
+     "maxdd": -0.397375183167642,
+     "src": "slice"
+    },
+    {
+     "sid": "VAL_ownpe_q_10",
+     "family": "VAL",
+     "cagr": 0.25156279395522696,
+     "sharpe": 1.0336383893471353,
+     "maxdd": -0.4006293589746156,
+     "src": "slice"
+    },
+    {
+     "sid": "MOM_relstr_q_30",
+     "family": "MOM",
+     "cagr": 0.249924,
+     "sharpe": 1.0307,
+     "maxdd": -0.391562,
+     "src": "fresh"
+    },
+    {
+     "sid": "MOM_roc252_q_30",
+     "family": "MOM",
+     "cagr": 0.249924,
+     "sharpe": 1.0307,
+     "maxdd": -0.391562,
+     "src": "fresh"
+    },
+    {
+     "sid": "VAL_ownpe_m_30",
+     "family": "VAL",
+     "cagr": 0.24678486070805405,
+     "sharpe": 1.1924729811596562,
+     "maxdd": -0.26682979565788834,
+     "src": "slice"
+    },
+    {
+     "sid": "VAL_ownpe_w_30",
+     "family": "VAL",
+     "cagr": 0.24642237778035314,
+     "sharpe": 1.200967937148005,
+     "maxdd": -0.2733560919153605,
+     "src": "slice"
+    },
+    {
+     "sid": "SZ_small_q_10",
+     "family": "SZ",
+     "cagr": 0.24635419090547095,
+     "sharpe": 0.9726011173434771,
+     "maxdd": -0.4104100518774182,
+     "src": "slice"
+    },
+    {
+     "sid": "CMP_qmj_m_20",
+     "family": "CMP",
+     "cagr": 0.2461901649153042,
+     "sharpe": 1.0305794113430193,
+     "maxdd": -0.3333344317070336,
+     "src": "slice"
+    },
+    {
+     "sid": "CMP_valmom_m_15",
+     "family": "CMP",
+     "cagr": 0.24599599119575521,
+     "sharpe": 0.9442514140591673,
+     "maxdd": -0.33863924857232974,
+     "src": "slice"
+    },
+    {
+     "sid": "VAL_ownpe_m_15",
+     "family": "VAL",
+     "cagr": 0.24549709485710647,
+     "sharpe": 1.0990665748534247,
+     "maxdd": -0.37644108653489416,
+     "src": "slice"
+    },
+    {
+     "sid": "SZ_small_w_15",
+     "family": "SZ",
+     "cagr": 0.24522170479783623,
+     "sharpe": 1.0016891181379515,
+     "maxdd": -0.39264146093264607,
+     "src": "slice"
+    },
+    {
+     "sid": "CMP_qvm_w_30",
+     "family": "CMP",
+     "cagr": 0.2451853460939657,
+     "sharpe": 0.9933563718283586,
+     "maxdd": -0.298839882564758,
+     "src": "slice"
+    },
+    {
+     "sid": "GRO_revg_m_20",
+     "family": "GRO",
+     "cagr": 0.24420099581248,
+     "sharpe": 1.0453252175290446,
+     "maxdd": -0.37548882197501465,
+     "src": "slice"
+    },
+    {
+     "sid": "CMP_qvm_m_20",
+     "family": "CMP",
+     "cagr": 0.24367609457570572,
+     "sharpe": 0.9783877235741103,
+     "maxdd": -0.2863451951635586,
+     "src": "slice"
+    },
+    {
+     "sid": "SZ_small_q_20",
+     "family": "SZ",
+     "cagr": 0.24239365715095063,
+     "sharpe": 1.0243070841417414,
+     "maxdd": -0.32044002196835153,
+     "src": "slice"
+    },
+    {
+     "sid": "DVM_dm_m_30",
+     "family": "DVM",
+     "cagr": 0.24210685002523946,
+     "sharpe": 0.9930990727698104,
+     "maxdd": -0.3316123137981424,
+     "src": "slice"
+    },
+    {
+     "sid": "QUA_lowde_margin_w_10",
+     "family": "QUA",
+     "cagr": 0.24193235240658217,
+     "sharpe": 0.9237421132696952,
+     "maxdd": -0.4592878690310247,
+     "src": "slice"
+    },
+    {
+     "sid": "MOM_relstr_q_20",
+     "family": "MOM",
+     "cagr": 0.241538,
+     "sharpe": 0.9923,
+     "maxdd": -0.435033,
+     "src": "fresh"
+    },
+    {
+     "sid": "MOM_roc252_q_20",
+     "family": "MOM",
+     "cagr": 0.241538,
+     "sharpe": 0.9923,
+     "maxdd": -0.435033,
+     "src": "fresh"
+    },
+    {
+     "sid": "CMP_qvm_q_15",
+     "family": "CMP",
+     "cagr": 0.2411961274280856,
+     "sharpe": 0.9458003529901189,
+     "maxdd": -0.3571667984379675,
+     "src": "slice"
+    },
+    {
+     "sid": "GRO_revg_w_20",
+     "family": "GRO",
+     "cagr": 0.24057489940736154,
+     "sharpe": 1.0369604123243255,
+     "maxdd": -0.35641907391377403,
+     "src": "slice"
+    },
+    {
+     "sid": "GRO_npg_m_15",
+     "family": "GRO",
+     "cagr": 0.23962739756504492,
+     "sharpe": 1.0208693796740518,
+     "maxdd": -0.3016082168913049,
+     "src": "slice"
+    },
+    {
+     "sid": "MOM_relstr_w_30",
+     "family": "MOM",
+     "cagr": 0.236605,
+     "sharpe": 0.9603,
+     "maxdd": -0.353423,
+     "src": "fresh"
+    },
+    {
+     "sid": "MOM_roc252_w_30",
+     "family": "MOM",
+     "cagr": 0.236605,
+     "sharpe": 0.9603,
+     "maxdd": -0.353423,
+     "src": "fresh"
+    },
+    {
+     "sid": "TRD_golden_m_30",
+     "family": "TRD",
+     "cagr": 0.235878,
+     "sharpe": 0.9483,
+     "maxdd": -0.329387,
+     "src": "fresh"
+    },
+    {
+     "sid": "CMP_valmom_w_15",
+     "family": "CMP",
+     "cagr": 0.2353066901571188,
+     "sharpe": 0.9090411603791984,
+     "maxdd": -0.37482018686506313,
+     "src": "slice"
+    },
+    {
+     "sid": "DVM_dm_q_20",
+     "family": "DVM",
+     "cagr": 0.2335373609753446,
+     "sharpe": 0.9544181906068544,
+     "maxdd": -0.34398097412995154,
+     "src": "slice"
+    },
+    {
+     "sid": "GRO_npg_m_20",
+     "family": "GRO",
+     "cagr": 0.23054779503581369,
+     "sharpe": 1.0051180474285861,
+     "maxdd": -0.2847853390512194,
+     "src": "slice"
+    },
+    {
+     "sid": "MOM_relstr_w_15",
+     "family": "MOM",
+     "cagr": 0.230176,
+     "sharpe": 0.9159,
+     "maxdd": -0.440078,
+     "src": "fresh"
+    },
+    {
+     "sid": "MOM_roc252_w_15",
+     "family": "MOM",
+     "cagr": 0.230176,
+     "sharpe": 0.9159,
+     "maxdd": -0.440078,
+     "src": "fresh"
+    },
+    {
+     "sid": "DVM_dv_q_20",
+     "family": "DVM",
+     "cagr": 0.22987667637340436,
+     "sharpe": 0.9761264273697083,
+     "maxdd": -0.2835927364050702,
+     "src": "slice"
+    },
+    {
+     "sid": "MOM_roc126_m_20",
+     "family": "MOM",
+     "cagr": 0.228077,
+     "sharpe": 0.9054,
+     "maxdd": -0.359746,
+     "src": "fresh"
+    },
+    {
+     "sid": "DVM_all_m_30",
+     "family": "DVM",
+     "cagr": 0.22693487024202152,
+     "sharpe": 0.9157968545474438,
+     "maxdd": -0.3439773711223548,
+     "src": "slice"
+    },
+    {
+     "sid": "CMP_qvm_m_10",
+     "family": "CMP",
+     "cagr": 0.22558729618250073,
+     "sharpe": 0.8723409273011102,
+     "maxdd": -0.34575549565576424,
+     "src": "slice"
+    },
+    {
+     "sid": "SZ_small_q_30",
+     "family": "SZ",
+     "cagr": 0.22552531157585287,
+     "sharpe": 0.9931991579394646,
+     "maxdd": -0.2975195407909069,
+     "src": "slice"
+    },
+    {
+     "sid": "DVM_dm_q_15",
+     "family": "DVM",
+     "cagr": 0.22540492278338586,
+     "sharpe": 0.9216878145884256,
+     "maxdd": -0.364197106484635,
+     "src": "slice"
+    },
+    {
+     "sid": "VAL_tlpbv_m_30",
+     "family": "VAL",
+     "cagr": 0.22507308517504643,
+     "sharpe": 0.9936782253607518,
+     "maxdd": -0.32113393325830486,
+     "src": "slice"
+    },
+    {
+     "sid": "CMP_valmom_w_30",
+     "family": "CMP",
+     "cagr": 0.22502777675264185,
+     "sharpe": 0.9070456198392036,
+     "maxdd": -0.32978561733792344,
+     "src": "slice"
+    },
+    {
+     "sid": "DVM_dv_w_20",
+     "family": "DVM",
+     "cagr": 0.22354361946044343,
+     "sharpe": 0.9387332682307448,
+     "maxdd": -0.29878017991601,
+     "src": "slice"
+    },
+    {
+     "sid": "QUA_piotroski_m_20",
+     "family": "QUA",
+     "cagr": 0.22317158276856008,
+     "sharpe": 1.0551850409289103,
+     "maxdd": -0.2936752317708059,
+     "src": "slice"
+    },
+    {
+     "sid": "QUA_lowde_margin_m_10",
+     "family": "QUA",
+     "cagr": 0.22282934963296186,
+     "sharpe": 0.8613839719234831,
+     "maxdd": -0.5030729036035912,
+     "src": "slice"
+    },
+    {
+     "sid": "DVM_dv_q_15",
+     "family": "DVM",
+     "cagr": 0.2224549749774003,
+     "sharpe": 0.9312153907533972,
+     "maxdd": -0.3032076536788828,
+     "src": "slice"
+    },
+    {
+     "sid": "DVM_all_q_30",
+     "family": "DVM",
+     "cagr": 0.22209523518953156,
+     "sharpe": 0.9286959176077587,
+     "maxdd": -0.3317696445703433,
+     "src": "slice"
+    },
+    {
+     "sid": "GRO_revg_q_20",
+     "family": "GRO",
+     "cagr": 0.22151955770290943,
+     "sharpe": 0.9785560681677306,
+     "maxdd": -0.4160272681710838,
+     "src": "slice"
+    },
+    {
+     "sid": "CMP_valmom_w_20",
+     "family": "CMP",
+     "cagr": 0.22066441839903272,
+     "sharpe": 0.8738834583437657,
+     "maxdd": -0.35969404962325846,
+     "src": "slice"
+    },
+    {
+     "sid": "DVM_all_q_20",
+     "family": "DVM",
+     "cagr": 0.21968198457074983,
+     "sharpe": 0.9091917512114608,
+     "maxdd": -0.3604048527447803,
+     "src": "slice"
+    },
+    {
+     "sid": "CMP_qmj_w_30",
+     "family": "CMP",
+     "cagr": 0.21916124364771328,
+     "sharpe": 0.9504386238864373,
+     "maxdd": -0.3402188690457222,
+     "src": "slice"
+    },
+    {
+     "sid": "QUA_piotroski_w_20",
+     "family": "QUA",
+     "cagr": 0.21913615273598608,
+     "sharpe": 1.0294958866893513,
+     "maxdd": -0.29279438430577,
+     "src": "slice"
+    },
+    {
+     "sid": "DVM_dv_q_30",
+     "family": "DVM",
+     "cagr": 0.21822574132579753,
+     "sharpe": 0.9557522468345538,
+     "maxdd": -0.32040698540959356,
+     "src": "slice"
+    },
+    {
+     "sid": "DVM_all_q_15",
+     "family": "DVM",
+     "cagr": 0.2181118208695738,
+     "sharpe": 0.8749222635910358,
+     "maxdd": -0.36707420336060004,
+     "src": "slice"
+    },
+    {
+     "sid": "CMP_valmom_m_30",
+     "family": "CMP",
+     "cagr": 0.21796542280383258,
+     "sharpe": 0.8849590880177508,
+     "maxdd": -0.3240324251083516,
+     "src": "slice"
+    },
+    {
+     "sid": "DVM_dv_m_20",
+     "family": "DVM",
+     "cagr": 0.21787091702623473,
+     "sharpe": 0.9250680906693771,
+     "maxdd": -0.3072477918352876,
+     "src": "slice"
+    },
+    {
+     "sid": "DVM_dm_w_30",
+     "family": "DVM",
+     "cagr": 0.21647323079827707,
+     "sharpe": 0.9181001118174825,
+     "maxdd": -0.32322141998321874,
+     "src": "slice"
+    },
+    {
+     "sid": "SZ_small_w_10",
+     "family": "SZ",
+     "cagr": 0.21567647548379942,
+     "sharpe": 0.8599970721806893,
+     "maxdd": -0.40676424621955587,
+     "src": "slice"
+    },
+    {
+     "sid": "GRO_npg_m_30",
+     "family": "GRO",
+     "cagr": 0.21566640416351812,
+     "sharpe": 0.9716826578720629,
+     "maxdd": -0.3241677366689816,
+     "src": "slice"
+    },
+    {
+     "sid": "CMP_qvm_q_10",
+     "family": "CMP",
+     "cagr": 0.21492795626354888,
+     "sharpe": 0.8569005756297305,
+     "maxdd": -0.38904800338904544,
+     "src": "slice"
+    },
+    {
+     "sid": "GRO_revg_q_30",
+     "family": "GRO",
+     "cagr": 0.21460055964769054,
+     "sharpe": 0.9559342758186509,
+     "maxdd": -0.4194862218974744,
+     "src": "slice"
+    },
+    {
+     "sid": "QUA_piotroski_w_30",
+     "family": "QUA",
+     "cagr": 0.2144490611637795,
+     "sharpe": 1.030491916210295,
+     "maxdd": -0.2896348991583947,
+     "src": "slice"
+    },
+    {
+     "sid": "CMP_qmj_q_20",
+     "family": "CMP",
+     "cagr": 0.21438016877579802,
+     "sharpe": 0.9427708126126555,
+     "maxdd": -0.3266955445988896,
+     "src": "slice"
+    },
+    {
+     "sid": "QUA_tlroce_q_20",
+     "family": "QUA",
+     "cagr": 0.21359396516803186,
+     "sharpe": 1.0591096851175104,
+     "maxdd": -0.33176051789796035,
+     "src": "slice"
+    },
+    {
+     "sid": "VAL_tlpbv_q_20",
+     "family": "VAL",
+     "cagr": 0.21294511993103615,
+     "sharpe": 0.9005229567241059,
+     "maxdd": -0.43239366115834665,
+     "src": "slice"
+    },
+    {
+     "sid": "DVM_dm_w_10",
+     "family": "DVM",
+     "cagr": 0.21270461433515586,
+     "sharpe": 0.8183139785001717,
+     "maxdd": -0.39685346940170985,
+     "src": "slice"
+    },
+    {
+     "sid": "MOM_roc126_m_30",
+     "family": "MOM",
+     "cagr": 0.212671,
+     "sharpe": 0.8842,
+     "maxdd": -0.348189,
+     "src": "fresh"
+    },
+    {
+     "sid": "QUA_piotroski_w_15",
+     "family": "QUA",
+     "cagr": 0.21225841459774486,
+     "sharpe": 0.98611716579896,
+     "maxdd": -0.31182626076546105,
+     "src": "slice"
+    },
+    {
+     "sid": "MOM_relstr_w_20",
+     "family": "MOM",
+     "cagr": 0.2107,
+     "sharpe": 0.8686,
+     "maxdd": -0.400474,
+     "src": "fresh"
+    },
+    {
+     "sid": "MOM_roc252_w_20",
+     "family": "MOM",
+     "cagr": 0.2107,
+     "sharpe": 0.8686,
+     "maxdd": -0.400474,
+     "src": "fresh"
+    },
+    {
+     "sid": "DVM_dv_m_30",
+     "family": "DVM",
+     "cagr": 0.2098897741800112,
+     "sharpe": 0.9189809594412365,
+     "maxdd": -0.3324589660588356,
+     "src": "slice"
+    },
+    {
+     "sid": "VAL_tlpbv_w_15",
+     "family": "VAL",
+     "cagr": 0.208969672548853,
+     "sharpe": 0.8759732309378621,
+     "maxdd": -0.4148836524918075,
+     "src": "slice"
+    },
+    {
+     "sid": "CMP_valmom_w_10",
+     "family": "CMP",
+     "cagr": 0.20870676099764318,
+     "sharpe": 0.7937012898109399,
+     "maxdd": -0.4434093904170189,
+     "src": "slice"
+    },
+    {
+     "sid": "VAL_tlpe_m_20",
+     "family": "VAL",
+     "cagr": 0.208701,
+     "sharpe": 0.949,
+     "maxdd": -0.256455,
+     "src": "fresh"
+    },
+    {
+     "sid": "VAL_tlpbv_w_30",
+     "family": "VAL",
+     "cagr": 0.20841817316646094,
+     "sharpe": 0.9363860568565562,
+     "maxdd": -0.33253671919035777,
+     "src": "slice"
+    },
+    {
+     "sid": "CMP_qmj_m_30",
+     "family": "CMP",
+     "cagr": 0.20742146983506515,
+     "sharpe": 0.9122128648798898,
+     "maxdd": -0.332611087264607,
+     "src": "slice"
+    },
+    {
+     "sid": "QUA_piotroski_m_30",
+     "family": "QUA",
+     "cagr": 0.20737845006757438,
+     "sharpe": 1.0133533389143103,
+     "maxdd": -0.27908169038978625,
+     "src": "slice"
+    },
+    {
+     "sid": "QUA_ownroe_w_10",
+     "family": "QUA",
+     "cagr": 0.20489125867304692,
+     "sharpe": 0.9459427610068657,
+     "maxdd": -0.3767467094905551,
+     "src": "slice"
+    },
+    {
+     "sid": "DVM_dv_w_10",
+     "family": "DVM",
+     "cagr": 0.20368966763097474,
+     "sharpe": 0.8375501078009059,
+     "maxdd": -0.28098982476486756,
+     "src": "slice"
+    },
+    {
+     "sid": "VAL_tlpe_q_20",
+     "family": "VAL",
+     "cagr": 0.20207729669562413,
+     "sharpe": 0.8884369073204257,
+     "maxdd": -0.28835847687613214,
+     "src": "slice"
+    },
+    {
+     "sid": "VAL_tlpbv_w_20",
+     "family": "VAL",
+     "cagr": 0.20160706216711244,
+     "sharpe": 0.8816462273132962,
+     "maxdd": -0.37808420325351866,
+     "src": "slice"
+    },
+    {
+     "sid": "MOM_relstr_q_15",
+     "family": "MOM",
+     "cagr": 0.201482,
+     "sharpe": 0.8344,
+     "maxdd": -0.443469,
+     "src": "fresh"
+    },
+    {
+     "sid": "MOM_roc252_q_15",
+     "family": "MOM",
+     "cagr": 0.201482,
+     "sharpe": 0.8344,
+     "maxdd": -0.443469,
+     "src": "fresh"
+    },
+    {
+     "sid": "VAL_tlpbv_m_20",
+     "family": "VAL",
+     "cagr": 0.20093996213770504,
+     "sharpe": 0.8550906109411559,
+     "maxdd": -0.41012438303823584,
+     "src": "slice"
+    },
+    {
+     "sid": "CMP_qvm_q_20",
+     "family": "CMP",
+     "cagr": 0.19903382591561058,
+     "sharpe": 0.8364390323294469,
+     "maxdd": -0.37910885941483363,
+     "src": "slice"
+    },
+    {
+     "sid": "DVM_dv_m_10",
+     "family": "DVM",
+     "cagr": 0.19803481274535817,
+     "sharpe": 0.810957610628312,
+     "maxdd": -0.318086926380157,
+     "src": "slice"
+    },
+    {
+     "sid": "VAL_tlpbv_q_15",
+     "family": "VAL",
+     "cagr": 0.19768085773944089,
+     "sharpe": 0.8307367872132926,
+     "maxdd": -0.4593449021708569,
+     "src": "slice"
+    },
+    {
+     "sid": "QUA_ownroe_w_30",
+     "family": "QUA",
+     "cagr": 0.1959098272454871,
+     "sharpe": 1.031198788628362,
+     "maxdd": -0.3059266905898783,
+     "src": "slice"
+    },
+    {
+     "sid": "VAL_tlpe_m_15",
+     "family": "VAL",
+     "cagr": 0.194284,
+     "sharpe": 0.8704,
+     "maxdd": -0.346437,
+     "src": "fresh"
+    },
+    {
+     "sid": "DVM_dv_w_15",
+     "family": "DVM",
+     "cagr": 0.19302541360366487,
+     "sharpe": 0.8176445231207323,
+     "maxdd": -0.29025170264867617,
+     "src": "slice"
+    },
+    {
+     "sid": "CMP_qmj_w_15",
+     "family": "CMP",
+     "cagr": 0.19245342602100157,
+     "sharpe": 0.8301553706876197,
+     "maxdd": -0.3346497312354023,
+     "src": "slice"
+    },
+    {
+     "sid": "VAL_tlpe_m_30",
+     "family": "VAL",
+     "cagr": 0.19192636739418312,
+     "sharpe": 0.8620711258249472,
+     "maxdd": -0.25948565512986177,
+     "src": "slice"
+    },
+    {
+     "sid": "DVM_dm_w_15",
+     "family": "DVM",
+     "cagr": 0.18767595129300907,
+     "sharpe": 0.7669938363166894,
+     "maxdd": -0.36641200263343565,
+     "src": "slice"
+    },
+    {
+     "sid": "GRO_revg_q_15",
+     "family": "GRO",
+     "cagr": 0.18730641909548784,
+     "sharpe": 0.8394049588169561,
+     "maxdd": -0.4549820328665365,
+     "src": "slice"
+    },
+    {
+     "sid": "VAL_tlpbv_m_15",
+     "family": "VAL",
+     "cagr": 0.1870270955113078,
+     "sharpe": 0.7915446477155406,
+     "maxdd": -0.44988339240300823,
+     "src": "slice"
+    },
+    {
+     "sid": "DVM_dv_q_10",
+     "family": "DVM",
+     "cagr": 0.18679926211999032,
+     "sharpe": 0.7818411993241439,
+     "maxdd": -0.301888994589405,
+     "src": "slice"
+    },
+    {
+     "sid": "DVM_dm_q_30",
+     "family": "DVM",
+     "cagr": 0.1865577021217264,
+     "sharpe": 0.8300981962673653,
+     "maxdd": -0.32187657272124504,
+     "src": "slice"
+    },
+    {
+     "sid": "DVM_dv_w_30",
+     "family": "DVM",
+     "cagr": 0.186353142524615,
+     "sharpe": 0.8350278099096548,
+     "maxdd": -0.31735744166041424,
+     "src": "slice"
+    },
+    {
+     "sid": "QUA_tlroce_q_30",
+     "family": "QUA",
+     "cagr": 0.1861866511921504,
+     "sharpe": 0.9506026953040688,
+     "maxdd": -0.2816533727676096,
+     "src": "slice"
+    },
+    {
+     "sid": "GRO_npg_w_20",
+     "family": "GRO",
+     "cagr": 0.1856453544687071,
+     "sharpe": 0.8467654220115762,
+     "maxdd": -0.2786531461070081,
+     "src": "slice"
+    },
+    {
+     "sid": "DVM_dm_w_20",
+     "family": "DVM",
+     "cagr": 0.1846384380821664,
+     "sharpe": 0.778858126619479,
+     "maxdd": -0.33743804666156374,
+     "src": "slice"
+    },
+    {
+     "sid": "MOM_roc126_q_10",
+     "family": "MOM",
+     "cagr": 0.183437,
+     "sharpe": 0.7455,
+     "maxdd": -0.371762,
+     "src": "fresh"
+    },
+    {
+     "sid": "CMP_valmom_m_20",
+     "family": "CMP",
+     "cagr": 0.18319392368010678,
+     "sharpe": 0.7633467345592861,
+     "maxdd": -0.3255942838463496,
+     "src": "slice"
+    },
+    {
+     "sid": "GRO_npg_m_10",
+     "family": "GRO",
+     "cagr": 0.18236462581303337,
+     "sharpe": 0.7785340993918275,
+     "maxdd": -0.32946736135150834,
+     "src": "slice"
+    },
+    {
+     "sid": "GRO_npg_w_30",
+     "family": "GRO",
+     "cagr": 0.18202119712284204,
+     "sharpe": 0.849115511989859,
+     "maxdd": -0.30355176083390845,
+     "src": "slice"
+    },
+    {
+     "sid": "CMP_valmom_q_15",
+     "family": "CMP",
+     "cagr": 0.18096906481892638,
+     "sharpe": 0.7621486384479869,
+     "maxdd": -0.3149660227336454,
+     "src": "slice"
+    },
+    {
+     "sid": "CMP_qmj_q_30",
+     "family": "CMP",
+     "cagr": 0.18034870945595904,
+     "sharpe": 0.8267864091261912,
+     "maxdd": -0.31740725886456034,
+     "src": "slice"
+    },
+    {
+     "sid": "CMP_qvm_q_30",
+     "family": "CMP",
+     "cagr": 0.18020151915955807,
+     "sharpe": 0.7923662365557063,
+     "maxdd": -0.3606537213948269,
+     "src": "slice"
+    },
+    {
+     "sid": "CMP_qmj_w_20",
+     "family": "CMP",
+     "cagr": 0.18008917962877535,
+     "sharpe": 0.7952220983581436,
+     "maxdd": -0.3574869864097452,
+     "src": "slice"
+    },
+    {
+     "sid": "QUA_piotroski_m_15",
+     "family": "QUA",
+     "cagr": 0.1798357428225894,
+     "sharpe": 0.871235156305691,
+     "maxdd": -0.3047544850163778,
+     "src": "slice"
+    },
+    {
+     "sid": "CMP_qmj_q_15",
+     "family": "CMP",
+     "cagr": 0.17952491408535276,
+     "sharpe": 0.8037338047013804,
+     "maxdd": -0.3566058793124276,
+     "src": "slice"
+    },
+    {
+     "sid": "QUA_tlroce_w_20",
+     "family": "QUA",
+     "cagr": 0.17885752230144192,
+     "sharpe": 0.9129543890233416,
+     "maxdd": -0.33186265112204205,
+     "src": "slice"
+    },
+    {
+     "sid": "CMP_qmj_m_15",
+     "family": "CMP",
+     "cagr": 0.1767823148755685,
+     "sharpe": 0.7783435273582269,
+     "maxdd": -0.38936754224880643,
+     "src": "slice"
+    },
+    {
+     "sid": "DVM_dv_m_15",
+     "family": "DVM",
+     "cagr": 0.17605253222051842,
+     "sharpe": 0.7679040883618712,
+     "maxdd": -0.3098892955142015,
+     "src": "slice"
+    },
+    {
+     "sid": "VAL_tlpe_q_30",
+     "family": "VAL",
+     "cagr": 0.17574958597746537,
+     "sharpe": 0.8132406462125689,
+     "maxdd": -0.30322430885012375,
+     "src": "slice"
+    },
+    {
+     "sid": "QUA_ownroe_w_20",
+     "family": "QUA",
+     "cagr": 0.1739158192772139,
+     "sharpe": 0.9067807857789493,
+     "maxdd": -0.3321182298291814,
+     "src": "slice"
+    },
+    {
+     "sid": "QUA_tlroce_q_15",
+     "family": "QUA",
+     "cagr": 0.17356178225674834,
+     "sharpe": 0.872842957390894,
+     "maxdd": -0.4179365453732379,
+     "src": "slice"
+    },
+    {
+     "sid": "MOM_relstr_w_10",
+     "family": "MOM",
+     "cagr": 0.173215,
+     "sharpe": 0.7113,
+     "maxdd": -0.525247,
+     "src": "fresh"
+    },
+    {
+     "sid": "MOM_roc252_w_10",
+     "family": "MOM",
+     "cagr": 0.173215,
+     "sharpe": 0.7113,
+     "maxdd": -0.525247,
+     "src": "fresh"
+    },
+    {
+     "sid": "CMP_valmom_m_10",
+     "family": "CMP",
+     "cagr": 0.17311569733054477,
+     "sharpe": 0.7054678908462906,
+     "maxdd": -0.36638325890679113,
+     "src": "slice"
+    },
+    {
+     "sid": "TRD_golden_q_10",
+     "family": "TRD",
+     "cagr": 0.172071,
+     "sharpe": 0.705,
+     "maxdd": -0.405845,
+     "src": "fresh"
+    },
+    {
+     "sid": "CMP_valmom_q_30",
+     "family": "CMP",
+     "cagr": 0.17136615148042922,
+     "sharpe": 0.7397336736225366,
+     "maxdd": -0.33434888796481255,
+     "src": "slice"
+    },
+    {
+     "sid": "GRO_revg_q_10",
+     "family": "GRO",
+     "cagr": 0.17031967172189955,
+     "sharpe": 0.7433293698072705,
+     "maxdd": -0.5247677892853078,
+     "src": "slice"
+    },
+    {
+     "sid": "QUA_tlroce_m_20",
+     "family": "QUA",
+     "cagr": 0.17023642289742047,
+     "sharpe": 0.8783101948133233,
+     "maxdd": -0.35210535087810846,
+     "src": "slice"
+    },
+    {
+     "sid": "DVM_all_q_10",
+     "family": "DVM",
+     "cagr": 0.1677938088835762,
+     "sharpe": 0.6974133458497824,
+     "maxdd": -0.3617743232605821,
+     "src": "slice"
+    },
+    {
+     "sid": "QUA_ownroe_m_30",
+     "family": "QUA",
+     "cagr": 0.16704665259538864,
+     "sharpe": 0.8956090357370379,
+     "maxdd": -0.3049352644916745,
+     "src": "slice"
+    },
+    {
+     "sid": "QUA_tlroce_w_30",
+     "family": "QUA",
+     "cagr": 0.16564660879590676,
+     "sharpe": 0.8666824662113829,
+     "maxdd": -0.30187860648153086,
+     "src": "slice"
+    },
+    {
+     "sid": "TRD_golden_q_15",
+     "family": "TRD",
+     "cagr": 0.165493,
+     "sharpe": 0.6971,
+     "maxdd": -0.434687,
+     "src": "fresh"
+    },
+    {
+     "sid": "TRD_golden_q_20",
+     "family": "TRD",
+     "cagr": 0.163685,
+     "sharpe": 0.7116,
+     "maxdd": -0.414897,
+     "src": "fresh"
+    },
+    {
+     "sid": "QUA_ownroe_q_30",
+     "family": "QUA",
+     "cagr": 0.1626957465415051,
+     "sharpe": 0.8549331693754777,
+     "maxdd": -0.32276533670222407,
+     "src": "slice"
+    },
+    {
+     "sid": "QUA_ownroe_q_20",
+     "family": "QUA",
+     "cagr": 0.1619651172966463,
+     "sharpe": 0.8267322171498598,
+     "maxdd": -0.3757438068577562,
+     "src": "slice"
+    },
+    {
+     "sid": "TRD_golden_w_30",
+     "family": "TRD",
+     "cagr": 0.161438,
+     "sharpe": 0.7075,
+     "maxdd": -0.380788,
+     "src": "fresh"
+    },
+    {
+     "sid": "QUA_ownroe_w_15",
+     "family": "QUA",
+     "cagr": 0.1606886525073008,
+     "sharpe": 0.8550381795077834,
+     "maxdd": -0.3616585473356996,
+     "src": "slice"
+    },
+    {
+     "sid": "MOM_roc126_q_30",
+     "family": "MOM",
+     "cagr": 0.160382,
+     "sharpe": 0.7252,
+     "maxdd": -0.402216,
+     "src": "fresh"
+    },
+    {
+     "sid": "GRO_npg_w_15",
+     "family": "GRO",
+     "cagr": 0.1585228663796927,
+     "sharpe": 0.7399650415631225,
+     "maxdd": -0.3115373928838525,
+     "src": "slice"
+    },
+    {
+     "sid": "MOM_roc126_q_15",
+     "family": "MOM",
+     "cagr": 0.157964,
+     "sharpe": 0.6766,
+     "maxdd": -0.413326,
+     "src": "fresh"
+    },
+    {
+     "sid": "CMP_valmom_q_20",
+     "family": "CMP",
+     "cagr": 0.156334639743676,
+     "sharpe": 0.6807091048132424,
+     "maxdd": -0.34294515256601754,
+     "src": "slice"
+    },
+    {
+     "sid": "MOM_roc126_q_20",
+     "family": "MOM",
+     "cagr": 0.15599,
+     "sharpe": 0.6895,
+     "maxdd": -0.397335,
+     "src": "fresh"
+    },
+    {
+     "sid": "QUA_ownroe_m_10",
+     "family": "QUA",
+     "cagr": 0.1559393904053692,
+     "sharpe": 0.7503880582510557,
+     "maxdd": -0.439830528383961,
+     "src": "slice"
+    },
+    {
+     "sid": "TRD_golden_q_30",
+     "family": "TRD",
+     "cagr": 0.155256,
+     "sharpe": 0.7026,
+     "maxdd": -0.412436,
+     "src": "fresh"
+    },
+    {
+     "sid": "CMP_qmj_w_10",
+     "family": "CMP",
+     "cagr": 0.15482287042879928,
+     "sharpe": 0.6689438641931921,
+     "maxdd": -0.46611630669633397,
+     "src": "slice"
+    },
+    {
+     "sid": "GRO_npg_q_20",
+     "family": "GRO",
+     "cagr": 0.15009809059908585,
+     "sharpe": 0.7160734195556729,
+     "maxdd": -0.2763681804043917,
+     "src": "slice"
+    },
+    {
+     "sid": "MOM_roc126_w_30",
+     "family": "MOM",
+     "cagr": 0.149654,
+     "sharpe": 0.6772,
+     "maxdd": -0.382044,
+     "src": "fresh"
+    },
+    {
+     "sid": "TRD_golden_w_20",
+     "family": "TRD",
+     "cagr": 0.1491,
+     "sharpe": 0.6516,
+     "maxdd": -0.405587,
+     "src": "fresh"
+    },
+    {
+     "sid": "VAL_tlpe_w_20",
+     "family": "VAL",
+     "cagr": 0.149032,
+     "sharpe": 0.733,
+     "maxdd": -0.328414,
+     "src": "fresh"
+    },
+    {
+     "sid": "GRO_npg_w_10",
+     "family": "GRO",
+     "cagr": 0.1483849227072367,
+     "sharpe": 0.6741049239941965,
+     "maxdd": -0.32631107956986394,
+     "src": "slice"
+    },
+    {
+     "sid": "VAL_tlpe_q_15",
+     "family": "VAL",
+     "cagr": 0.14835517633806328,
+     "sharpe": 0.6711090895238235,
+     "maxdd": -0.3860636694059091,
+     "src": "slice"
+    },
+    {
+     "sid": "QUA_piotroski_q_20",
+     "family": "QUA",
+     "cagr": 0.14683322135906174,
+     "sharpe": 0.753154301205895,
+     "maxdd": -0.34926347016121395,
+     "src": "slice"
+    },
+    {
+     "sid": "QUA_tlroce_m_30",
+     "family": "QUA",
+     "cagr": 0.14529718203606712,
+     "sharpe": 0.7794038313340631,
+     "maxdd": -0.3099603142205263,
+     "src": "slice"
+    },
+    {
+     "sid": "TRD_golden_w_15",
+     "family": "TRD",
+     "cagr": 0.143355,
+     "sharpe": 0.6205,
+     "maxdd": -0.422232,
+     "src": "fresh"
+    },
+    {
+     "sid": "QUA_piotroski_q_30",
+     "family": "QUA",
+     "cagr": 0.14233824329455325,
+     "sharpe": 0.7505653953877605,
+     "maxdd": -0.31002692072395277,
+     "src": "slice"
+    },
+    {
+     "sid": "QUA_piotroski_q_15",
+     "family": "QUA",
+     "cagr": 0.14114308720657487,
+     "sharpe": 0.728554735724735,
+     "maxdd": -0.3723183940063035,
+     "src": "slice"
+    },
+    {
+     "sid": "MOM_roc126_w_15",
+     "family": "MOM",
+     "cagr": 0.140331,
+     "sharpe": 0.6154,
+     "maxdd": -0.450858,
+     "src": "fresh"
+    },
+    {
+     "sid": "TRD_near52h_m_15",
+     "family": "TRD",
+     "cagr": 0.139816,
+     "sharpe": 0.6108,
+     "maxdd": -0.36248,
+     "src": "fresh"
+    },
+    {
+     "sid": "QUA_lowde_margin_w_15",
+     "family": "QUA",
+     "cagr": 0.13977189624757358,
+     "sharpe": 0.646574744945371,
+     "maxdd": -0.4633079104771919,
+     "src": "slice"
+    },
+    {
+     "sid": "TRD_golden_w_10",
+     "family": "TRD",
+     "cagr": 0.1394,
+     "sharpe": 0.5843,
+     "maxdd": -0.561886,
+     "src": "fresh"
+    },
+    {
+     "sid": "VAL_tlpe_w_30",
+     "family": "VAL",
+     "cagr": 0.138055,
+     "sharpe": 0.7143,
+     "maxdd": -0.302673,
+     "src": "fresh"
+    },
+    {
+     "sid": "QUA_lowde_margin_w_20",
+     "family": "QUA",
+     "cagr": 0.1377736735556534,
+     "sharpe": 0.675844349600951,
+     "maxdd": -0.44467906434218885,
+     "src": "slice"
+    },
+    {
+     "sid": "GRO_npg_q_15",
+     "family": "GRO",
+     "cagr": 0.1360655027623665,
+     "sharpe": 0.6615499506571433,
+     "maxdd": -0.27480434045076296,
+     "src": "slice"
+    },
+    {
+     "sid": "TRD_near52h_m_30",
+     "family": "TRD",
+     "cagr": 0.135679,
+     "sharpe": 0.6335,
+     "maxdd": -0.326873,
+     "src": "fresh"
+    },
+    {
+     "sid": "GRO_npg_q_30",
+     "family": "GRO",
+     "cagr": 0.1353098964131163,
+     "sharpe": 0.6729222150802249,
+     "maxdd": -0.32020116895952255,
+     "src": "slice"
+    },
+    {
+     "sid": "CMP_qmj_q_10",
+     "family": "CMP",
+     "cagr": 0.13504984898055916,
+     "sharpe": 0.6247294680729198,
+     "maxdd": -0.45839623871983526,
+     "src": "slice"
+    },
+    {
+     "sid": "QUA_lowde_margin_w_30",
+     "family": "QUA",
+     "cagr": 0.13401605289483642,
+     "sharpe": 0.7115880728476552,
+     "maxdd": -0.3838558606547898,
+     "src": "slice"
+    },
+    {
+     "sid": "MOM_relstr_q_10",
+     "family": "MOM",
+     "cagr": 0.133685,
+     "sharpe": 0.5992,
+     "maxdd": -0.514644,
+     "src": "fresh"
+    },
+    {
+     "sid": "MOM_roc252_q_10",
+     "family": "MOM",
+     "cagr": 0.133685,
+     "sharpe": 0.5992,
+     "maxdd": -0.514644,
+     "src": "fresh"
+    },
+    {
+     "sid": "QUA_ownroe_m_20",
+     "family": "QUA",
+     "cagr": 0.13319875393474856,
+     "sharpe": 0.7216930894268893,
+     "maxdd": -0.3597586422478125,
+     "src": "slice"
+    },
+    {
+     "sid": "MOM_roc126_w_10",
+     "family": "MOM",
+     "cagr": 0.132645,
+     "sharpe": 0.5694,
+     "maxdd": -0.562642,
+     "src": "fresh"
+    },
+    {
+     "sid": "QUA_tlroce_w_15",
+     "family": "QUA",
+     "cagr": 0.1321573658269941,
+     "sharpe": 0.7158307392901315,
+     "maxdd": -0.4082323521854593,
+     "src": "slice"
+    },
+    {
+     "sid": "QUA_tlroce_m_15",
+     "family": "QUA",
+     "cagr": 0.1321553273600875,
+     "sharpe": 0.7205132365054162,
+     "maxdd": -0.41963339691543267,
+     "src": "slice"
+    },
+    {
+     "sid": "MOM_roc126_w_20",
+     "family": "MOM",
+     "cagr": 0.129601,
+     "sharpe": 0.5928,
+     "maxdd": -0.405331,
+     "src": "fresh"
+    },
+    {
+     "sid": "QUA_tlroce_q_10",
+     "family": "QUA",
+     "cagr": 0.12907809838566453,
+     "sharpe": 0.6781658377773483,
+     "maxdd": -0.427170381035784,
+     "src": "slice"
+    },
+    {
+     "sid": "DVM_user",
+     "family": "DVM",
+     "cagr": 0.12666482099589027,
+     "sharpe": 0.5660049342866496,
+     "maxdd": -0.27011285661770734,
+     "src": "slice"
+    },
+    {
+     "sid": "CMP_qmj_m_10",
+     "family": "CMP",
+     "cagr": 0.12357137310304034,
+     "sharpe": 0.5753029245512966,
+     "maxdd": -0.5003635815871255,
+     "src": "slice"
+    },
+    {
+     "sid": "TRD_near52h_m_20",
+     "family": "TRD",
+     "cagr": 0.122503,
+     "sharpe": 0.5665,
+     "maxdd": -0.374141,
+     "src": "fresh"
+    },
+    {
+     "sid": "QUA_piotroski_w_10",
+     "family": "QUA",
+     "cagr": 0.12209093547536387,
+     "sharpe": 0.6436477208387514,
+     "maxdd": -0.3290759618012302,
+     "src": "slice"
+    },
+    {
+     "sid": "QUA_tlroce_w_10",
+     "family": "QUA",
+     "cagr": 0.12015519671670227,
+     "sharpe": 0.6420722133310623,
+     "maxdd": -0.4079293056914668,
+     "src": "slice"
+    },
+    {
+     "sid": "VAL_tlpe_w_15",
+     "family": "VAL",
+     "cagr": 0.116008,
+     "sharpe": 0.5836,
+     "maxdd": -0.449883,
+     "src": "fresh"
+    },
+    {
+     "sid": "VAL_tlpe_w_10",
+     "family": "VAL",
+     "cagr": 0.114259,
+     "sharpe": 0.5635,
+     "maxdd": -0.452209,
+     "src": "fresh"
+    },
+    {
+     "sid": "QUA_ownroe_q_15",
+     "family": "QUA",
+     "cagr": 0.11417204154891891,
+     "sharpe": 0.6168955432240741,
+     "maxdd": -0.36691072248959133,
+     "src": "slice"
+    },
+    {
+     "sid": "QUA_lowde_margin_m_30",
+     "family": "QUA",
+     "cagr": 0.11192000777093969,
+     "sharpe": 0.6212937565410735,
+     "maxdd": -0.4107909515980086,
+     "src": "slice"
+    },
+    {
+     "sid": "GRO_npg_q_10",
+     "family": "GRO",
+     "cagr": 0.10986521636131252,
+     "sharpe": 0.5376067469358049,
+     "maxdd": -0.3146010586933986,
+     "src": "slice"
+    },
+    {
+     "sid": "LV_atr_q_10",
+     "family": "LV",
+     "cagr": 0.10535518676683342,
+     "sharpe": 0.9506383469392164,
+     "maxdd": -0.20267872924915253,
+     "src": "slice"
+    },
+    {
+     "sid": "QUA_piotroski_m_10",
+     "family": "QUA",
+     "cagr": 0.103481602577568,
+     "sharpe": 0.564850298476317,
+     "maxdd": -0.3234317556281565,
+     "src": "slice"
+    },
+    {
+     "sid": "QUA_lowde_margin_m_15",
+     "family": "QUA",
+     "cagr": 0.10089720268626023,
+     "sharpe": 0.502987269531545,
+     "maxdd": -0.5293937502269692,
+     "src": "slice"
+    },
+    {
+     "sid": "QUA_tlroce_m_10",
+     "family": "QUA",
+     "cagr": 0.10025453602352097,
+     "sharpe": 0.5554134737850024,
+     "maxdd": -0.4545294586529034,
+     "src": "slice"
+    },
+    {
+     "sid": "QUA_ownroe_q_10",
+     "family": "QUA",
+     "cagr": 0.09943593093943326,
+     "sharpe": 0.522429195808577,
+     "maxdd": -0.4339970095683414,
+     "src": "slice"
+    },
+    {
+     "sid": "QUA_ownroe_m_15",
+     "family": "QUA",
+     "cagr": 0.09655640492557072,
+     "sharpe": 0.5525694794689755,
+     "maxdd": -0.3884642623810646,
+     "src": "slice"
+    },
+    {
+     "sid": "LV_atr_q_15",
+     "family": "LV",
+     "cagr": 0.09237708712571235,
+     "sharpe": 0.9090983586143656,
+     "maxdd": -0.20614965214332848,
+     "src": "slice"
+    },
+    {
+     "sid": "QUA_lowde_margin_m_20",
+     "family": "QUA",
+     "cagr": 0.08761240947812277,
+     "sharpe": 0.4732845329573507,
+     "maxdd": -0.48030789157815656,
+     "src": "slice"
+    },
+    {
+     "sid": "QUA_lowde_margin_q_10",
+     "family": "QUA",
+     "cagr": 0.08633805285853957,
+     "sharpe": 0.4355681586821545,
+     "maxdd": -0.550308084371363,
+     "src": "slice"
+    },
+    {
+     "sid": "CMP_valmom_q_10",
+     "family": "CMP",
+     "cagr": 0.0852579530923725,
+     "sharpe": 0.44062202743792,
+     "maxdd": -0.42858875813373853,
+     "src": "slice"
+    },
+    {
+     "sid": "VAL_tlpe_m_10",
+     "family": "VAL",
+     "cagr": 0.080622,
+     "sharpe": 0.4358,
+     "maxdd": -0.509346,
+     "src": "fresh"
+    },
+    {
+     "sid": "QUA_piotroski_q_10",
+     "family": "QUA",
+     "cagr": 0.07915526944533324,
+     "sharpe": 0.4606610227950695,
+     "maxdd": -0.39303118290419903,
+     "src": "slice"
+    },
+    {
+     "sid": "LV_atr_q_20",
+     "family": "LV",
+     "cagr": 0.07827465673242395,
+     "sharpe": 0.8292054343835924,
+     "maxdd": -0.192406503175375,
+     "src": "slice"
+    },
+    {
+     "sid": "MR_rsi_w_15",
+     "family": "MR",
+     "cagr": 0.070026,
+     "sharpe": 0.4069,
+     "maxdd": -0.359359,
+     "src": "fresh"
+    },
+    {
+     "sid": "TRD_near52h_w_30",
+     "family": "TRD",
+     "cagr": 0.06904,
+     "sharpe": 0.3913,
+     "maxdd": -0.452366,
+     "src": "fresh"
+    },
+    {
+     "sid": "LV_atr_q_30",
+     "family": "LV",
+     "cagr": 0.068291427960115,
+     "sharpe": 0.7511774033290474,
+     "maxdd": -0.19572700336040438,
+     "src": "slice"
+    },
+    {
+     "sid": "MR_rsi_w_10",
+     "family": "MR",
+     "cagr": 0.064687,
+     "sharpe": 0.3815,
+     "maxdd": -0.414536,
+     "src": "fresh"
+    },
+    {
+     "sid": "QUA_lowde_margin_q_30",
+     "family": "QUA",
+     "cagr": 0.06131541223147985,
+     "sharpe": 0.3887943449057055,
+     "maxdd": -0.4097805498731727,
+     "src": "slice"
+    },
+    {
+     "sid": "QUA_lowde_margin_q_20",
+     "family": "QUA",
+     "cagr": 0.054820180720418055,
+     "sharpe": 0.34357287554612675,
+     "maxdd": -0.4493515732484258,
+     "src": "slice"
+    },
+    {
+     "sid": "VAL_tlpe_q_10",
+     "family": "VAL",
+     "cagr": 0.05464460598798615,
+     "sharpe": 0.33214505788926396,
+     "maxdd": -0.48865488738805973,
+     "src": "slice"
+    },
+    {
+     "sid": "LV_atr_m_10",
+     "family": "LV",
+     "cagr": 0.05405526923392512,
+     "sharpe": 0.5614046489525453,
+     "maxdd": -0.2235032064066208,
+     "src": "slice"
+    },
+    {
+     "sid": "MR_pullback_q_30",
+     "family": "MR",
+     "cagr": 0.046005,
+     "sharpe": 0.321,
+     "maxdd": -0.360161,
+     "src": "fresh"
+    },
+    {
+     "sid": "MR_rsi_m_10",
+     "family": "MR",
+     "cagr": 0.039129,
+     "sharpe": 0.2859,
+     "maxdd": -0.380803,
+     "src": "fresh"
+    },
+    {
+     "sid": "MR_pullback_q_20",
+     "family": "MR",
+     "cagr": 0.038682,
+     "sharpe": 0.2837,
+     "maxdd": -0.415074,
+     "src": "fresh"
+    },
+    {
+     "sid": "LV_atr_m_15",
+     "family": "LV",
+     "cagr": 0.03742194990226788,
+     "sharpe": 0.4357984243700276,
+     "maxdd": -0.2174789361569225,
+     "src": "slice"
+    },
+    {
+     "sid": "LV_atr_m_20",
+     "family": "LV",
+     "cagr": 0.037281932525876194,
+     "sharpe": 0.44470246455168033,
+     "maxdd": -0.19290200546690395,
+     "src": "slice"
+    },
+    {
+     "sid": "LV_atr_w_10",
+     "family": "LV",
+     "cagr": 0.03694079804457573,
+     "sharpe": 0.41509309273956463,
+     "maxdd": -0.22718633407704225,
+     "src": "slice"
+    },
+    {
+     "sid": "MR_rsi_w_30",
+     "family": "MR",
+     "cagr": 0.03664,
+     "sharpe": 0.2731,
+     "maxdd": -0.326291,
+     "src": "fresh"
+    },
+    {
+     "sid": "LV_atr_w_15",
+     "family": "LV",
+     "cagr": 0.034933953309849386,
+     "sharpe": 0.41827378233728985,
+     "maxdd": -0.1996304159095491,
+     "src": "slice"
+    },
+    {
+     "sid": "TRD_near52h_w_20",
+     "family": "TRD",
+     "cagr": 0.034415,
+     "sharpe": 0.264,
+     "maxdd": -0.540589,
+     "src": "fresh"
+    },
+    {
+     "sid": "LV_atr_m_30",
+     "family": "LV",
+     "cagr": 0.03388418702158891,
+     "sharpe": 0.4309867572665609,
+     "maxdd": -0.17056930660537317,
+     "src": "slice"
+    },
+    {
+     "sid": "TRD_near52h_q_30",
+     "family": "TRD",
+     "cagr": 0.033466,
+     "sharpe": 0.2604,
+     "maxdd": -0.387282,
+     "src": "fresh"
+    },
+    {
+     "sid": "MR_rsi_w_20",
+     "family": "MR",
+     "cagr": 0.0274,
+     "sharpe": 0.2345,
+     "maxdd": -0.381142,
+     "src": "fresh"
+    },
+    {
+     "sid": "TRD_near52h_w_15",
+     "family": "TRD",
+     "cagr": 0.027164,
+     "sharpe": 0.2406,
+     "maxdd": -0.579315,
+     "src": "fresh"
+    },
+    {
+     "sid": "QUA_lowde_margin_q_15",
+     "family": "QUA",
+     "cagr": 0.023854988281672096,
+     "sharpe": 0.22301262566867502,
+     "maxdd": -0.5494992315409395,
+     "src": "slice"
+    },
+    {
+     "sid": "TRD_near52h_q_20",
+     "family": "TRD",
+     "cagr": 0.020566,
+     "sharpe": 0.2094,
+     "maxdd": -0.452713,
+     "src": "fresh"
+    },
+    {
+     "sid": "LV_atr_w_20",
+     "family": "LV",
+     "cagr": 0.018683534958168213,
+     "sharpe": 0.2525190689319332,
+     "maxdd": -0.19694959768048403,
+     "src": "slice"
+    },
+    {
+     "sid": "MR_rsi_q_30",
+     "family": "MR",
+     "cagr": 0.011558,
+     "sharpe": 0.1638,
+     "maxdd": -0.425645,
+     "src": "fresh"
+    },
+    {
+     "sid": "TRD_near52h_m_10",
+     "family": "TRD",
+     "cagr": 0.011523,
+     "sharpe": 0.1872,
+     "maxdd": -0.52034,
+     "src": "fresh"
+    },
+    {
+     "sid": "MR_pullback_q_15",
+     "family": "MR",
+     "cagr": 0.010973,
+     "sharpe": 0.1667,
+     "maxdd": -0.486531,
+     "src": "fresh"
+    },
+    {
+     "sid": "MR_rsi_q_10",
+     "family": "MR",
+     "cagr": 0.00762,
+     "sharpe": 0.1504,
+     "maxdd": -0.411557,
+     "src": "fresh"
+    },
+    {
+     "sid": "MR_rsi_q_15",
+     "family": "MR",
+     "cagr": 0.004298,
+     "sharpe": 0.1333,
+     "maxdd": -0.425645,
+     "src": "fresh"
+    },
+    {
+     "sid": "MR_rsi_m_30",
+     "family": "MR",
+     "cagr": 0.001495,
+     "sharpe": 0.1098,
+     "maxdd": -0.34682,
+     "src": "fresh"
+    },
+    {
+     "sid": "LV_atr_w_30",
+     "family": "LV",
+     "cagr": 0.0012083053722247161,
+     "sharpe": 0.055704605179562515,
+     "maxdd": -0.2063135573607645,
+     "src": "slice"
+    },
+    {
+     "sid": "MR_rsi_m_20",
+     "family": "MR",
+     "cagr": -0.006006,
+     "sharpe": 0.0756,
+     "maxdd": -0.368385,
+     "src": "fresh"
+    },
+    {
+     "sid": "MR_rsi_q_20",
+     "family": "MR",
+     "cagr": -0.009557,
+     "sharpe": 0.0693,
+     "maxdd": -0.425645,
+     "src": "fresh"
+    },
+    {
+     "sid": "MR_rsi_m_15",
+     "family": "MR",
+     "cagr": -0.010609,
+     "sharpe": 0.0562,
+     "maxdd": -0.391657,
+     "src": "fresh"
+    },
+    {
+     "sid": "TRD_near52h_q_10",
+     "family": "TRD",
+     "cagr": -0.018638,
+     "sharpe": 0.0728,
+     "maxdd": -0.509096,
+     "src": "fresh"
+    },
+    {
+     "sid": "MR_pullback_w_10",
+     "family": "MR",
+     "cagr": -0.024128,
+     "sharpe": 0.0481,
+     "maxdd": -0.431068,
+     "src": "fresh"
+    },
+    {
+     "sid": "TRD_near52h_q_15",
+     "family": "TRD",
+     "cagr": -0.024353,
+     "sharpe": 0.0371,
+     "maxdd": -0.522033,
+     "src": "fresh"
+    },
+    {
+     "sid": "TRD_near52h_w_10",
+     "family": "TRD",
+     "cagr": -0.026914,
+     "sharpe": 0.0647,
+     "maxdd": -0.701318,
+     "src": "fresh"
+    },
+    {
+     "sid": "MR_pullback_m_30",
+     "family": "MR",
+     "cagr": -0.035659,
+     "sharpe": -0.0657,
+     "maxdd": -0.381883,
+     "src": "fresh"
+    },
+    {
+     "sid": "MR_pullback_q_10",
+     "family": "MR",
+     "cagr": -0.05019,
+     "sharpe": -0.0847,
+     "maxdd": -0.60049,
+     "src": "fresh"
+    },
+    {
+     "sid": "MR_pullback_m_20",
+     "family": "MR",
+     "cagr": -0.062475,
+     "sharpe": -0.1722,
+     "maxdd": -0.454815,
+     "src": "fresh"
+    },
+    {
+     "sid": "MR_pullback_w_15",
+     "family": "MR",
+     "cagr": -0.066457,
+     "sharpe": -0.1469,
+     "maxdd": -0.461856,
+     "src": "fresh"
+    },
+    {
+     "sid": "MR_pullback_m_15",
+     "family": "MR",
+     "cagr": -0.076202,
+     "sharpe": -0.2149,
+     "maxdd": -0.50142,
+     "src": "fresh"
+    },
+    {
+     "sid": "MR_pullback_w_20",
+     "family": "MR",
+     "cagr": -0.098734,
+     "sharpe": -0.3189,
+     "maxdd": -0.53672,
+     "src": "fresh"
+    },
+    {
+     "sid": "MR_pullback_w_30",
+     "family": "MR",
+     "cagr": -0.127376,
+     "sharpe": -0.5006,
+     "maxdd": -0.592876,
+     "src": "fresh"
+    },
+    {
+     "sid": "MR_pullback_m_10",
+     "family": "MR",
+     "cagr": -0.158508,
+     "sharpe": -0.5505,
+     "maxdd": -0.662079,
+     "src": "fresh"
+    }
+   ]
+  },
+  "precovid": {
+   "title": "Pre-COVID check (2016-21)",
+   "window": "2016-07-01 \u2192 2021-07-01",
+   "caption": "The out-of-window test for the 5y finalists: did the edge also exist before COVID? Includes the 2018-19 bear and the COVID crash.",
+   "benchmark": null,
+   "rows": [
+    {
+     "sid": "DVM_all_w_10",
+     "family": "DVM",
+     "cagr": 0.431728,
+     "sharpe": 1.3739,
+     "maxdd": -0.711477
+    },
+    {
+     "sid": "MOM_roc252_m_10",
+     "family": "MOM",
+     "cagr": 0.418762,
+     "sharpe": 1.3023,
+     "maxdd": -0.509529
+    },
+    {
+     "sid": "MOM_roc252_m_20",
+     "family": "MOM",
+     "cagr": 0.356923,
+     "sharpe": 1.2907,
+     "maxdd": -0.549644
+    },
+    {
+     "sid": "DVM_dm_m_20",
+     "family": "DVM",
+     "cagr": 0.322348,
+     "sharpe": 1.3722,
+     "maxdd": -0.558673
+    },
+    {
+     "sid": "DVM_all_m_10",
+     "family": "DVM",
+     "cagr": 0.321721,
+     "sharpe": 1.1285,
+     "maxdd": -0.737384
+    },
+    {
+     "sid": "TRD_golden_m_10",
+     "family": "TRD",
+     "cagr": 0.225913,
+     "sharpe": 0.9374,
+     "maxdd": -0.511553
+    },
+    {
+     "sid": "VAL_ownpe_w_10",
+     "family": "VAL",
+     "cagr": 0.190475,
+     "sharpe": 0.75,
+     "maxdd": -0.785759
+    },
+    {
+     "sid": "GRO_revg_w_10",
+     "family": "GRO",
+     "cagr": 0.184715,
+     "sharpe": 0.8025,
+     "maxdd": -0.651037
+    },
+    {
+     "sid": "SZ_small_m_20",
+     "family": "SZ",
+     "cagr": 0.113649,
+     "sharpe": 0.5473,
+     "maxdd": -0.848767
+    },
+    {
+     "sid": "VAL_ownpe_q_30",
+     "family": "VAL",
+     "cagr": 0.097685,
+     "sharpe": 0.5222,
+     "maxdd": -0.730771
+    },
+    {
+     "sid": "SZ_small_m_15",
+     "family": "SZ",
+     "cagr": 0.060849,
+     "sharpe": 0.3586,
+     "maxdd": -0.881817
+    }
+   ]
+  },
+  "families": {
+   "title": "Families (post-COVID)",
+   "window": "2021-07-01 \u2192 2026-06-16",
+   "caption": "Median beats cherry-picked best: a family whose median is strong has a real edge; a lone hot config in a weak family is usually luck.",
+   "rows": [
+    {
+     "family": "SZ",
+     "desc": "Small caps",
+     "median_cagr": 0.28004420972866195,
+     "best_cagr": 0.38286767768611085,
+     "n": 12
+    },
+    {
+     "family": "MOM",
+     "desc": "Pure price momentum (6/12-month returns, relative strength)",
+     "median_cagr": 0.230176,
+     "best_cagr": 0.389379,
+     "n": 36
+    },
+    {
+     "family": "DVM",
+     "desc": "Trendlyne D/V/M scores (all-3 or durability+momentum)",
+     "median_cagr": 0.22209523518953156,
+     "best_cagr": 0.4154891801287297,
+     "n": 37
+    },
+    {
+     "family": "GRO",
+     "desc": "Growth (revenue / net-profit growth)",
+     "median_cagr": 0.21566640416351812,
+     "best_cagr": 0.3273474260561191,
+     "n": 24
+    },
+    {
+     "family": "CMP",
+     "desc": "Composites (quality+value+momentum blends)",
+     "median_cagr": 0.21438016877579802,
+     "best_cagr": 0.299632199996815,
+     "n": 36
+    },
+    {
+     "family": "VAL",
+     "desc": "Value (own-history P/E and P/BV percentiles)",
+     "median_cagr": 0.21294511993103615,
+     "best_cagr": 0.3190136256341711,
+     "n": 36
+    },
+    {
+     "family": "QUA",
+     "desc": "Quality (ROE, low debt, margins)",
+     "median_cagr": 0.14529718203606712,
+     "best_cagr": 0.24193235240658217,
+     "n": 48
+    },
+    {
+     "family": "TRD",
+     "desc": "Trend-following (golden cross, near 52-week high)",
+     "median_cagr": 0.139816,
+     "best_cagr": 0.379909,
+     "n": 24
+    },
+    {
+     "family": "LV",
+     "desc": "Low volatility (defensive sleeve of the 70/30 blend)",
+     "median_cagr": 0.03742194990226788,
+     "best_cagr": 0.10535518676683342,
+     "n": 12
+    },
+    {
+     "family": "MR",
+     "desc": "Mean reversion (buy pullbacks / RSI dips)",
+     "median_cagr": 0.001495,
+     "best_cagr": 0.070026,
+     "n": 24
+    }
+   ]
+  },
+  "verdicts": {
+   "title": "Robustness verdicts",
+   "window": "protocol run 2026-07-17",
+   "caption": "Full-protocol result per finalist: 5y fresh, half-split persistence (H1 2021-23 vs H2 2024-26), pre-COVID out-of-window, and half-year segments vs benchmark. Survivor = passed everything.",
+   "rows": [
+    {
+     "sid": "MOM_roc252_m_10",
+     "family": "MOM",
+     "verdict": "survivor",
+     "note": "Strong in both eras; 8/10 halves beat benchmark",
+     "cagr_5y": 0.389379,
+     "sharpe_5y": 1.2946,
+     "maxdd_5y": -0.336317,
+     "h1_cagr": 0.514557,
+     "h2_cagr": 0.238279,
+     "pre_cagr": 0.418762,
+     "pre_sharpe": 1.3023,
+     "seg_beat": 8,
+     "seg_total": 10
+    },
+    {
+     "sid": "DVM_all_w_10",
+     "family": "DVM",
+     "verdict": "survivor",
+     "note": "Zero losing half-years in 5y; also 43% pre-COVID",
+     "cagr_5y": 0.36173,
+     "sharpe_5y": 1.1902,
+     "maxdd_5y": -0.330095,
+     "h1_cagr": 0.378095,
+     "h2_cagr": 0.312283,
+     "pre_cagr": 0.431728,
+     "pre_sharpe": 1.3739,
+     "seg_beat": 8,
+     "seg_total": 10
+    },
+    {
+     "sid": "DVM_all_m_10",
+     "family": "DVM",
+     "verdict": "survivor",
+     "note": "Consistent across every window; monthly cadence",
+     "cagr_5y": 0.320196,
+     "sharpe_5y": 1.1059,
+     "maxdd_5y": -0.32838,
+     "h1_cagr": 0.326323,
+     "h2_cagr": 0.217492,
+     "pre_cagr": 0.321721,
+     "pre_sharpe": 1.1285,
+     "seg_beat": 6,
+     "seg_total": 10
+    },
+    {
+     "sid": "MOM_roc252_m_20",
+     "family": "MOM",
+     "verdict": "incumbent",
+     "note": "Paper book; solid but n=10 variant leads this window",
+     "cagr_5y": 0.272011,
+     "sharpe_5y": 1.0605,
+     "maxdd_5y": -0.377568,
+     "h1_cagr": 0.382371,
+     "h2_cagr": 0.174584,
+     "pre_cagr": 0.356923,
+     "pre_sharpe": 1.2907,
+     "seg_beat": 6,
+     "seg_total": 10
+    },
+    {
+     "sid": "DVM_dm_m_20",
+     "family": "DVM",
+     "verdict": "incumbent-flag",
+     "note": "H2 only 4.3% \u2014 recent 2.5y is weak; matches live paper lag",
+     "cagr_5y": 0.206597,
+     "sharpe_5y": 0.8841,
+     "maxdd_5y": -0.334305,
+     "h1_cagr": 0.308818,
+     "h2_cagr": 0.043024,
+     "pre_cagr": 0.322348,
+     "pre_sharpe": 1.3722,
+     "seg_beat": 6,
+     "seg_total": 10
+    },
+    {
+     "sid": "SZ_small_m_15",
+     "family": "SZ",
+     "verdict": "regime-bet",
+     "note": "H1 50% -> H2 13%; pre-COVID just 6% \u2014 post-COVID artifact",
+     "cagr_5y": 0.329866,
+     "sharpe_5y": 1.2944,
+     "maxdd_5y": -0.292072,
+     "h1_cagr": 0.501287,
+     "h2_cagr": 0.131168,
+     "pre_cagr": 0.060849,
+     "pre_sharpe": 0.3586,
+     "seg_beat": 7,
+     "seg_total": 10
+    },
+    {
+     "sid": "SZ_small_m_20",
+     "family": "SZ",
+     "verdict": "regime-bet",
+     "note": "Same fade as SZ_small_m_15",
+     "cagr_5y": 0.261639,
+     "sharpe_5y": 1.0945,
+     "maxdd_5y": -0.323213,
+     "h1_cagr": 0.396021,
+     "h2_cagr": 0.092952,
+     "pre_cagr": 0.113649,
+     "pre_sharpe": 0.5473,
+     "seg_beat": 7,
+     "seg_total": 10
+    },
+    {
+     "sid": "VAL_ownpe_q_30",
+     "family": "VAL",
+     "verdict": "regime-bet",
+     "note": "Shallow drawdowns but pre-COVID 9.8%; edge is post-2021 only",
+     "cagr_5y": 0.229746,
+     "sharpe_5y": 1.1377,
+     "maxdd_5y": -0.225566,
+     "h1_cagr": 0.286789,
+     "h2_cagr": 0.160351,
+     "pre_cagr": 0.097685,
+     "pre_sharpe": 0.5222,
+     "seg_beat": 7,
+     "seg_total": 10
+    },
+    {
+     "sid": "TRD_golden_m_10",
+     "family": "TRD",
+     "verdict": "noise",
+     "note": "Lone 38% in a family whose median is 14%; worst DD of finalists",
+     "cagr_5y": 0.379909,
+     "sharpe_5y": 1.2279,
+     "maxdd_5y": -0.396006,
+     "h1_cagr": 0.340377,
+     "h2_cagr": 0.430131,
+     "pre_cagr": 0.225913,
+     "pre_sharpe": 0.9374,
+     "seg_beat": 6,
+     "seg_total": 10
+    },
+    {
+     "sid": "VAL_ownpe_w_10",
+     "family": "VAL",
+     "verdict": "noise",
+     "note": "H1 53% -> H2 2.2%; one hot stretch carried the number",
+     "cagr_5y": 0.271836,
+     "sharpe_5y": 1.1361,
+     "maxdd_5y": -0.366878,
+     "h1_cagr": 0.53278,
+     "h2_cagr": 0.02246,
+     "pre_cagr": 0.190475,
+     "pre_sharpe": 0.75,
+     "seg_beat": 5,
+     "seg_total": 10
+    },
+    {
+     "sid": "GRO_revg_w_10",
+     "family": "GRO",
+     "verdict": "finalist",
+     "note": "",
+     "cagr_5y": 0.312846,
+     "sharpe_5y": 1.2091,
+     "maxdd_5y": -0.314281,
+     "h1_cagr": 0.326943,
+     "h2_cagr": 0.264358,
+     "pre_cagr": 0.184715,
+     "pre_sharpe": 0.8025,
+     "seg_beat": 6,
+     "seg_total": 10
+    }
+   ]
+  }
+ }
+}
