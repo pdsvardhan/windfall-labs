@@ -269,7 +269,7 @@ export default function PaperPage() {
       ) : (
         <>
           {renderGroup("Originals — live since 6 Jul", originals, 0)}
-          {renderGroup("Survivors — live since 17 Jul (5y-study winners)", survivors, originals.length)}
+          {renderGroup("Survivors — seeded 17 Jul at the 16 Jul close (5y-study winners)", survivors, originals.length)}
         </>
       )}
     </div>

@@ -55,8 +55,18 @@ def main():
         cfg["name"] = f"{sid}__sim0629"
         try:
             res = call("/api/backtests", {"config": cfg, "save": False})
-            books[sid] = {"points": norm_points(res.get("equity_curve") or []),
-                          "ret": (res.get("summary") or {}).get("total_return")}
+            pts = norm_points(res.get("equity_curve") or [])
+            trades = res.get("trades") or []
+            # A zero-trade sim is NOT "+0.0% performance" — the engine took no positions from
+            # this cold start (factor-seeding artifact, verifier finding iter-94 item 656).
+            # Record it as unavailable rather than displaying a misleading flat zero.
+            if not trades and pts and all(abs(v) < 1e-9 for _, v in pts):
+                books[sid] = {"points": [], "error":
+                              "engine entered no positions from a 2026-06-29 cold start "
+                              "(factor-seeding artifact) — sim not comparable"}
+            else:
+                books[sid] = {"points": pts,
+                              "ret": (res.get("summary") or {}).get("total_return")}
         except Exception as exc:  # noqa: BLE001
             books[sid] = {"points": [], "error": str(exc)[:200]}
 
