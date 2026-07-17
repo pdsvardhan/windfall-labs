@@ -1,7 +1,7 @@
 import type {
   BacktestResult, BacktestResultFull, BacktestRow, CostSensitivity, Coverage, DataStatus,
-  FundamentalsStatus, PaperPosition, Readiness, ScoreRow, SignalRun, Strategy, SweepResult,
-  WalkForwardReport,
+  FundamentalsStatus, LeaderboardsData, PaperEquity, PaperPosition, PaperSim, Readiness, ScoreRow,
+  SignalRun, Strategy, SweepResult, WalkForwardReport,
 } from "./types";
 
 // Same-origin by default: calls go to /api/* on whatever host serves the cockpit, and Next.js
@@ -74,6 +74,10 @@ export const api = {
     post<{ position_id: string }>("/api/paper/commit", { strategy_id, signal }),
   markPaper: () => post<unknown>("/api/paper/mark", {}),
   scoreboard: () => get<ScoreRow[]>("/api/paper/scoreboard"),
+  paperEquity: () => get<PaperEquity>("/api/paper/equity"),
+  paperSim: () => get<PaperSim>("/api/paper/sim"),
 
   validate: () => get<{ overall: string; checks: unknown[] }>("/api/validate"),
+
+  leaderboards: () => get<LeaderboardsData>("/api/leaderboards"),
 };
