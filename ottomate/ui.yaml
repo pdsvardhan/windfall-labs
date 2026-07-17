@@ -96,3 +96,16 @@ pages:
     mobile_handling: responsive
     entry_points: []
     components: []
+  - id: page-windfall-leaderboards
+    title: Leaderboards
+    route: /leaderboards
+    purpose: "Multi-board strategy leaderboards: overall 10y sweep, post-COVID 5y
+      study, pre-COVID out-of-window, family medians, robustness verdicts"
+    layout_type: dashboard
+    empty_state: No study dataset found - run the leaderboard curation script
+    loading_state: skeleton
+    error_state: inline error with retry
+    permissions: anonymous
+    mobile_handling: responsive
+    entry_points: []
+    components: []

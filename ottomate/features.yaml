@@ -281,3 +281,40 @@ features:
         test_status: not-tested
         linked_test: null
     dependencies: []
+  - id: strategy-leaderboards
+    title: Strategy leaderboards (multi-board)
+    short_description: "Curated leaderboards from persisted study datasets: overall
+      10y, post-COVID 5y, pre-COVID, family medians, robustness verdicts"
+    type: hybrid
+    status: done
+    priority: P1
+    size: M
+    test_status: not-tested
+    acceptance_criteria:
+      - content: All five boards render from the persisted dataset and match
+          docs/validation numbers
+        test_status: not-tested
+        linked_test: null
+      - content: Every row links to its strategy; verdict pills show
+          survivor/regime-bet/noise
+        test_status: not-tested
+        linked_test: null
+    dependencies: []
+  - id: paper-sim-cohorts
+    title: Paper SIM series + survivor cohort books
+    short_description: Labeled simulated Jun-29 series per live strategy (live
+      untouched) plus 3 survivor books as a second cohort
+    type: hybrid
+    status: done
+    priority: P1
+    size: M
+    test_status: not-tested
+    acceptance_criteria:
+      - content: SIM series are visibly labeled simulated and never mixed into live P&L
+        test_status: not-tested
+        linked_test: null
+      - content: Three survivor books exist with their own cohort grouping and start
+          dates
+        test_status: not-tested
+        linked_test: null
+    dependencies: []
