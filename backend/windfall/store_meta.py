@@ -25,7 +25,8 @@ CREATE TABLE IF NOT EXISTS paper_positions (
     id VARCHAR PRIMARY KEY, strategy_id VARCHAR, ticker VARCHAR, status VARCHAR,
     entry_date DATE, entry DOUBLE, stop DOUBLE, target DOUBLE, weight DOUBLE, shares DOUBLE,
     last_price DOUBLE, last_date DATE, exit_date DATE, exit DOUBLE,
-    return_pct DOUBLE, r_multiple DOUBLE, reason VARCHAR, created_at TIMESTAMP
+    return_pct DOUBLE, r_multiple DOUBLE, reason VARCHAR, created_at TIMESTAMP,
+    planned_capital DOUBLE
 );
 """
 
@@ -33,6 +34,9 @@ CREATE TABLE IF NOT EXISTS paper_positions (
 def _init():
     con = connect()
     con.execute(_META_SCHEMA)
+    # Migration (iter-147 #248): DBs created before next-open entries lack planned_capital —
+    # the capital a 'pending' row will size against once its next-session open is known.
+    con.execute("ALTER TABLE paper_positions ADD COLUMN IF NOT EXISTS planned_capital DOUBLE")
     return con
 
 

@@ -2,6 +2,10 @@
 
 Each committed signal becomes a simulated open position. mark_to_market() pulls the latest close
 for every open position, updates P&L, and closes positions whose stop or target was hit.
+
+Rebalance entries (iter-147, todo #248) are queued as status='pending' with no entry price and
+filled at the first session OPEN strictly after commit — matching the backtest's next-open fill
+assumption. The daily mark fills or voids them; manual /api/paper/commit stays immediate.
 """
 from __future__ import annotations
 
@@ -47,6 +51,104 @@ def _latest_close(ticker: str):
     return r[0], r[1]
 
 
+def _next_open(ticker: str, after: dt.date):
+    """First adjusted OPEN strictly after `after` — the next-open fill price for a pending entry.
+    Same store + Bhavcopy splice as _latest_close, so fills and marks stay on one price basis.
+    Naturally skips weekends/holidays: the first bar after a Friday/pre-holiday commit is the
+    next trading session."""
+    try:
+        panel = ts.adjusted_close_panel([ticker], start=after.isoformat(), end=None,
+                                        field="open", extend_live=True)
+        col = ticker.upper()
+        if col in panel.columns:
+            s = panel[col].dropna()
+            s = s[[d.date() > after for d in s.index]]
+            if len(s):
+                return s.index[0].date(), float(s.iloc[0])
+    except Exception as exc:  # noqa: BLE001
+        _log.warning("paper fill: next-open lookup failed for %s: %r", ticker, exc)
+    return None, None
+
+
+def commit_pending_signal(strategy_id: str | None, signal: dict, capital: float) -> str:
+    """Queue a rebalance entry for fill at the NEXT session's open (iter-147, todo #248).
+
+    The backtest fills entries at next-open (no look-ahead); entering paper at the rebalance
+    evening's close booked a fill the backtest never assumes (adr-038 deferred the switch to
+    avoid re-baselining mid-experiment). A pending row carries no entry price or share count —
+    fill_pending() prices it from the first open strictly after commit, or voids it."""
+    if not signal.get("ticker"):
+        raise ValueError("signal has no ticker")
+    if not capital or capital <= 0:
+        raise ValueError("no capital allocated")
+    pid = new_id("pp")
+    con = _init()
+    try:
+        con.execute(
+            "INSERT INTO paper_positions (id,strategy_id,ticker,status,entry_date,entry,stop,"
+            "target,weight,shares,last_price,last_date,return_pct,r_multiple,reason,created_at,"
+            "planned_capital) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            [pid, strategy_id, signal["ticker"], "pending", None, None,
+             signal.get("stop"), signal.get("target"), signal.get("weight", 0.0), None,
+             None, None, None, None, None, dt.datetime.now(), float(capital)])
+        return pid
+    finally:
+        con.close()
+
+
+PENDING_VOID_AFTER_DAYS = 14  # no bar for 2 weeks after commit = suspension/delisting, not a gap
+
+
+def fill_pending() -> dict:
+    """Fill pending next-open entries whose next session's open is now available.
+
+    shares = floor(planned_capital / open) — a fill that floors to 0 shares is voided (the same
+    small-account granularity rule the close-priced commit applied), as is a pending row with no
+    bar for PENDING_VOID_AFTER_DAYS after commit. Runs at the top of every daily mark."""
+    con = _init()
+    try:
+        rows = con.execute(
+            "SELECT id,ticker,planned_capital,created_at FROM paper_positions "
+            "WHERE status='pending'").fetchall()
+        filled = voided = 0
+        for pid, ticker, cap, created_at in rows:
+            committed = created_at.date() if isinstance(created_at, dt.datetime) else dt.date.today()
+            fill_date, px = _next_open(ticker, committed)
+            if px is None or px <= 0:
+                if (dt.date.today() - committed).days > PENDING_VOID_AFTER_DAYS:
+                    con.execute("UPDATE paper_positions SET status='void', reason=? WHERE id=?",
+                                ["no-fill-data", pid])
+                    voided += 1
+                continue
+            shares = math.floor((cap or 0) / px)
+            if shares < 1:
+                con.execute("UPDATE paper_positions SET status='void', reason=? WHERE id=?",
+                            ["unfillable-granularity", pid])
+                voided += 1
+                continue
+            con.execute(
+                "UPDATE paper_positions SET status='open', entry=?, entry_date=?, shares=?, "
+                "last_price=?, last_date=?, return_pct=0.0 WHERE id=?",
+                [float(px), fill_date, float(shares), float(px), fill_date, pid])
+            filled += 1
+        return {"pending_filled": filled, "pending_voided": voided}
+    finally:
+        con.close()
+
+
+def void_pending(pid: str, reason: str = "rebalance-dropped") -> bool:
+    """Void one still-pending entry (a rebalance drop-out that never got filled)."""
+    con = _init()
+    try:
+        r = con.execute("SELECT status FROM paper_positions WHERE id=?", [pid]).fetchone()
+        if not r or r[0] != "pending":
+            return False
+        con.execute("UPDATE paper_positions SET status='void', reason=? WHERE id=?", [reason, pid])
+        return True
+    finally:
+        con.close()
+
+
 def commit_signal(strategy_id: str | None, signal: dict, capital_per_position: float = 15000.0) -> str:
     # Enter at the latest EXECUTABLE close — what you'd actually pay committing the trade now — not the
     # signal bar's close. When signals resolve on stale data (as-of an older bar than today), pricing
@@ -75,6 +177,7 @@ def commit_signal(strategy_id: str | None, signal: dict, capital_per_position: f
 
 
 def mark_to_market() -> dict:
+    fills = fill_pending()  # next-open entries first, so a fresh fill gets marked the same run
     con = _init()
     try:
         rows = con.execute(
@@ -102,7 +205,7 @@ def mark_to_market() -> dict:
                  reason, pid])
             if status == "closed":
                 closed += 1
-        return {"open_marked": updated, "newly_closed": closed}
+        return {"open_marked": updated, "newly_closed": closed, **fills}
     finally:
         con.close()
 
@@ -148,7 +251,8 @@ def list_positions(strategy_id: str | None = None, status: str | None = None) ->
     con = connect(read_only=True)
     try:
         q = ("SELECT id,strategy_id,ticker,status,entry_date,entry,stop,target,shares,"
-             "last_price,last_date,exit,exit_date,return_pct,r_multiple,reason FROM paper_positions WHERE 1=1")
+             "last_price,last_date,exit,exit_date,return_pct,r_multiple,reason,planned_capital "
+             "FROM paper_positions WHERE 1=1")
         params: list = []
         if strategy_id:
             q += " AND strategy_id=?"; params.append(strategy_id)
@@ -159,7 +263,8 @@ def list_positions(strategy_id: str | None = None, status: str | None = None) ->
     finally:
         con.close()
     cols = ["id", "strategy_id", "ticker", "status", "entry_date", "entry", "stop", "target",
-            "shares", "last_price", "last_date", "exit", "exit_date", "return_pct", "r_multiple", "reason"]
+            "shares", "last_price", "last_date", "exit", "exit_date", "return_pct", "r_multiple",
+            "reason", "planned_capital"]
     out = []
     for r in rows:
         d = dict(zip(cols, r))
@@ -186,17 +291,21 @@ def scoreboard() -> list[dict]:
     for sid, ps in by_strat.items():
         closed = [p for p in ps if p["status"] == "closed"]
         open_ = [p for p in ps if p["status"] == "open"]
+        pending = [p for p in ps if p["status"] == "pending"]
+        # pending/void rows have no entry price yet — they carry no P&L until filled
+        priced = [p for p in ps if p["entry"] and p["status"] in ("open", "closed")]
         rets = [p["return_pct"] for p in closed if p["return_pct"] is not None]
         rmults = [p["r_multiple"] for p in closed if p["r_multiple"] is not None]
         pnl = sum(((p["exit"] or p["last_price"] or p["entry"]) - p["entry"]) * (p["shares"] or 0)
-                  for p in ps)
+                  for p in priced)
         # Net P&L after the modelled NSE delivery costs (same side-aware rates + flat DP the backtest
         # deducts, adr-020): buy cost is already spent, sell cost is what you'd pay to exit the mark now.
         # So paper P&L is reported net-of-costs, not just gross (audit #184).
-        net_pnl = sum(_net_pnl(p) for p in ps)
+        net_pnl = sum(_net_pnl(p) for p in priced)
         wins = [r for r in rets if r > 0]
         board.append({
             "strategy_id": sid, "open": len(open_), "closed": len(closed),
+            "pending": len(pending),
             "total_pnl": round(pnl, 2), "net_pnl": round(net_pnl, 2),
             "win_rate": round(len(wins) / len(rets), 3) if rets else 0.0,
             "avg_return_pct": round(sum(rets) / len(rets), 4) if rets else 0.0,

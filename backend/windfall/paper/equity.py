@@ -24,7 +24,10 @@ def _iso(x) -> str | None:
 
 
 def book_equity(benchmark: str = "NIFTY500") -> dict:
-    positions = list_positions()
+    # Pending next-open entries (iter-147 #248) and voided rows carry no entry price/date yet —
+    # they are not part of the book's curve until filled.
+    positions = [p for p in list_positions()
+                 if p["entry"] is not None and p["status"] in ("open", "closed")]
     by: dict[str, list[dict]] = defaultdict(list)
     for p in positions:
         if p.get("strategy_id"):
