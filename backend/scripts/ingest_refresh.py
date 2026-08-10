@@ -125,8 +125,13 @@ def main():
     if stocks_f:
         have = _read_union(con, stocks_f, "h_stocks")
         mcap_src = "CAST(h.mcap AS DOUBLE)" if "mcap" in have else "CAST(NULL AS DOUBLE)"
+        # TEMP TABLE, not VIEW (verifier-936 hard failure): this plan LEFT JOINs the target
+        # `stocks` table for the mcap/name fallbacks. A lazy view re-evaluates at INSERT time —
+        # AFTER the apply loop's DELETE — so COALESCE(.., s.mcap) saw NULL and a no-mcap gapfill
+        # blanked real mcaps (which feed pit_mcap's shares calc). Materializing freezes the
+        # pre-delete state. dvm/ohlcv plans read only CSVs, so lazy views stay fine there.
         con.execute(f"""
-            CREATE OR REPLACE TEMP VIEW h_stocks_d AS
+            CREATE OR REPLACE TEMP TABLE h_stocks_d AS
             SELECT CAST(h.pk AS BIGINT) pk, CAST(h.nsecode AS VARCHAR) nsecode,
                    -- SEO-blob guard: a by-pk scrape can return a page title; keep the DB name then
                    CASE WHEN h."name" IS NULL OR length(h."name") > 120
