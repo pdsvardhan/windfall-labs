@@ -258,7 +258,9 @@ export default function PaperPage() {
         <b className="text-ink">How this works:</b> prices are NSE Bhavcopy <b>end-of-day</b> (not intraday),
         refreshed weekday nights; P&amp;L marks to the last trading day{lastMark ? <> — currently <b className="text-ink">{lastMark}</b></> : ""}.
         Headline card P&amp;L is <b>gross of costs</b>; the net column deducts modelled brokerage/STT/slippage.
-        Each position enters at the close it was opened on, so day-0 P&amp;L starts at zero. Books are only
+        Rebalance entries fill at the <b>next session&apos;s open</b> (matching the backtest&apos;s
+        no-look-ahead fills; they show as <b>pending</b> until that bar exists); manual commits enter at
+        the latest close. Day-0 P&amp;L starts at zero either way. Books are only
         partly invested when a name&apos;s weight rounds below one share — see <b>cash %</b> per strategy.
         The yellow SIM blocks are <b>simulated</b> engine runs from 29 Jun, kept strictly apart from the
         live record. You still place every real order yourself.
