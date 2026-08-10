@@ -91,3 +91,37 @@ adr-033/034/035/036 and the backtests store — the ADRs carry the full evidence
   dry-run was later picked from.
 - **adr-036 (2026-06-30, documentation):** recorded during the Ottomate deep-dive — the engine
   shipped hand-rolled; the adr-004 vectorbt plan was never adopted.
+
+## Session 2026-08-10 — Iteration 147: post-1-Aug-rebalance catch-up
+
+**Stage:** Stage 4 iteration (3 items: gated walk-forward, next-open paper entries, refresh tooling)
+**Duration:** ~3.5 hrs
+**What changed:**
+- adr-041 MA100 regime gate walk-forwarded (adr-040 protocol, 16 runs) — **fails its own adoption
+  bar** (overfit signature: IS up / OOS down on all 4 deployables; DVM_user outright FAILs).
+  Recorded as adr-042 (rejected). Books stay ungated for the 1 Sep rebalance.
+- Paper rebalance entries now fill at the next session's open (`pending` status, filled by the
+  daily mark) instead of the rebalance evening's close — matches the backtest's no-look-ahead
+  fill assumption (adr-038's deferred switch). New `paper_positions.planned_capital` column +
+  migration. 9 new tests, full suite 208 green.
+- `backend/scripts/ingest_refresh.py` + `docs/ops/trendlyne-refresh-runbook.md`: the Trendlyne
+  refresh merge-ingest (lost with a prior session's scratchpad) is now a repo script with a
+  history-shrink guard and a truncation floor, tested against DB copies. Owner run still pending
+  (todo #220 — WAF forces in-browser harvesting).
+- Paper page copy reconciled to describe next-open fills (doc-reconcile).
+
+**Decisions:** adr-042 (MA100 regime gate rejected — curated, cat:product)
+**Friction:** verifier-936 caught a real bug (lazy TEMP VIEW re-evaluated post-DELETE, silently
+blanking real market-caps on a no-mcap gapfill ingest) — fixed same session (commit 9066d89),
+re-verified. Tag: tooling-bug, caught-by-verifier (the anti-gaslight bedrock doing its job, not
+friction to route around).
+**Next session context:**
+- Owner still owes: run the Trendlyne refresh (todo #220, runbook staged) and acknowledge/ratify
+  the adr-042 gate-rejection decision.
+- adr-042 flags 2 remaining unmeasured risk levers if drawdown mitigation is revisited:
+  vol-targeting position sizing, or a crash-conditional/regime-stratified evaluation design —
+  each needs its own pre-declared bar + ADR before counting as an adoption gate.
+- Pre-existing anti-gaslight HARD violations (not from this session, unaddressed):
+  `cockpit-dashboard` and `strategy-editor` at status=done with no feature_claims row.
+- Pre-existing untracked `docs/orientation/` in the repo — not touched this session, unclear
+  provenance, worth asking the owner about next time it comes up.
