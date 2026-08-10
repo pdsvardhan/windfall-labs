@@ -396,3 +396,13 @@ decisions:
       - curated
       - cat:product
     body_path: docs/decisions/adr-041-windfall-regime-gate-candidate.md
+  - id: adr-042-windfall-regime-gate-rejected
+    project_slug: windfall-labs
+    title: The MA100 regime gate fails its own adoption gate - rejected for the live
+      books by walk-forward
+    status: accepted
+    date: 2026-08-10T00:00:00.000Z
+    tags:
+      - curated
+      - cat:product
+    body_path: docs/decisions/adr-042-windfall-regime-gate-rejected.md
