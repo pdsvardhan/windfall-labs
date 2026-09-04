@@ -86,6 +86,9 @@ def test_stale_pending_voids_after_cutoff(monkeypatch):
     assert _row(pid)["reason"] == "no-fill-data"
 
 
+# force=True past the cadence gate (iter-171): these tests exercise the SYNC logic, and the first
+# rebalance_paper() call in the module records a run for today, which would make every later call
+# a not-due no-op. The gate itself is covered in test_paper_cadence_equity.py.
 def _wire_rebalance(monkeypatch, signals):
     monkeypatch.setattr(rebalance, "ROSTER", [{"sid": SID, "kind": "saved", "capital": 100000.0}])
     monkeypatch.setattr(rebalance.store_meta, "get_strategy", lambda sid: {"id": sid, "config": {}})
@@ -98,7 +101,7 @@ def test_rebalance_queues_pending_not_immediate(monkeypatch):
         {"ticker": "BBB", "action": "buy", "weight": 0.5, "last_close": 200.0},
     ])
     monkeypatch.setattr(book, "_next_open", lambda t, after: (None, None))  # no bar yet
-    out = rebalance.rebalance_paper()
+    out = rebalance.rebalance_paper(force=True)
     r = out["strategies"][SID]
     assert out["entry_mode"] == "next-open"
     assert r["opened_pending"] == 2 and r["closed"] == 0
@@ -115,7 +118,7 @@ def test_rebalance_leaves_existing_open_positions_untouched(monkeypatch):
     _wire_rebalance(monkeypatch, [{"ticker": "AAA", "action": "hold", "weight": 0.5,
                                    "last_close": 120.0}])
     monkeypatch.setattr(book, "_next_open", lambda t, after: (None, None))
-    out = rebalance.rebalance_paper()
+    out = rebalance.rebalance_paper(force=True)
     r = out["strategies"][SID]
     assert r["opened_pending"] == 0 and r["closed"] == 0 and r["kept"] == 1
     after = _row(kept_pid)
@@ -127,7 +130,7 @@ def test_rebalance_voids_dropped_pending(monkeypatch):
     pid = _pending(ticker="GONE")
     _wire_rebalance(monkeypatch, [])  # empty target: the pending name dropped out pre-fill
     monkeypatch.setattr(book, "_next_open", lambda t, after: (None, None))
-    out = rebalance.rebalance_paper()
+    out = rebalance.rebalance_paper(force=True)
     assert out["strategies"][SID]["dropped_pending"] == 1
     p = _row(pid)
     assert p["status"] == "void" and p["reason"] == "rebalance-dropped"

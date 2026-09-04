@@ -47,21 +47,30 @@ def _notional_steps(sid: str, since: str) -> list[tuple[str, float]]:
         from ..store_meta import _init
         con = _init()
         try:
+            # ran_at is a DATE, so two runs on one day cannot be ordered by it — order by the
+            # created_at TIMESTAMP and keep only the LAST run of each day. Without that, a day
+            # holding both a Rs5L run and a Rs1L correction (exactly what an aborted notional
+            # step-up leaves behind) sorts arbitrarily and injects a phantom step.
             rows = con.execute(
                 "SELECT ran_at, notional FROM paper_rebalance_runs WHERE strategy_id=? "
-                "AND notional IS NOT NULL ORDER BY ran_at", [sid]).fetchall()
+                "AND notional IS NOT NULL ORDER BY ran_at, created_at", [sid]).fetchall()
         finally:
             con.close()
     except Exception:  # noqa: BLE001 — a missing run log must not kill the curves
         rows = []
+    last_of_day: dict[str, float] = {}
     for ran_at, notional in rows:
         d = _iso(ran_at)
-        if d is None or float(notional) == steps[-1][1]:
-            continue
+        if d is not None:
+            last_of_day[d] = float(notional)      # later row on the same date wins
+    for d in sorted(last_of_day):
+        notional = last_of_day[d]
+        if notional == steps[-1][1]:
+            continue                              # no change — not a step
         if d <= steps[0][0]:
-            steps[0] = (steps[0][0], float(notional))
+            steps[0] = (steps[0][0], notional)
         else:
-            steps.append((d, float(notional)))
+            steps.append((d, notional))
     return steps
 
 
@@ -197,15 +206,19 @@ def book_equity(benchmark: str = "NIFTY500") -> dict:
         for i, d in enumerate(dates):
             if d < s0:
                 continue
-            # New capital arriving: issue units at the prevailing NAV per unit so the contribution
-            # itself moves the return by nothing (iter-171, item 1236).
+            # Capital moving in or out: issue units on a contribution and redeem them on a
+            # withdrawal, both at the prevailing NAV per unit, so the cash flow itself moves the
+            # return by nothing (iter-171, item 1236). The redemption half is not optional — with
+            # an issue-only guard a notional that goes up and back down leaves the units inflated
+            # against an unchanged NAV, which read every book at roughly -79% while all eight were
+            # profitable. Same expression serves both directions; only the sign differs.
             while step_i < len(steps) and steps[step_i][0] <= d:
                 new_base = steps[step_i][1]
-                contribution = new_base - base
-                if contribution > 0 and units > 0:
+                flow = new_base - base
+                if flow != 0 and units > 0:
                     nav_before = _state(d, i, base)[0]
                     if nav_before > 0:
-                        units += contribution / (nav_before / units)
+                        units += flow / (nav_before / units)
                 base = new_base
                 step_i += 1
 

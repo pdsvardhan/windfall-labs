@@ -28,8 +28,8 @@ const LABELS: Record<string, { name: string; note: string }> = {
 
 interface Agg {
   sid: string; positions: PaperPosition[]; open: number; closed: number;
-  invested: number; value: number; pnl: number; pnlPct: number; wins: number; marked: number;
-  start: string; days: number;
+  invested: number; openCost: number; value: number; pnl: number; pnlPct: number;
+  wins: number; marked: number; start: string; days: number;
 }
 
 function daysBetween(a: string, b: string): number {
@@ -37,24 +37,28 @@ function daysBetween(a: string, b: string): number {
 }
 
 function aggregate(sid: string, ps: PaperPosition[], today: string): Agg {
-  let invested = 0, value = 0, wins = 0, open = 0, closed = 0, marked = 0;
+  let invested = 0, openCost = 0, value = 0, wins = 0, open = 0, closed = 0, marked = 0;
   let start = ps[0]?.entry_date ?? today;
   for (const p of ps) {
     const cost = p.entry * p.shares;
     const mark = (p.last_price ?? p.entry) * p.shares;
     invested += cost; value += mark;
+    // `invested` is every rupee ever deployed, so on a book that has recycled capital it exceeds
+    // the notional and reads as nonsense next to a cash figure (₹1,54,885 on a ₹1L book).
+    // openCost is what is actually at work right now (iter-171).
+    if (p.status === "open") openCost += cost;
     if (p.status === "open") open++; else closed++;
     if (p.last_price != null) marked++;
     if ((p.return_pct ?? 0) > 0) wins++;
     if (p.entry_date < start) start = p.entry_date;
   }
   const pnl = value - invested;
-  return { sid, positions: ps, open, closed, invested, value, pnl,
+  return { sid, positions: ps, open, closed, invested, openCost, value, pnl,
     pnlPct: invested ? pnl / invested : 0, wins, marked, start, days: daysBetween(start, today) };
 }
 
-function BookCard({ a, i, netPnl, equity, sim, isOpen, onToggle }: {
-  a: Agg; i: number; netPnl: number | null;
+function BookCard({ a, i, netPnl, score, equity, sim, isOpen, onToggle }: {
+  a: Agg; i: number; netPnl: number | null; score?: ScoreRow;
   equity?: PaperEquityBook;
   sim?: { points: [string, number][]; ret?: number | null; error?: string };
   isOpen: boolean; onToggle: () => void;
@@ -107,11 +111,11 @@ function BookCard({ a, i, netPnl, equity, sim, isOpen, onToggle }: {
           <div className="text-[11px] text-faint">open</div>
         </div>
         <div className="text-right w-[84px] hidden md:block">
-          <div className="text-[13px] font-bold tn">{money(a.invested)}</div>
+          <div className="text-[13px] font-bold tn">{money(a.openCost)}</div>
           <div className="text-[11px] text-faint">
             {cashPct != null
               ? `${Math.round(cashPct * 100)}% idle cash`
-              : `${Math.round(Math.max(0, 1 - a.invested / NOTIONAL) * 100)}% cash`}
+              : `${Math.round(Math.max(0, 1 - a.openCost / NOTIONAL) * 100)}% cash`}
           </div>
         </div>
         <span className="text-faint text-[15px] transition-transform" style={{ transform: isOpen ? "rotate(90deg)" : "none" }}>›</span>
@@ -124,6 +128,28 @@ function BookCard({ a, i, netPnl, equity, sim, isOpen, onToggle }: {
               <Pill tone="warn">UNPRICED</Pill>{" "}
               no live price for <b>{unpriced.join(", ")}</b> on some days — held at entry cost there,
               so this book&apos;s path understates movement it actually had.
+            </div>
+          )}
+          {score && (
+            <div className="px-5 pt-4 flex flex-wrap gap-x-6 gap-y-1 text-[12px]">
+              <span className="text-faint">
+                Win rate{" "}
+                <b className="tn">{score.book_win_rate != null ? pctSigned(score.book_win_rate).replace("+", "") : "—"}</b>{" "}
+                whole book
+              </span>
+              <span className="text-faint">
+                <b className="tn">{score.closed_win_rate != null ? pctSigned(score.closed_win_rate).replace("+", "") : "—"}</b>{" "}
+                on closed trades only
+              </span>
+              <span className="text-faint">
+                {score.closed} closed · {score.open} open
+              </span>
+            </div>
+          )}
+          {score && score.closed > 0 && (score.closed_win_rate ?? 1) < 0.5 && (score.book_win_rate ?? 0) >= 0.5 && (
+            <div className="mx-5 mt-2 px-3 py-2 rounded-[10px] text-[12px] text-faint" style={{ background: "#f4f3f8" }}>
+              A rotation book closes its losers and holds its winners, so the closed-trade rate reads
+              low by design — the whole-book figure is the one that describes what you own.
             </div>
           )}
           {chartStrategy.length > 1 && (
@@ -215,6 +241,7 @@ export default function PaperPage() {
   const originals = aggs.filter((a) => a.start < SURVIVOR_CUTOFF);
   const survivors = aggs.filter((a) => a.start >= SURVIVOR_CUTOFF);
   const netBy = useMemo(() => Object.fromEntries(scoreRows.map((r) => [r.strategy_id, r.net_pnl ?? null])), [scoreRows]);
+  const scoreBy = useMemo(() => Object.fromEntries(scoreRows.map((r) => [r.strategy_id, r])), [scoreRows]);
 
   const lastMark = useMemo(() => {
     const ds = positions.map((p) => p.last_date).filter(Boolean) as string[];
@@ -237,7 +264,7 @@ export default function PaperPage() {
         <div className="flex flex-col gap-2.5">
           {list.map((a, i) => (
             <BookCard
-              key={a.sid} a={a} i={offset + i} netPnl={netBy[a.sid] ?? null}
+              key={a.sid} a={a} i={offset + i} netPnl={netBy[a.sid] ?? null} score={scoreBy[a.sid]}
               equity={equity?.books[a.sid]} sim={sim?.books[a.sid]}
               isOpen={open === a.sid} onToggle={() => setOpen(open === a.sid ? null : a.sid)}
             />

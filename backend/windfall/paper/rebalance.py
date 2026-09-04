@@ -180,13 +180,24 @@ def _target_book(entry: dict) -> tuple[dict, dict]:
              if s.get("action") in ("buy", "hold")}, health)
 
 
-def _invested(sid: str) -> float:
-    """Capital currently tied up: open positions at cost, plus pending entries at their allocation."""
-    held = sum((p["entry"] or 0) * (p["shares"] or 0)
-               for p in list_positions(sid, status="open"))
-    queued = sum(p.get("planned_capital") or 0.0
-                 for p in list_positions(sid, status="pending"))
-    return held + queued
+def available_cash(sid: str, notional: float) -> float:
+    """What the book can actually spend right now.
+
+    True cash, not notional-minus-open-cost: every entry ever made leaves the account and every
+    exit returns its proceeds, so realized P&L belongs in the balance. Sizing off open cost alone
+    ignores realized LOSSES and overstates capacity by exactly the amount lost — measured at up to
+    Rs6,279 on MOM_roc252_m_10 — which is how a book overdrew in the first place (item 1235).
+    Pending entries are money already committed to a fill, so they are held back too.
+    """
+    cash = notional
+    for p in list_positions(sid):
+        if p["status"] in ("open", "closed") and p["entry"] and p["shares"]:
+            cash -= p["entry"] * p["shares"]
+        if p["status"] == "closed" and p["exit"] and p["shares"]:
+            cash += p["exit"] * p["shares"]
+        if p["status"] == "pending":
+            cash -= p.get("planned_capital") or 0.0
+    return cash
 
 
 def rebalance_paper(today: dt.date | None = None, force: bool = False) -> dict:
@@ -220,7 +231,7 @@ def rebalance_paper(today: dt.date | None = None, force: bool = False) -> dict:
         # than the book held — CMP_valmom_m_20's reconstructed cash floor hit -Rs861.51, so the book
         # briefly traded on capital it did not have and its return was computed on an inflated base.
         notional = float(entry["capital"])
-        available = notional - _invested(sid)
+        available = available_cash(sid, notional)
         underfunded = 0
         for tk, sig in target.items():
             if tk in held or tk in pending:
@@ -248,6 +259,16 @@ def rebalance_paper(today: dt.date | None = None, force: bool = False) -> dict:
                         "cash_left": round(available, 2),
                         "underfunded_skips": underfunded,
                         "signal_health": health_by_book.get(sid)}
+
+    # When nothing was due, no signal run happened — say so rather than reporting an all-clear
+    # nobody checked. A reassuring "signals current" asserted on zero evidence is the same failure
+    # mode item 1233 exists to remove.
+    if not health_by_book:
+        return {"rebalanced_at": str(today), "entry_mode": "next-open", "strategies": results,
+                "data_health": {"stale": None, "stale_books": [], "worst_data_age_days": None,
+                                "signal_as_of": [],
+                                "message": "not evaluated - no book was due, so no signals ran"},
+                "mark": mark_to_market()}
 
     stale_books = sorted(sid for sid, h in health_by_book.items() if h.get("is_stale"))
     ages = [h["data_age_days"] for h in health_by_book.values()
