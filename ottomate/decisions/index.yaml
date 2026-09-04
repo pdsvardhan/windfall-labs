@@ -406,3 +406,23 @@ decisions:
       - curated
       - cat:product
     body_path: docs/decisions/adr-042-windfall-regime-gate-rejected.md
+  - id: adr-043-windfall-mainboard-series-pricing
+    project_slug: windfall-labs
+    title: "Price a holding wherever it actually trades: NSE mainboard series, not
+      EQ alone"
+    status: accepted
+    date: 2026-09-04T00:00:00.000Z
+    tags:
+      - curated
+      - cat:reliability
+    body_path: docs/decisions/adr-043-windfall-mainboard-series-pricing.md
+  - id: adr-044-windfall-batch-splice-holes
+    project_slug: windfall-labs
+    title: The price panel splices live data from one batch-wide last bar, leaving
+      per-symbol holes
+    status: proposed
+    date: 2026-09-04T00:00:00.000Z
+    tags:
+      - curated
+      - cat:reliability
+    body_path: docs/decisions/adr-044-windfall-batch-splice-holes.md
