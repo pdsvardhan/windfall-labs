@@ -24,7 +24,7 @@ from windfall.engine.backtest import run_backtest, resolve_with_warmup
 from windfall.engine.rotation import run_rotation
 from windfall.paper import (
     book_equity, commit_signal, delete_positions, list_positions, mark_to_market, rebalance_paper,
-    resize_book, scoreboard,
+    resize_book, scoreboard, void_pending_entries,
 )
 from windfall.scripts_validation import run_validation
 from windfall.signals_live import generate_blend_signals, generate_signals
@@ -656,6 +656,17 @@ def paper_rebalance(force: bool = False):
 class ResizeIn(BaseModel):
     strategy_id: str
     notional: float | None = None
+
+
+@app.post("/api/paper/void-pending")
+def paper_void_pending(body: ResizeIn):
+    """Void every not-yet-filled entry for a book (iter-171).
+
+    A pending row carries no price and no P&L until the next session's open fills it, so cancelling
+    one before that costs nothing. The operational undo for a rebalance queued under the wrong
+    parameters. Open positions are untouched.
+    """
+    return clean(void_pending_entries(body.strategy_id))
 
 
 @app.post("/api/paper/resize")

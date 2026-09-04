@@ -27,17 +27,27 @@ from ..store_meta import _init, new_id
 from .book import (close_position, commit_pending_signal, list_positions, mark_to_market,
                    void_pending)
 
-# Notional per paper book. Raised from Rs1L to Rs5L on 2026-09-04 (iter-171, item 1236) to match the
-# real account size the strategies are designed for: at Rs1L a 20-40 name book allocates Rs2.5-5K per
-# name, which is less than one share of many NSE stocks, so fill_pending's granularity rule voided
-# those entries and left 11-26% of every book in idle cash — measured min-cash was Rs25,758 of Rs1L
-# on BLEND_70_30. The backtests assume invest_fully, so that drag was a live-vs-backtest gap.
+# Notional per paper book.
 #
-# The new notional applies to NEW entries from the next rebalance. Existing positions keep the size
-# they were bought at, so a book runs mixed weights until turnover migrates it — deliberately, since
-# re-sizing the whole book means one full round-trip of modelled costs. Trigger that re-baseline
-# explicitly with resize_book() when you want it; nothing does it automatically.
-BOOK_NOTIONAL = 500000.0
+# The owner's decision (iter-171, item 1236) is to run these books at Rs5L, matching the real account
+# size the strategies are designed for: at Rs1L a 20-40 name book allocates Rs2.5-5K per name, less
+# than one share of many NSE stocks, so fill_pending's granularity rule voided those entries and left
+# 11-26% of every book in idle cash (measured min-cash: Rs25,758 of Rs1L on BLEND_70_30) while the
+# backtests assume invest_fully.
+#
+# It is still Rs1L here, on purpose, because the step has an ORDER (measured 2026-09-04): raising the
+# notional alone does not resize existing holdings, so a book keeps its Rs1L of positions and simply
+# carries Rs4L of idle cash — DVM_user came out 80% in cash, which is a worse distortion than the
+# drag being fixed. The notional is only meaningful together with resize_book(), and resizing means
+# re-entering the whole book at whatever the current signals say. Those signals are frozen at
+# 2026-07-22 until the Trendlyne refresh lands (item 1238), so re-entering now would lock all eight
+# books into a six-week-old ranking.
+#
+# Sequence: refresh Trendlyne -> confirm a signal run returns a current as_of -> set this to 500000
+# -> POST /api/paper/resize per book -> next rebalance re-enters fully invested at the new size.
+# Everything except the flip is built and tested; PAPER_TARGET_NOTIONAL records the intent.
+BOOK_NOTIONAL = 100000.0
+PAPER_TARGET_NOTIONAL = 500000.0
 
 # The tracked paper slate (started 2026-07-06). BLEND_70_30 is a synthetic id (no single strategy
 # row) — a fixed 70/30 sleeve blend.
@@ -128,22 +138,46 @@ def is_due(entry: dict, today: dt.date) -> tuple[bool, str]:
     return _period_key(today, cadence) != _period_key(last, cadence), cadence
 
 
-def _target_book(entry: dict) -> dict:
-    """Current target holdings {ticker: signal} — the buy+hold names of today's signal run."""
+# A signal run that trips one of these is not a fresh book — it is the last book the data could
+# still produce, re-derived (iter-171, item 1233). The engine has always said so in `warnings`; the
+# cron logged 400 characters of the response and nothing read them, so the 1-Aug and 1-Sep runs both
+# rebalanced on a 22-July book with no alert for six weeks. Now the run reports its own health and
+# the cron alerts on it.
+STALE_WARNING_MARKERS = (
+    "no eligible universe",
+    "stale point-in-time",
+    "refresh data before trading",
+)
+DATA_AGE_ALERT_DAYS = 35   # same threshold the fundamentals snapshot calls stale
+
+
+def _target_book(entry: dict) -> tuple[dict, dict]:
+    """(target holdings, signal-run health) — the buy+hold names of today's signal run."""
     if entry["kind"] == "saved":
         strat = store_meta.get_strategy(entry["sid"])
         if not strat:
-            return {}
+            return {}, {"error": f"no saved strategy {entry['sid']}"}
         out = generate_signals(strat["config"])
     else:
         sleeves = []
         for s in entry["sleeves"]:
             st = store_meta.get_strategy(s)
             if not st:
-                return {}
+                return {}, {"error": f"no saved sleeve {s}"}
             sleeves.append(st["config"])
         out = generate_blend_signals(sleeves, entry["weights"], name=entry["sid"])
-    return {s["ticker"]: s for s in out.get("signals", []) if s.get("action") in ("buy", "hold")}
+    warnings = out.get("warnings") or []
+    age = out.get("data_age_days")
+    stale = [w for w in warnings
+             if any(m in str(w).lower() for m in STALE_WARNING_MARKERS)]
+    health = {
+        "as_of": out.get("as_of"),
+        "data_age_days": age,
+        "stale_warnings": stale,
+        "is_stale": bool(stale) or (age is not None and age > DATA_AGE_ALERT_DAYS),
+    }
+    return ({s["ticker"]: s for s in out.get("signals", [])
+             if s.get("action") in ("buy", "hold")}, health)
 
 
 def _invested(sid: str) -> float:
@@ -159,6 +193,7 @@ def rebalance_paper(today: dt.date | None = None, force: bool = False) -> dict:
     """Sync every DUE tracked strategy's open positions to its current target book."""
     today = today or dt.date.today()
     results = {}
+    health_by_book = {}
     for entry in ROSTER:
         sid = entry["sid"]
         due, cadence = is_due(entry, today)
@@ -166,7 +201,8 @@ def rebalance_paper(today: dt.date | None = None, force: bool = False) -> dict:
             results[sid] = {"skipped": "not-due", "cadence": cadence}
             continue
 
-        target = _target_book(entry)
+        target, health = _target_book(entry)
+        health_by_book[sid] = health
         held = {p["ticker"]: p for p in list_positions(sid, status="open")}
         pending = {p["ticker"]: p for p in list_positions(sid, status="pending")}
         closed = opened = dropped_pending = 0
@@ -210,9 +246,42 @@ def rebalance_paper(today: dt.date | None = None, force: bool = False) -> dict:
                         "dropped_pending": dropped_pending, "kept": len(held) - closed,
                         "cadence": cadence, "notional": notional,
                         "cash_left": round(available, 2),
-                        "underfunded_skips": underfunded}
+                        "underfunded_skips": underfunded,
+                        "signal_health": health_by_book.get(sid)}
+
+    stale_books = sorted(sid for sid, h in health_by_book.items() if h.get("is_stale"))
+    ages = [h["data_age_days"] for h in health_by_book.values()
+            if h.get("data_age_days") is not None]
+    as_ofs = sorted({str(h["as_of"]) for h in health_by_book.values() if h.get("as_of")})
+    data_health = {
+        "stale": bool(stale_books),
+        "stale_books": stale_books,
+        "worst_data_age_days": max(ages) if ages else None,
+        "signal_as_of": as_ofs,
+        "message": (
+            f"signals are STALE for {len(stale_books)} of {len(health_by_book)} book(s) "
+            f"(as_of {', '.join(as_ofs) or 'unknown'}, data age "
+            f"{max(ages) if ages else '?'}d) — this rebalance re-derived an old book rather "
+            f"than a current one; refresh the Trendlyne pull"
+            if stale_books else "signals current"),
+    }
     return {"rebalanced_at": str(today), "entry_mode": "next-open",
-            "strategies": results, "mark": mark_to_market()}
+            "strategies": results, "data_health": data_health,
+            "mark": mark_to_market()}
+
+
+def void_pending_entries(sid: str) -> dict:
+    """Void every not-yet-filled entry for a book, leaving open positions untouched.
+
+    An operational undo for a rebalance queued under the wrong parameters — a pending row carries no
+    price and no P&L until the next open fills it, so voiding one before that costs nothing. Added
+    iter-171 after a rebalance run under a Rs5L notional queued 34 entries at the wrong slice size.
+    """
+    voided = 0
+    for p in list_positions(sid, status="pending"):
+        if void_pending(p["id"], reason="voided-by-operator"):
+            voided += 1
+    return {"strategy_id": sid, "voided_pending": voided}
 
 
 def resize_book(sid: str, notional: float | None = None) -> dict:

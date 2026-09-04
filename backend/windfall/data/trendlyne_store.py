@@ -297,6 +297,35 @@ def universe_over_window(start, end, floor_cr: float = MCAP_FLOOR_CR) -> list[st
     return sorted(r[0] for r in rows if r[0] in _nse_symbols())  # NSE-only gate (adr-024)
 
 
+def raw_close_panel(symbols, start=None, end=None, field: str = "close") -> pd.DataFrame:
+    """RAW (unadjusted) Bhavcopy closes, wide date x symbol, for NSE mainboard series.
+
+    A last-resort price source for a name the adjusted panel does not carry at all — e.g. a paper
+    holding that never made it into the Trendlyne store. Raw prices are only safe over a short
+    window: any split or bonus inside it shows up as a step. Callers spanning years must use
+    adjusted_close_panel instead (iter-171, item 1229).
+    """
+    syms = [s.upper() for s in symbols]
+    if not syms:
+        return pd.DataFrame()
+    fcol = {"close": "close", "open": "open", "high": "high", "low": "low"}.get(field, "close")
+    cond = (f"WHERE series IN {_MAINBOARD_SQL_IN} AND {fcol}>0 "
+            "AND upper(regexp_replace(ticker,'\\.NS$','')) IN ("
+            + ",".join(["?"] * len(syms)) + ")")
+    params = syms[:]
+    if start:
+        cond += " AND date >= ?"; params.append(start)
+    if end:
+        cond += " AND date <= ?"; params.append(end)
+    df = _con().execute(
+        f"SELECT upper(regexp_replace(ticker,'\\.NS$','')) symbol, date, {fcol} v "
+        f"FROM bc.bhavcopy_prices {cond}", params).fetchdf()
+    if df.empty:
+        return pd.DataFrame()
+    df["date"] = pd.to_datetime(df["date"])
+    return df.pivot_table(index="date", columns="symbol", values="v").sort_index()
+
+
 def traded_value_panel(symbols, start=None, end=None) -> pd.DataFrame:
     """Daily rupee turnover (raw NSE Bhavcopy `turnover`) for ADTV / liquidity sizing — wide
     date x symbol. Resolves ticker renames via ISIN (adr-025) so a company's pre-rename turnover

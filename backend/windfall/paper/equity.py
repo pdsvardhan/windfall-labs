@@ -73,6 +73,42 @@ def _iso(x) -> str | None:
     return str(x)[:10]
 
 
+def _with_bhavcopy_fallback(panel, tickers: list[str], start: str):
+    """Fill the holes the adjusted panel leaves for held names, from raw Bhavcopy closes.
+
+    Two holes exist. A name the panel does not carry at all gets no column. And a name whose
+    Trendlyne history ends earlier than the REST of the batch's gets leading NaNs, because
+    adjusted_close_panel splices live Bhavcopy from one batch-wide `last_tl` — the max Trendlyne
+    date across every requested symbol — rather than from each symbol's own last bar. SCPL, held in
+    DVM_dm_m_20 from 06-Jul, had no value until 09-Jul in a 98-name batch though it prices fine when
+    requested alone.
+
+    Either way the position was valued at its ENTRY price for those days: a flat line that jumped to
+    the truth only on the exit date (SCPL closed +14.9% with every day in between reported as 0%).
+    Valuing a holding at what you paid for it is not a mark.
+
+    Only NaN cells are filled, so adjusted prices always win where they exist. Raw, unadjusted
+    prices are acceptable over a paper book's weeks-long window — a corporate action inside it would
+    show as a step — but NOT over a backtest's years. The batch-wide `last_tl` itself is left alone
+    on purpose: fixing it inside adjusted_close_panel would re-baseline every backtest that has run,
+    so it needs an owner decision and an ADR (raised as a finding in iter-171).
+    """
+    try:
+        extra = ts.raw_close_panel(list(tickers), start=start)
+    except Exception:  # noqa: BLE001 — a fallback problem must never kill the curves
+        return panel
+    if extra is None or extra.empty:
+        return panel
+    idx = panel.index if len(panel.index) else extra.index
+    extra = extra.reindex(idx).ffill()
+    for col in extra.columns:
+        if col not in panel.columns:
+            panel[col] = extra[col]
+        else:
+            panel[col] = panel[col].combine_first(extra[col])
+    return panel
+
+
 def _max_drawdown(navs: list[float]) -> float:
     if not navs:
         return 0.0
@@ -99,6 +135,7 @@ def book_equity(benchmark: str = "NIFTY500") -> dict:
     start = min(_iso(p["entry_date"]) for p in positions)
     tickers = sorted({p["ticker"] for p in positions})
     panel = ts.adjusted_close_panel(tickers, start=start, end=None, extend_live=True).ffill()
+    panel = _with_bhavcopy_fallback(panel, tickers, start)
     dates = [d.date().isoformat() for d in panel.index]
 
     try:

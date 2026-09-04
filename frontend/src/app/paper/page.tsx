@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
-import type { PaperEquity, PaperPosition, PaperSim, ScoreRow } from "@/lib/types";
+import type { PaperEquity, PaperEquityBook, PaperPosition, PaperSim, ScoreRow } from "@/lib/types";
 import { dateShort, money, num, pctSigned, signClass } from "@/lib/format";
 import { Card, Pill, StatCard } from "@/components/ui";
 import { EquityChart } from "@/components/charts";
@@ -55,12 +55,23 @@ function aggregate(sid: string, ps: PaperPosition[], today: string): Agg {
 
 function BookCard({ a, i, netPnl, equity, sim, isOpen, onToggle }: {
   a: Agg; i: number; netPnl: number | null;
-  equity?: { start: string; points: [string, number][]; benchmark: [string, number][] };
+  equity?: PaperEquityBook;
   sim?: { points: [string, number][]; ret?: number | null; error?: string };
   isOpen: boolean; onToggle: () => void;
 }) {
   const lab = LABELS[a.sid] ?? { name: a.sid, note: a.sid === "dvm-monthly" ? "older test book" : "" };
   const benchRet = equity?.benchmark?.length ? equity.benchmark[equity.benchmark.length - 1][1] : null;
+  // Headline return comes from the API's NAV curve, not from pnl/invested. Dividing by every rupee
+  // ever deployed counts recycled capital twice and diluted every rebalancing book — DVM_user read
+  // 7.67% where the account had made 11.88% (iter-171, item 1229). The local aggregate stays as the
+  // fallback for a book the equity endpoint has no curve for.
+  const st = equity?.stats;
+  const grossRet = st ? st.gross_return : a.pnlPct;
+  const netRet = st?.net_return ?? null;
+  // min_cash_pct is the LOWEST the cash balance ever got: capital that was never deployed even at
+  // the book's most-invested moment, i.e. the permanent drag (iter-171, item 1236).
+  const cashPct = st ? st.min_cash_pct : null;
+  const unpriced = st?.unpriced_holdings ?? [];
   const chartStrategy = useMemo(
     () => (equity?.points ?? []).map(([d, r]) => [d, (1 + r) * NOTIONAL] as [string, number]),
     [equity]);
@@ -80,11 +91,11 @@ function BookCard({ a, i, netPnl, equity, sim, isOpen, onToggle }: {
           </div>
         </div>
         <div className="text-right w-[92px]">
-          <div className={`font-extrabold text-[16px] tn ${signClass(a.pnl)}`}>{pctSigned(a.pnlPct)}</div>
+          <div className={`font-extrabold text-[16px] tn ${signClass(grossRet)}`}>{pctSigned(grossRet)}</div>
           <div className="text-[11px] text-faint tn">{money(a.pnl)} gross</div>
         </div>
         <div className="text-right w-[92px] hidden sm:block">
-          <div className={`text-[13px] font-bold tn ${signClass(netPnl)}`}>{netPnl != null ? money(netPnl) : "—"}</div>
+          <div className={`text-[13px] font-bold tn ${signClass(netRet ?? netPnl)}`}>{netRet != null ? pctSigned(netRet) : (netPnl != null ? money(netPnl) : "—")}</div>
           <div className="text-[11px] text-faint">net of costs</div>
         </div>
         <div className="text-right w-[80px] hidden sm:block">
@@ -97,13 +108,24 @@ function BookCard({ a, i, netPnl, equity, sim, isOpen, onToggle }: {
         </div>
         <div className="text-right w-[84px] hidden md:block">
           <div className="text-[13px] font-bold tn">{money(a.invested)}</div>
-          <div className="text-[11px] text-faint">{Math.round(Math.max(0, 1 - a.invested / NOTIONAL) * 100)}% cash</div>
+          <div className="text-[11px] text-faint">
+            {cashPct != null
+              ? `${Math.round(cashPct * 100)}% idle cash`
+              : `${Math.round(Math.max(0, 1 - a.invested / NOTIONAL) * 100)}% cash`}
+          </div>
         </div>
         <span className="text-faint text-[15px] transition-transform" style={{ transform: isOpen ? "rotate(90deg)" : "none" }}>›</span>
       </button>
 
       {isOpen && (
         <div className="border-t" style={{ borderColor: "#f0eef6" }}>
+          {unpriced.length > 0 && (
+            <div className="mx-5 mt-4 px-3 py-2 rounded-[10px] text-[12px]" style={{ background: "#fdeeee" }}>
+              <Pill tone="warn">UNPRICED</Pill>{" "}
+              no live price for <b>{unpriced.join(", ")}</b> on some days — held at entry cost there,
+              so this book&apos;s path understates movement it actually had.
+            </div>
+          )}
           {chartStrategy.length > 1 && (
             <div className="px-5 pt-4">
               <div className="text-[11px] text-faint font-bold mb-1">
