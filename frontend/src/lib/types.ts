@@ -116,18 +116,47 @@ export interface ScoreRow {
   closed: number;
   total_pnl: number;
   net_pnl?: number | null;
+  /** @deprecated alias of closed_win_rate — kept so old callers keep their meaning */
   win_rate: number;
+  /** Win rate over CLOSED trades only. A rotation book cuts losers and rides winners, so this
+   *  reads as failure on a profitable book — pair it with book_win_rate (iter-171, item 1237). */
+  closed_win_rate?: number;
+  /** Win rate over the whole book: closed trades plus open positions at their mark. */
+  book_win_rate?: number;
   avg_return_pct: number;
+  avg_book_return_pct?: number;
   avg_r_multiple: number | null;
+  unpriced_open?: number;
+}
+
+export interface PaperBookStats {
+  gross_return: number;
+  net_return: number;
+  benchmark_return: number | null;
+  max_drawdown: number;
+  min_cash: number;
+  /** Lowest the cash balance ever got, as a fraction of notional — capital never deployed. */
+  min_cash_pct: number;
+  cash_went_negative: boolean;
+  /** Holdings with no live price on some day; valued at entry cost there. */
+  unpriced_holdings: string[];
+}
+
+export interface PaperEquityBook {
+  start: string;
+  /** [date, NAV return since book start] — gross of costs. NAV, not cost-basis (iter-171). */
+  points: [string, number][];
+  /** Same dates, net of modelled NSE delivery costs. */
+  points_net?: [string, number][];
+  benchmark: [string, number][]; // same dates, benchmark return since book start
+  notional?: number;
+  notional_steps?: [string, number][];
+  stats?: PaperBookStats;
 }
 
 export interface PaperEquity {
   benchmark: string;
-  books: Record<string, {
-    start: string;
-    points: [string, number][]; // [date, return since book start] — gross of costs
-    benchmark: [string, number][]; // same dates, benchmark return since book start
-  }>;
+  books: Record<string, PaperEquityBook>;
 }
 
 export interface PaperSim {

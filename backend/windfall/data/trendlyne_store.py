@@ -29,6 +29,20 @@ BHAVCOPY_DB = Path(os.environ.get("WINDFALL_BHAVCOPY_DB", DATA_DIR / "bhavcopy.d
 
 MCAP_FLOOR_CR = 500.0   # investable-universe floor: NSE-listed + market cap > Rs500 Cr (adr-015)
 
+# NSE mainboard equity series for PRICING a name we already hold or track (iter-171, item 1228).
+# EQ is rolling settlement; BE and BZ are trade-for-trade / surveillance segments — same shares, same
+# exchange, still deliverable, just no intraday netting. A holding that moves EQ -> BE (which is
+# exactly what happens when a name draws surveillance attention) must keep getting a real mark:
+# filtering the live splice to EQ alone silently froze 10 open paper positions on dead prices for up
+# to 8 weeks, e.g. STALLION marked 254.00 from 10-Aug while it actually closed 206.68 on 04-Sep.
+# SME series (SM/ST) are deliberately excluded — a different platform, not the mainboard.
+# NOTE this constant governs PRICING only. The investable-universe gate (_nse_symbols), the dead-name
+# history splice and the ADTV/turnover panel still read EQ-only; widening those changes which names
+# a strategy may select and re-baselines ten years of backtests, so they need an owner decision and
+# an ADR rather than a silent edit (raised as a finding in iter-171).
+MAINBOARD_SERIES = ("EQ", "BE", "BZ")
+_MAINBOARD_SQL_IN = "(" + ",".join(f"'{s}'" for s in MAINBOARD_SERIES) + ")"
+
 
 def available() -> bool:
     return TRENDLYNE_DB.exists()
@@ -169,7 +183,8 @@ def adjusted_close_panel(symbols, start=None, end=None, field: str = "close",
             if last_tl is not None and syms_live:
                 ext = con.execute(
                     f"SELECT upper(regexp_replace(ticker,'\\.NS$','')) symbol, date, {fcol} v "
-                    f"FROM bc.bhavcopy_prices WHERE series='EQ' AND {fcol}>0 AND date > ? "
+                    f"FROM bc.bhavcopy_prices WHERE series IN {_MAINBOARD_SQL_IN} AND {fcol}>0 "
+                    f"AND date > ? "
                     f"AND upper(regexp_replace(ticker,'\\.NS$','')) IN ({','.join(['?'] * len(syms_live))})",
                     [last_tl] + syms_live).fetchdf()
                 if not ext.empty:
@@ -280,6 +295,35 @@ def universe_over_window(start, end, floor_cr: float = MCAP_FLOOR_CR) -> list[st
         GROUP BY symbol HAVING max(mcap_cr) > ?""",
         [str(start), str(end), floor_cr, floor_cr]).fetchall()
     return sorted(r[0] for r in rows if r[0] in _nse_symbols())  # NSE-only gate (adr-024)
+
+
+def raw_close_panel(symbols, start=None, end=None, field: str = "close") -> pd.DataFrame:
+    """RAW (unadjusted) Bhavcopy closes, wide date x symbol, for NSE mainboard series.
+
+    A last-resort price source for a name the adjusted panel does not carry at all — e.g. a paper
+    holding that never made it into the Trendlyne store. Raw prices are only safe over a short
+    window: any split or bonus inside it shows up as a step. Callers spanning years must use
+    adjusted_close_panel instead (iter-171, item 1229).
+    """
+    syms = [s.upper() for s in symbols]
+    if not syms:
+        return pd.DataFrame()
+    fcol = {"close": "close", "open": "open", "high": "high", "low": "low"}.get(field, "close")
+    cond = (f"WHERE series IN {_MAINBOARD_SQL_IN} AND {fcol}>0 "
+            "AND upper(regexp_replace(ticker,'\\.NS$','')) IN ("
+            + ",".join(["?"] * len(syms)) + ")")
+    params = syms[:]
+    if start:
+        cond += " AND date >= ?"; params.append(start)
+    if end:
+        cond += " AND date <= ?"; params.append(end)
+    df = _con().execute(
+        f"SELECT upper(regexp_replace(ticker,'\\.NS$','')) symbol, date, {fcol} v "
+        f"FROM bc.bhavcopy_prices {cond}", params).fetchdf()
+    if df.empty:
+        return pd.DataFrame()
+    df["date"] = pd.to_datetime(df["date"])
+    return df.pivot_table(index="date", columns="symbol", values="v").sort_index()
 
 
 def traded_value_panel(symbols, start=None, end=None) -> pd.DataFrame:

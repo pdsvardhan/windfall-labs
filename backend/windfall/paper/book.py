@@ -184,9 +184,17 @@ def mark_to_market() -> dict:
             "SELECT id,ticker,entry,stop,target,shares FROM paper_positions WHERE status='open'"
         ).fetchall()
         updated, closed = 0, 0
+        unpriced: list[str] = []
         for pid, ticker, entry, stop, target, shares in rows:
             last_date, last_price = _latest_close(ticker)
             if last_price is None:
+                # No price anywhere for an OPEN holding. Skipping silently is how the BE-series
+                # freeze hid for 8 weeks (iter-171, item 1232): the only trace was open_marked
+                # falling short of the open count in a cron log nobody reads. Count it, name it,
+                # and log it so the mark result itself reports what it could not price.
+                unpriced.append(ticker)
+                _log.warning("paper mark: no price for open position %s (%s) — left unmarked",
+                             ticker, pid)
                 continue
             updated += 1
             reason, status, exit_price, exit_date = None, "open", None, None
@@ -205,7 +213,8 @@ def mark_to_market() -> dict:
                  reason, pid])
             if status == "closed":
                 closed += 1
-        return {"open_marked": updated, "newly_closed": closed, **fills}
+        return {"open_marked": updated, "newly_closed": closed,
+                "unpriced": len(unpriced), "unpriced_tickers": sorted(unpriced), **fills}
     finally:
         con.close()
 
@@ -303,14 +312,31 @@ def scoreboard() -> list[dict]:
         # So paper P&L is reported net-of-costs, not just gross (audit #184).
         net_pnl = sum(_net_pnl(p) for p in priced)
         wins = [r for r in rets if r > 0]
+        # A rotation book cuts losers at rebalance and lets winners ride, so the CLOSED half is
+        # mostly losses by design: measured 2026-09-04, closed trades averaged -0.8% to -9.2% while
+        # open ones averaged +4% to +12.5% and every book was profitable. Reporting only the closed
+        # win rate therefore reads as failure on a working book (iter-171, item 1237). Report both,
+        # named for what they are; `win_rate` is kept as a deprecated alias of the closed figure so
+        # existing callers keep their meaning rather than silently changing it.
+        book_rets = [r for r in rets]
+        for p in open_:
+            if p["entry"] and p["last_price"]:
+                book_rets.append(p["last_price"] / p["entry"] - 1.0)
+        book_wins = [r for r in book_rets if r > 0]
+        closed_win_rate = round(len(wins) / len(rets), 3) if rets else 0.0
         board.append({
             "strategy_id": sid, "open": len(open_), "closed": len(closed),
             "pending": len(pending),
             "total_pnl": round(pnl, 2), "net_pnl": round(net_pnl, 2),
-            "win_rate": round(len(wins) / len(rets), 3) if rets else 0.0,
+            "closed_win_rate": closed_win_rate,
+            "book_win_rate": (round(len(book_wins) / len(book_rets), 3) if book_rets else 0.0),
+            "win_rate": closed_win_rate,   # deprecated alias — use closed_win_rate
             "avg_return_pct": round(sum(rets) / len(rets), 4) if rets else 0.0,
+            "avg_book_return_pct": (round(sum(book_rets) / len(book_rets), 4)
+                                    if book_rets else 0.0),
             "avg_r_multiple": round(sum(rmults) / len(rmults), 3) if rmults else None,
             "unrealized_open": len(open_),
+            "unpriced_open": sum(1 for p in open_ if p.get("stale_mark")),
         })
     return board
 

@@ -24,7 +24,7 @@ from windfall.engine.backtest import run_backtest, resolve_with_warmup
 from windfall.engine.rotation import run_rotation
 from windfall.paper import (
     book_equity, commit_signal, delete_positions, list_positions, mark_to_market, rebalance_paper,
-    scoreboard,
+    resize_book, scoreboard, void_pending_entries,
 )
 from windfall.scripts_validation import run_validation
 from windfall.signals_live import generate_blend_signals, generate_signals
@@ -616,9 +616,20 @@ def paper_scoreboard():
 
 
 @app.get("/api/paper/equity")
-def paper_equity():
-    """Per-book daily equity vs benchmark, rebuilt from positions + the adjusted-close panel."""
-    return clean(book_equity())
+def paper_equity(strategy_id: str | None = None):
+    """Per-book daily NAV equity vs benchmark, rebuilt from positions + the adjusted-close panel.
+
+    `strategy_id` narrows the response to one book. It used to be accepted and silently ignored
+    (iter-171, item 1234): a caller filtering for its book got all eight back and read the result
+    as empty. An unknown id is now a 404 rather than the whole slate.
+    """
+    out = book_equity()
+    if strategy_id:
+        book = out["books"].get(strategy_id)
+        if book is None:
+            raise HTTPException(404, f"no paper book for strategy_id {strategy_id!r}")
+        out = {**out, "books": {strategy_id: book}}
+    return clean(out)
 
 
 @app.get("/api/paper/sim")
@@ -632,9 +643,44 @@ def paper_sim():
 
 
 @app.post("/api/paper/rebalance")
-def paper_rebalance():
-    """Monthly rebalance: sync every tracked paper strategy to its current target book."""
-    return clean(rebalance_paper())
+def paper_rebalance(force: bool = False):
+    """Rebalance every tracked paper book that is DUE on its own cadence (iter-171, item 1231).
+
+    Safe to call daily — a book already rebalanced inside its current period is skipped, and one
+    whose run was missed (holiday, failed cron) is caught up. `force=true` overrides the cadence
+    check for a manual run.
+    """
+    return clean(rebalance_paper(force=force))
+
+
+class ResizeIn(BaseModel):
+    strategy_id: str
+    notional: float | None = None
+
+
+@app.post("/api/paper/void-pending")
+def paper_void_pending(body: ResizeIn):
+    """Void every not-yet-filled entry for a book (iter-171).
+
+    A pending row carries no price and no P&L until the next session's open fills it, so cancelling
+    one before that costs nothing. The operational undo for a rebalance queued under the wrong
+    parameters. Open positions are untouched.
+    """
+    return clean(void_pending_entries(body.strategy_id))
+
+
+@app.post("/api/paper/resize")
+def paper_resize(body: ResizeIn):
+    """Re-baseline one book to the current notional: close every open position so the next
+    rebalance re-enters the target at the new slice size (iter-171, item 1236).
+
+    Deliberately manual — it costs a full round-trip of modelled costs and re-bases a live track
+    record, so raising BOOK_NOTIONAL alone never triggers it.
+    """
+    try:
+        return clean(resize_book(body.strategy_id, body.notional))
+    except ValueError as exc:
+        raise HTTPException(404, str(exc))
 
 
 class PurgeIn(BaseModel):
