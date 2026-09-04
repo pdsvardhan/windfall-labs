@@ -125,3 +125,94 @@ friction to route around).
   `cockpit-dashboard` and `strategy-editor` at status=done with no feature_claims row.
 - Pre-existing untracked `docs/orientation/` in the repo — not touched this session, unclear
   provenance, worth asking the owner about next time it comes up.
+
+---
+
+## iter-171 — 2026-09-04 — paper-book honesty audit
+
+**Trigger:** owner returned after ~3 weeks away and asked what the paper books had actually done,
+which strategies were working, and whether the pipeline was functioning. The first answer given was
+a leaderboard of eight books. The owner's follow-up — *"is anything true?"* — was correct to ask: two
+independent defects meant most of those numbers were wrong.
+
+**Duration:** ~2.5 hrs
+**Iteration:** ottomate 171 · 12 items locked (10 built, 2 observations) · verifier round 1 BLOCK,
+round 2 APPROVE
+
+**What was wrong (measured, not inferred):**
+- **BE-series marks froze.** Every price path filtered `series='EQ'`, so a holding moving to the
+  trade-for-trade segment vanished from the live splice; `mark_to_market` skipped it silently and the
+  curve forward-filled its last EQ close. 10 open positions affected, up to 8 weeks. STALLION was
+  marked 254.00 from 10-Aug against a real 206.68; BLISSGVS was booked at −3.2% while actually +26.6%.
+- **The equity curve was not a portfolio return.** It divided by every rupee ever deployed, so
+  recycled capital was counted twice and any rebalancing book was diluted toward zero. DVM_user read
+  7.67% where the account had made 11.88% gross / 11.27% net.
+- **Three of eight books had never rebalanced.** `ROSTER` held five; MOM_roc252_m_10, DVM_all_w_10 and
+  DVM_all_m_10 were seeded 29-Jun and buy-and-hold ever since, while still being marked daily and
+  published as live. They are the three the 2026-07-17 protocol rated *survivor* — the only three
+  that passed it. The weekly and monthly DVM_all_10 variants reporting identical returns was the tell.
+- **Signals have been frozen at 2026-07-22 for six weeks.** Point-in-time membership runs dry after
+  that date, so the engine falls back to the last bar with a tradeable book and says so in
+  `warnings`. The cron logged 400 truncated characters of the response and nothing read them, so the
+  1-Aug and 1-Sep rebalances both re-derived a stale book with no alert.
+
+**Corrected numbers (net of costs, NAV basis, ₹1L book, 29-Jun/6-Jul → 4-Sep):**
+DVM_user +11.27% · CMP_valmom_m_20 +3.94% · DVM_all_w/m_10 +3.53% · MOM_roc252_m_10 +4.09% ·
+MOM_roc252_m_20 +3.50% · DVM_dm_m_20 +1.77% · BLEND_70_30 +1.65% — against a Nifty 500 that ran
+−0.77% to +1.12% over the same windows. Every book beats its benchmark; the ranking changed
+materially (BLEND fell from 4th to last, MOM_roc252_m_10 rose from last to near the top).
+
+**What changed:**
+- Pricing reads NSE mainboard series (EQ/BE/BZ). Universe gate, ADTV panel and dead-name splice stay
+  EQ-only on purpose — widening those re-baselines every published backtest (adr-043).
+- NAV equity curve replaces the cost-basis ratio, unitized across notional changes, with a
+  net-of-costs series alongside gross and per-book stats for drawdown, cash floor and unpriceable
+  holdings.
+- `mark_to_market` counts and names what it cannot price. `scoreboard` splits `closed_win_rate` from
+  `book_win_rate` — the closed-only figure read 17–33% on books that were all profitable, because a
+  rotation book cuts losers and rides winners by design.
+- Rebalance is cadence-aware per book (cron moved to daily, the API decides who is due), funds new
+  entries from true cash so a book cannot overdraw, and records every run in `paper_rebalance_runs`.
+- The three survivors joined the roster, keeping their 29-Jun baskets.
+- Signal-run health is returned and the cron alerts on staleness instead of logging a truncated prefix.
+- `/api/paper/equity` honours `strategy_id`; `/api/paper/resize` and `/api/paper/void-pending` added.
+- Paper page reads the API's NAV numbers instead of recomputing them, surfaces both win rates, real
+  idle cash, overdraws and drawdown, and its cohort copy now matches what is on the page.
+
+**Decisions:** adr-043 (mainboard-series pricing — curated, cat:reliability) · adr-044 (batch-splice
+holes — **status: open**, curated, cat:reliability)
+
+**Friction / honesty note:** the verifier's round-1 BLOCK was correct and caught a defect this
+session introduced *after* its own verification pass: an aborted ₹5L notional step-up left both
+notionals in the run log, and the unitization issued units on an increase but never redeemed them on
+a decrease — every book read ≈ −79%. The lesson is narrow and worth keeping: **a state change after
+the verification invalidates the verification.** Round 2 also caught the regression test for that bug
+being decorative (it re-implemented the arithmetic instead of calling the code, and passed with the
+bug restored); it now drives `book_equity` and was mutation-checked failing at −0.79924.
+
+**Observations logged, not built:**
+- **#1238 — the Trendlyne refresh is the blocking owner action.** Fundamentals stale since 2026-06-18
+  (78 days), membership dry after 2026-07-22. Needs a browser session; Trendlyne's WAF blocks
+  server-side pulls. Tracked as to-do #220, runbook at `docs/ops/trendlyne-refresh-runbook.md`. Until
+  it lands, every rebalance re-derives a July book.
+- **#1239 — leaderboards and robustness verdicts are stale.** Generated 2026-07-17 with every window
+  ending 2026-06-16. Regenerate after the refresh. Already being confirmed live: DVM_dm_m_20 was
+  flagged *"recent 2.5y is weak"* and is the worst real book at +1.77%.
+
+**Next session context:**
+- Owner still owes the Trendlyne refresh (#220). It gates the ₹5L notional flip, the leaderboard
+  regeneration, and any real read on which strategy to deploy.
+- The ₹5L decision is recorded but NOT applied. `BOOK_NOTIONAL` stays ₹1L because raising it without
+  a resize leaves a book holding ₹1L of positions against a ₹5L base — DVM_user came out 80% in cash,
+  a worse distortion than the 11–26% drag being fixed. Sequence: refresh → confirm a current `as_of`
+  → set `BOOK_NOTIONAL = PAPER_TARGET_NOTIONAL` → `POST /api/paper/resize` per book.
+- adr-044 is open: the per-symbol splice fix is three lines and probably correct, but it changes
+  backtest inputs, so it wants its own measurement plus a re-run of the leaderboards and the parity
+  ledger. Worth landing together with adr-043's dead-name question as one deliberate re-baseline.
+- Residue from the aborted step-up, deliberately left as an audit trail: two 2026-09-04 rows per book
+  in `paper_rebalance_runs` (handled by the same-day collapse) and 34 `voided-by-operator` rows in
+  `paper_positions`.
+- Still unaddressed from iter-147: `cockpit-dashboard` and `strategy-editor` sit at status=done with
+  no feature_claims row (pre-existing anti-gaslight HARD violations).
+- `docs/orientation/` (CODE-MAP.md, CONCEPTS.md, dated 22 Jul) is still untracked and of unclear
+  provenance — asked about but not resolved.
