@@ -20,7 +20,7 @@ cron). A mid-month run is never wasted — live signals degrade daily past ~8 da
 
 ## Phase 1 — browser (logged-in trendlyne.com tab, F12 → Console, paste, Enter)
 
-Scripts live in `Desktop/Projects/Windfall Labs/` on the Windows machine. Click **Allow** when
+Scripts live in `Desktop/Projects/Windfall Labs/harvesters/` on the Windows machine (one-offs already applied are in `harvesters/_done/`; see that folder README for cadence). Click **Allow** when
 the browser asks about multiple downloads. Run all three — **a refresh takes three scripts, not
 one** (iter-22: DVM-only ingest would have deleted 806k rows / 138 megacaps — the base screener
 silently excludes the top ~100 index names).
