@@ -29,6 +29,20 @@ BHAVCOPY_DB = Path(os.environ.get("WINDFALL_BHAVCOPY_DB", DATA_DIR / "bhavcopy.d
 
 MCAP_FLOOR_CR = 500.0   # investable-universe floor: NSE-listed + market cap > Rs500 Cr (adr-015)
 
+# NSE mainboard equity series for PRICING a name we already hold or track (iter-171, item 1228).
+# EQ is rolling settlement; BE and BZ are trade-for-trade / surveillance segments — same shares, same
+# exchange, still deliverable, just no intraday netting. A holding that moves EQ -> BE (which is
+# exactly what happens when a name draws surveillance attention) must keep getting a real mark:
+# filtering the live splice to EQ alone silently froze 10 open paper positions on dead prices for up
+# to 8 weeks, e.g. STALLION marked 254.00 from 10-Aug while it actually closed 206.68 on 04-Sep.
+# SME series (SM/ST) are deliberately excluded — a different platform, not the mainboard.
+# NOTE this constant governs PRICING only. The investable-universe gate (_nse_symbols), the dead-name
+# history splice and the ADTV/turnover panel still read EQ-only; widening those changes which names
+# a strategy may select and re-baselines ten years of backtests, so they need an owner decision and
+# an ADR rather than a silent edit (raised as a finding in iter-171).
+MAINBOARD_SERIES = ("EQ", "BE", "BZ")
+_MAINBOARD_SQL_IN = "(" + ",".join(f"'{s}'" for s in MAINBOARD_SERIES) + ")"
+
 
 def available() -> bool:
     return TRENDLYNE_DB.exists()
@@ -169,7 +183,8 @@ def adjusted_close_panel(symbols, start=None, end=None, field: str = "close",
             if last_tl is not None and syms_live:
                 ext = con.execute(
                     f"SELECT upper(regexp_replace(ticker,'\\.NS$','')) symbol, date, {fcol} v "
-                    f"FROM bc.bhavcopy_prices WHERE series='EQ' AND {fcol}>0 AND date > ? "
+                    f"FROM bc.bhavcopy_prices WHERE series IN {_MAINBOARD_SQL_IN} AND {fcol}>0 "
+                    f"AND date > ? "
                     f"AND upper(regexp_replace(ticker,'\\.NS$','')) IN ({','.join(['?'] * len(syms_live))})",
                     [last_tl] + syms_live).fetchdf()
                 if not ext.empty:

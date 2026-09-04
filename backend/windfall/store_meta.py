@@ -28,6 +28,16 @@ CREATE TABLE IF NOT EXISTS paper_positions (
     return_pct DOUBLE, r_multiple DOUBLE, reason VARCHAR, created_at TIMESTAMP,
     planned_capital DOUBLE
 );
+-- One row per book per rebalance run (iter-171, item 1231). Two jobs: it makes the rebalance
+-- cadence-aware (a book is due when the current period differs from its last run's period, so a
+-- missed or failed run is caught up rather than skipped, and a re-run inside the same period is a
+-- no-op), and it records the notional in force for that run so the equity curve can unitize
+-- across a notional change instead of showing a step as if it were performance.
+CREATE TABLE IF NOT EXISTS paper_rebalance_runs (
+    id VARCHAR PRIMARY KEY, strategy_id VARCHAR, ran_at DATE, cadence VARCHAR,
+    notional DOUBLE, target_n INTEGER, closed INTEGER, opened INTEGER,
+    created_at TIMESTAMP
+);
 """
 
 
