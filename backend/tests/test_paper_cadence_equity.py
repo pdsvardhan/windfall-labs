@@ -137,31 +137,65 @@ def test_notional_steps_collapses_two_runs_on_one_day():
                    (dt.date(2026, 9, 4), 100000.0)]) == [("2026-06-29", 100000.0)]
 
 
-def test_unitization_is_flat_across_a_contribution_and_a_withdrawal():
-    """Units issued on money in and redeemed on money out, both at the prevailing NAV per unit.
+DATES = ["2026-06-29", "2026-06-30", "2026-07-01", "2026-07-02", "2026-07-03"]
 
-    Mirrors the loop in book_equity, including how NAV actually responds to a cash flow: NAV is
-    (holdings at market) + (base - invested), so contributed cash raises NAV by exactly itself —
-    it does not scale the existing gain. A book holding 110,000 of stock bought for 100,000 is up
-    10%; adding 400,000 of cash must leave it up 10%, and taking that 400,000 straight back out
-    must too. The issue-only guard skipped the withdrawal, leaving units inflated against an
-    unchanged NAV and reporting the book at roughly -79%.
+
+def _run_book_equity(monkeypatch, steps):
+    """Drive the REAL book_equity() over one deterministic book, with a chosen notional history.
+
+    One position: 100 shares bought at 100 (Rs10,000 of a Rs1L book) on day 0, still open, with the
+    price walking 100 -> 104. Everything book_equity touches is pinned, so the only thing under test
+    is its own loop.
     """
-    invested, holdings_value = 100000.0, 110000.0
-    base = units = 100000.0
+    import pandas as pd
 
-    def nav(b):
-        return holdings_value + (b - invested)
+    positions = [{
+        "id": "p1", "strategy_id": SID, "ticker": "AAA", "status": "open",
+        "entry_date": DATES[0], "entry": 100.0, "shares": 100.0,
+        "exit": None, "exit_date": None, "last_price": 104.0, "last_date": DATES[-1],
+    }]
+    panel = pd.DataFrame(
+        {"AAA": [100.0, 101.0, 102.0, 103.0, 104.0]},
+        index=pd.to_datetime(DATES))
 
-    assert nav(base) / units - 1 == pytest.approx(0.10)
+    monkeypatch.setattr(equity, "list_positions", lambda *a, **k: positions)
+    monkeypatch.setattr(equity.ts, "adjusted_close_panel", lambda *a, **k: panel)
+    monkeypatch.setattr(equity, "_with_bhavcopy_fallback", lambda p, t, s: p)
+    monkeypatch.setattr(equity.ts, "benchmark_series",
+                        lambda *a, **k: (_ for _ in ()).throw(RuntimeError("no benchmark")))
+    monkeypatch.setattr(equity, "_notional_steps", lambda sid, since: steps)
+    out = equity.book_equity()
+    return dict(out["books"][SID]["points"])
 
-    for new_base in (500000.0, 100000.0):
-        flow = new_base - base
-        units += flow / (nav(base) / units)
-        base = new_base
-        assert nav(base) / units - 1 == pytest.approx(0.10), "a cash flow moved the return"
 
-    assert units == pytest.approx(100000.0), "units must return to their pre-flow count"
+def test_a_contribution_does_not_move_the_return(monkeypatch):
+    """Money arriving is not a gain. The point ON the step date must be what it would have been."""
+    flat = _run_book_equity(monkeypatch, [(DATES[0], 100000.0)])
+    up = _run_book_equity(monkeypatch, [(DATES[0], 100000.0), (DATES[2], 500000.0)])
+    assert up[DATES[2]] == pytest.approx(flat[DATES[2]], abs=1e-9)
+    # ...and only afterwards does the idle cash dilute it, which is a real drag, not a jump.
+    assert up[DATES[4]] < flat[DATES[4]]
+
+
+def test_a_withdrawal_does_not_move_the_return(monkeypatch):
+    """The half the round-1 bug skipped. Removing money must not move the return either.
+
+    Compared against the SAME history with only the final flow removed — not against the unstepped
+    book, which has legitimately diverged by then. Under the one-sided `if flow > 0` guard the units
+    stay inflated here and this book reads about -79% instead of a couple of percent.
+    """
+    up_only = _run_book_equity(monkeypatch, [(DATES[0], 100000.0), (DATES[1], 500000.0)])
+    up_then_down = _run_book_equity(
+        monkeypatch, [(DATES[0], 100000.0), (DATES[1], 500000.0), (DATES[3], 100000.0)])
+    assert up_then_down[DATES[3]] == pytest.approx(up_only[DATES[3]], abs=1e-9)
+    assert up_then_down[DATES[3]] > -0.5, "units left inflated across the withdrawal"
+
+
+def test_book_with_no_notional_change_returns_the_plain_nav(monkeypatch):
+    """Sanity anchor: 100 shares 100 -> 104 on a Rs1L book is +Rs400, i.e. +0.4%."""
+    flat = _run_book_equity(monkeypatch, [(DATES[0], 100000.0)])
+    assert flat[DATES[0]] == pytest.approx(0.0)
+    assert flat[DATES[4]] == pytest.approx(400.0 / 100000.0)
 
 
 def test_max_drawdown_on_a_nav_series():

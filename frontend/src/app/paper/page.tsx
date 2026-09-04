@@ -7,12 +7,17 @@ import { dateShort, money, num, pctSigned, signClass } from "@/lib/format";
 import { Card, Pill, StatCard } from "@/components/ui";
 import { EquityChart } from "@/components/charts";
 
-// Notional capital per strategy — used to surface how much is actually deployed vs. sitting in cash
-// (the ₹1L books are only partly invested when weights × ₹1L round below one share).
-const NOTIONAL = 100000;
+// Fallback notional only. The API reports each book's own notional (equity.books[sid].notional),
+// which is what the page uses — the constant would silently misrender every chart and cash figure
+// the moment the books move off ₹1L, which is the planned next step (iter-171).
+const NOTIONAL_FALLBACK = 100000;
 
 // Books started before this date are the original 6-Jul cohort; at/after it, the survivor cohort.
-const SURVIVOR_CUTOFF = "2026-07-10";
+// The three 5y-study survivors were SEEDED 29 Jun but only joined the rebalancing roster on
+// 4 Sep (iter-171, item 1230) — until then they sat as frozen buy-and-hold baskets. They start
+// EARLIER than the original five, so a start-date cutoff can no longer separate the cohorts;
+// membership is explicit.
+const SURVIVOR_BOOKS = new Set(["MOM_roc252_m_10", "DVM_all_w_10", "DVM_all_m_10"]);
 
 // Friendly labels for the tracked strategies (strategy_id -> shown name + one-line what).
 const LABELS: Record<string, { name: string; note: string }> = {
@@ -76,12 +81,13 @@ function BookCard({ a, i, netPnl, score, equity, sim, isOpen, onToggle }: {
   // the book's most-invested moment, i.e. the permanent drag (iter-171, item 1236).
   const cashPct = st ? st.min_cash_pct : null;
   const unpriced = st?.unpriced_holdings ?? [];
+  const notional = equity?.notional ?? NOTIONAL_FALLBACK;
   const chartStrategy = useMemo(
-    () => (equity?.points ?? []).map(([d, r]) => [d, (1 + r) * NOTIONAL] as [string, number]),
-    [equity]);
+    () => (equity?.points ?? []).map(([d, r]) => [d, (1 + r) * notional] as [string, number]),
+    [equity, notional]);
   const chartBench = useMemo(
-    () => (equity?.benchmark ?? []).map(([d, r]) => [d, (1 + r) * NOTIONAL] as [string, number]),
-    [equity]);
+    () => (equity?.benchmark ?? []).map(([d, r]) => [d, (1 + r) * notional] as [string, number]),
+    [equity, notional]);
   const simRet = sim?.points?.length ? sim.points[sim.points.length - 1][1] : null;
 
   return (
@@ -113,9 +119,13 @@ function BookCard({ a, i, netPnl, score, equity, sim, isOpen, onToggle }: {
         <div className="text-right w-[84px] hidden md:block">
           <div className="text-[13px] font-bold tn">{money(a.openCost)}</div>
           <div className="text-[11px] text-faint">
-            {cashPct != null
-              ? `${Math.round(cashPct * 100)}% idle cash`
-              : `${Math.round(Math.max(0, 1 - a.openCost / NOTIONAL) * 100)}% cash`}
+            {cashPct == null
+              ? `${Math.round(Math.max(0, 1 - a.openCost / notional) * 100)}% cash`
+              : cashPct < 0
+                // A negative floor is not idle cash — the book briefly spent money it did not
+                // have. Labelling it "-1% idle cash" hides an overdraw (iter-171, item 1235).
+                ? `overdrew ${money(Math.abs(st?.min_cash ?? 0))}`
+                : `${Math.round(cashPct * 100)}% idle cash`}
           </div>
         </div>
         <span className="text-faint text-[15px] transition-transform" style={{ transform: isOpen ? "rotate(90deg)" : "none" }}>›</span>
@@ -144,6 +154,16 @@ function BookCard({ a, i, netPnl, score, equity, sim, isOpen, onToggle }: {
               <span className="text-faint">
                 {score.closed} closed · {score.open} open
               </span>
+              {st && (
+                <span className="text-faint">
+                  Max drawdown <b className="tn">{pctSigned(st.max_drawdown)}</b>
+                </span>
+              )}
+              {st?.cash_went_negative && (
+                <span className="text-faint">
+                  <Pill tone="warn">OVERDREW</Pill> cash floor {money(st.min_cash)}
+                </span>
+              )}
             </div>
           )}
           {score && score.closed > 0 && (score.closed_win_rate ?? 1) < 0.5 && (score.book_win_rate ?? 0) >= 0.5 && (
@@ -155,7 +175,7 @@ function BookCard({ a, i, netPnl, score, equity, sim, isOpen, onToggle }: {
           {chartStrategy.length > 1 && (
             <div className="px-5 pt-4">
               <div className="text-[11px] text-faint font-bold mb-1">
-                Book vs Nifty500 (₹{NOTIONAL / 1000}k rebased · gross)
+                Book vs Nifty500 (₹{Math.round(notional / 1000)}k rebased · gross)
               </div>
               <EquityChart strategy={chartStrategy} benchmark={chartBench} height={180} />
             </div>
@@ -238,8 +258,8 @@ export default function PaperPage() {
       .sort((a, b) => b.pnlPct - a.pnlPct);
   }, [positions, today]);
 
-  const originals = aggs.filter((a) => a.start < SURVIVOR_CUTOFF);
-  const survivors = aggs.filter((a) => a.start >= SURVIVOR_CUTOFF);
+  const originals = aggs.filter((a) => !SURVIVOR_BOOKS.has(a.sid));
+  const survivors = aggs.filter((a) => SURVIVOR_BOOKS.has(a.sid));
   const netBy = useMemo(() => Object.fromEntries(scoreRows.map((r) => [r.strategy_id, r.net_pnl ?? null])), [scoreRows]);
   const scoreBy = useMemo(() => Object.fromEntries(scoreRows.map((r) => [r.strategy_id, r])), [scoreRows]);
 
@@ -281,7 +301,8 @@ export default function PaperPage() {
           <h1 className="text-[34px] font-extrabold tracking-tight">Paper trades</h1>
           <p className="text-muted text-[14px] mt-1.5 max-w-[640px]">
             A zero-risk live dry-run on real NSE end-of-day prices — no money at stake. Two cohorts:
-            the original five (since 6 Jul) and the 5y-study survivors (since 17 Jul). Watch them
+            the original five (since 6 Jul) and the three 5y-study survivors (seeded 29 Jun, on the
+            rebalancing roster since 4 Sep — before that they were held, not traded). Watch them
             compete before funding one.
           </p>
         </div>
@@ -319,8 +340,8 @@ export default function PaperPage() {
         <Card className="px-5 py-10 text-center text-[13px] text-muted">No paper positions yet.</Card>
       ) : (
         <>
-          {renderGroup("Originals — live since 6 Jul", originals, 0)}
-          {renderGroup("Survivors — seeded 17 Jul at the 16 Jul close (5y-study winners)", survivors, originals.length)}
+          {renderGroup("Originals — rebalanced since 6 Jul", originals, 0)}
+          {renderGroup("Survivors — 5y-study winners, seeded 29 Jun, rebalanced since 4 Sep", survivors, originals.length)}
         </>
       )}
     </div>
