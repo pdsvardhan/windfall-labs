@@ -1,6 +1,6 @@
 # adr-044 — adjusted_close_panel splices live prices from one batch-wide last bar, leaving holes per symbol
 
-- **Status:** open
+- **Status:** proposed (open — the interim paper-side fix is in; the shared fix is not decided)
 - **Date:** 2026-09-04
 - **Tags:** curated, cat:reliability
 - **Iteration:** iter-171 (found while building item 1229)
