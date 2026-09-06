@@ -216,3 +216,79 @@ rebuild so membership staleness can't silently recur.
 1. Follow-ups #92/#93 (parity coverage holes) + audit #84–89 — all non-blocking backlog.
 2. If pure-DVM sub-₹500cr microcap exposure is ever wanted, that's a universe-policy change (adr-015), not an engine fix.
 3. Pre-existing anti-gaslight (still open, not this session): `unclaimed-done` on cockpit-dashboard + strategy-editor; `stale-verification` SOFT on engine features.
+
+## Session 2026-09-07 — ops: Trendlyne refresh (#220) + a silent data-loss bug it exposed
+
+**Stage:** Stage 4 adjacent — owner-run data refresh, no formal iteration opened (see Friction).
+**Duration:** ~4.5 hr
+**Commits:** `0b0ecce`
+
+### What happened
+
+The Trendlyne subscription was renewed (the 2026-09-05 attempt had failed on a lapsed one),
+so the refresh finally ran. It surfaced a data-loss bug that had been mistaken for a
+Trendlyne coverage limitation for months.
+
+**The refresh.** Three browser harvests + two gapfill rounds. Final state:
+`dvm_history` 10,066,281 rows / 2,076 stocks / max date **2026-09-04** (was 2026-07-16).
+1,906 of 2,076 stocks carry all three scores.
+
+**The bug.** `dvm_history` holds three independent series per stock (d/v/m), each fetched as
+its own rate-limited request, so partial returns are routine. `ingest_refresh.py` replaced a
+covered pk's rows *wholesale*, which deleted whichever series the harvest happened to miss.
+First apply of the night dropped **446 series across 445 stocks** (SRF, BERGEPAINT, NAUKRI,
+YESBANK, RAYMOND, HATSUN...), 769,773 rows. The shrink guard stayed silent: losing 1 of 3
+series is a ~35% row drop, under its 50% threshold. Restored from the pre-apply snapshot.
+
+**Why it looked like "gapfill is always needed".** Both harvesters discarded their own
+failures — the DVM one counted `errs++` and moved on; megacap's DVM loop had no error branch
+at all. Proven not to be a Trendlyne limitation: all 24 zero-row stocks were present in the
+screener, and 23 of 24 returned full history on a gentle CONC=1 retry.
+
+**Owner's hypothesis, tested and partly confirmed.** Of 269 series missing from the second
+pull, 172 were genuinely unscored (155 `d`, 17 `v`) — REITs, InvITs, hospitals, recent
+listings that Trendlyne does not score. 96 were fetch failures. So genuine absence is real
+but was the minority, not the explanation.
+
+### Changed
+
+- `backend/scripts/ingest_refresh.py` — replaces per `(pk, score)` for `dvm_history`
+  (ohlcv/stocks stay per pk). A partial harvest is now harmless by construction. Shrink guard
+  compares at delete granularity; its count was capped by a stray `LIMIT 10` and reported "10"
+  when the truth was 62. New summary line reports sub-series coverage.
+- `backend/tests/test_ingest_refresh_partial.py` — **new, there were none.** 4 tests, verified
+  failing against the unpatched script first.
+- `harvesters/` — **entered version control**; had never been committed, only the runbook
+  describing it. Recovery sweep added to the DVM and megacap harvesters; DVM CONC 6 -> 4;
+  new `trendlyne_preflight.js` (15-sec go/no-go); README rewritten.
+
+### Decisions
+
+- Harvesters live in the repo; repo is canonical, Desktop folder is the working copy.
+- No `--allow-shrink` was used at any point. Every apply went through the guard.
+
+### Friction
+
+- **ledger gap (recurring):** this was a real code change with tests, made outside a formal
+  Stage-4 iteration — same shape as the iter-21 gap recorded in to-do #207. The fix, its
+  tests and its evidence live in git and here, not in `iterations/`.
+- **api-change:** to-do titles are capped at 300 chars; three POSTs were rejected before
+  shortening. Worth knowing when filing detailed defects.
+- **data-mismatch:** commit `0b0ecce` cites to-do "#833" for the ingest fix; the API assigned
+  842. Cosmetic, not amended.
+- **unexplained:** to-do #841 appeared mid-session (server-time 21:48Z) and is not mine — a
+  near-duplicate of #396. No SSH logins; arrived over the API. Another session or an
+  automated sweep. Flagged, not closed.
+
+### Next session pick-up
+
+1. **Fundamentals `.xlsx` export is still outstanding** — 80 days stale (2026-06-18). This is
+   the remaining half of #220. Exact 24 columns in `harvesters/FUNDAMENTALS-EXPORT-COLUMNS.md`;
+   include `Forecaster Estimates 1Y forward PE` (#26 — the missing column behind valuation
+   DVM's 0.44 correlation ceiling).
+2. **No signal has run on the fresh data yet** — last `run_date` is 2026-07-16. Regenerate,
+   confirm `as_of`, then #819's Rs5L notional flip can proceed in sequence.
+3. **70 stocks still lack valuation history** despite a live screener value; retried at
+   CONC=1 and still empty, so likely a genuine history-endpoint gap for small/recent listings.
+   Worth one look, low priority.
+4. Consider whether the same per-key replace fix is needed anywhere else that replaces by pk.
