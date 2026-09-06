@@ -4,8 +4,18 @@
 MERGE, NEVER REPLACE (iter-22 rule, adr-030): a harvest only covers names in the screener
 universe TODAY. Replacing tables deletes the history of names that legitimately fell below
 the Rs500cr floor or delisted — silently reintroducing the survivorship bias the engine
-exists to avoid. Correct op: for every pk the harvest covers, drop its rows and reinsert
-(each harvest is full history per stock, so it supersedes); every other pk is untouched.
+exists to avoid. Correct op: for every KEY the harvest covers, drop those rows and reinsert
+(each harvest is full history per series, so it supersedes); every other key is untouched.
+
+The replace key is per-table, and it is NOT always the pk (changed 2026-09-07):
+    dvm_history -> (pk, score)     ohlcv -> (pk)     stocks -> (pk)
+dvm_history holds three independent series per stock (d/v/m), fetched as three separate
+requests. A rate-limited harvest routinely returns only some of them. Replacing per pk
+therefore DELETED the series the harvest happened to miss: on 2026-09-07 that silently
+dropped 446 series across 445 stocks (SRF, BERGEPAINT, NAUKRI, YESBANK...), and the
+shrink guard stayed quiet because losing 1 of 3 series is a ~35% row drop, under its 50%
+bar. Replacing per (pk, score) makes a partial harvest harmless by construction: an
+absent series is simply not touched. See tests/test_ingest_refresh_partial.py.
 
 NEVER ingests index_ohlcv — the automated NSE index feed (adr-038, scripts/index_ingest.py
 in the EOD cron) is fresher than Trendlyne's index OHLC; a harvest would move it backwards.
@@ -95,7 +105,11 @@ def main():
     else:
         con = duckdb.connect(str(DB), read_only=True)
 
-    plans = []  # (table, view, delete_pks, insert_sql)
+    # (table, view, insert_sql, key) — `key` is the granularity at which the apply loop
+    # REPLACES. dvm_history replaces per (pk, score), NOT per pk: a harvest that returns only
+    # 2 of a stock's 3 score series must leave the third alone, not delete it. See adr note
+    # + to-do #833; on 2026-09-07 a pk-level replace silently dropped 446 score series.
+    plans = []
 
     if dvm_f:
         _read_union(con, dvm_f, "h_dvm")
@@ -107,7 +121,8 @@ def main():
             QUALIFY row_number() OVER (PARTITION BY pk, score, "date" ORDER BY {PRIO} DESC) = 1
         """)
         plans.append(("dvm_history", "h_dvm_d",
-                      'INSERT INTO dvm_history SELECT pk, score, "date", "value" FROM h_dvm_d'))
+                      'INSERT INTO dvm_history SELECT pk, score, "date", "value" FROM h_dvm_d',
+                      ("pk", "score")))
     if ohlcv_f:
         _read_union(con, ohlcv_f, "h_ohlcv")
         con.execute(f"""
@@ -121,7 +136,8 @@ def main():
         """)
         plans.append(("ohlcv", "h_ohlcv_d",
                       'INSERT INTO ohlcv SELECT pk,"date","open","high","low","close","last",volume '
-                      "FROM h_ohlcv_d"))
+                      "FROM h_ohlcv_d",
+                      ("pk",)))
     if stocks_f:
         have = _read_union(con, stocks_f, "h_stocks")
         mcap_src = "CAST(h.mcap AS DOUBLE)" if "mcap" in have else "CAST(NULL AS DOUBLE)"
@@ -146,7 +162,8 @@ def main():
         """)
         plans.append(("stocks", "h_stocks_d",
                       'INSERT INTO stocks SELECT pk, nsecode, "name", mcap, d_now, v_now, m_now '
-                      "FROM h_stocks_d"))
+                      "FROM h_stocks_d",
+                      ("pk",)))
         n_stocks = con.execute("SELECT COUNT(DISTINCT pk) FROM h_stocks_d").fetchone()[0]
         if n_stocks < MIN_STOCKS and not args.allow_small:
             sys.exit(f"ABORT: harvest covers only {n_stocks} stocks (<{MIN_STOCKS}) — truncated "
@@ -156,7 +173,7 @@ def main():
 
     print(f"\n{'table':<14}{'harvest pks':>12}{'harvest rows':>14}{'db pks':>10}"
           f"{'preserved':>11}{'new':>6}   harvest date range")
-    for table, view, _ in plans:
+    for table, view, _, key in plans:
         hp, hr = con.execute(f"SELECT COUNT(DISTINCT pk), COUNT(*) FROM {view}").fetchone()
         dp = con.execute(f"SELECT COUNT(DISTINCT pk) FROM {table}").fetchone()[0]
         pres = con.execute(f"SELECT COUNT(DISTINCT pk) FROM {table} "
@@ -167,6 +184,17 @@ def main():
         if table != "stocks":
             rng = con.execute(f'SELECT MIN("date"), MAX("date") FROM {view}').fetchone()
         print(f"{table:<14}{hp:>12}{hr:>14}{dp:>10}{pres:>11}{new:>6}   {rng[0]} .. {rng[1]}")
+        # Sub-series coverage. A stock can be "covered" at pk level while the harvest
+        # carries only SOME of its series - the exact blind spot that cost 446 dvm series
+        # on 2026-09-07. Surfaced here so a partial harvest is visible BEFORE the apply.
+        if len(key) > 1:
+            kc = ", ".join(key)
+            miss = con.execute(f"SELECT COUNT(*) FROM ("
+                               f"SELECT DISTINCT {kc} FROM {table} EXCEPT "
+                               f"SELECT DISTINCT {kc} FROM {view})").fetchone()[0]
+            held = con.execute(f"SELECT COUNT(*) FROM (SELECT DISTINCT {kc} FROM {view})").fetchone()[0]
+            note = "kept as-is, NOT deleted" if miss else "full coverage"
+            print(f"{'':<14}series: harvest carries {held}, DB has {miss} it omits - {note}")
     print("\npreserved = pks in the DB the harvest does not cover (sub-floor / delisted names) —"
           "\ntheir history is kept untouched; a huge preserved count means a truncated harvest.\n")
 
@@ -174,20 +202,32 @@ def main():
     # with far fewer than it has is almost always a truncated/partial file, not a correction.
     # (Found by test: a 2-row fixture would have silently replaced BSE's ~6,600-row history.)
     shrinkers = []
-    for table, view, _ in plans:
+    for table, view, _, key in plans:
         if table == "stocks":
             continue
-        shrinkers += [(table, *r) for r in con.execute(f"""
-            SELECT h.pk, hr, dr FROM
-              (SELECT pk, COUNT(*) hr FROM {view} GROUP BY pk) h
-              JOIN (SELECT pk, COUNT(*) dr FROM {table} GROUP BY pk) d USING (pk)
-            WHERE hr < 0.5 * dr ORDER BY dr - hr DESC LIMIT 10
-        """).fetchall()]
+        # Compare at the SAME granularity the apply loop replaces at. For dvm_history that
+        # is (pk, score): a pk-level comparison cannot see a stock that kept 2 of 3 series
+        # (a ~35% drop, under the 50% bar) — which is exactly how 446 series were lost on
+        # 2026-09-07 with the guard reporting nothing.
+        cols = ", ".join(key)
+        rows = con.execute(f"""
+            SELECT {cols}, hr, dr FROM
+              (SELECT {cols}, COUNT(*) hr FROM {view} GROUP BY {cols}) h
+              JOIN (SELECT {cols}, COUNT(*) dr FROM {table} GROUP BY {cols}) d USING ({cols})
+            WHERE hr < 0.5 * dr ORDER BY dr - hr DESC
+        """).fetchall()
+        shrinkers += [(table, key, r) for r in rows]
     if shrinkers:
-        print(f"⚠ HISTORY-SHRINK: {len(shrinkers)} pk(s) would lose >50% of their stored rows "
+        # len(shrinkers) is now the REAL total — the old query carried LIMIT 10, so this line
+        # used to print "10" no matter how bad it was (to-do #832).
+        print(f"⚠ HISTORY-SHRINK: {len(shrinkers)} series would lose >50% of their stored rows "
               f"(harvest rows << DB rows):")
-        for table, pk, hr, dr in shrinkers[:5]:
-            print(f"    {table} pk={pk}: {dr} rows in DB, only {hr} in harvest")
+        for table, key, r in shrinkers[:10]:
+            ident = " ".join(f"{k}={v}" for k, v in zip(key, r[:len(key)]))
+            hr, dr = r[len(key)], r[len(key) + 1]
+            print(f"    {table} {ident}: {dr} rows in DB, only {hr} in harvest")
+        if len(shrinkers) > 10:
+            print(f"    ... and {len(shrinkers) - 10} more")
         if args.apply and not args.allow_shrink:
             sys.exit("ABORT: refusing to apply a history-shrinking ingest. If this is a real "
                      "upstream correction, re-run with --allow-shrink; otherwise the harvest "
@@ -198,10 +238,15 @@ def main():
         con.close()
         return
 
-    for table, view, insert_sql in plans:
+    for table, view, insert_sql, key in plans:
         before = con.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+        # Replace only what the harvest actually carries, at `key` granularity. With
+        # key=(pk, score) a harvest holding just momentum for a stock leaves that stock's
+        # durability and valuation series untouched instead of deleting them.
+        match = " AND ".join(f"v.{k} = {table}.{k}" for k in key)
         con.execute("BEGIN")
-        con.execute(f"DELETE FROM {table} WHERE pk IN (SELECT DISTINCT pk FROM {view})")
+        con.execute(f"DELETE FROM {table} WHERE EXISTS "
+                    f"(SELECT 1 FROM {view} v WHERE {match})")
         con.execute(insert_sql)
         con.execute("COMMIT")
         after, mx = before, None

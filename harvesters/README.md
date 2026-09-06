@@ -1,0 +1,120 @@
+# Trendlyne harvesters
+
+Every Trendlyne endpoint is WAF-protected — plain curl/Python gets 403 even with cookies. These
+are console scripts that run **inside a logged-in trendlyne.com tab** (F12 → Console → paste →
+Enter). Nothing server-side can replace them. Files land in `~/Downloads`; click **Allow** when
+Chrome asks about multiple downloads.
+
+Full procedure (staging, ingest, rebuild, verify) lives on the server at
+`docs/ops/trendlyne-refresh-runbook.md` in the windfall-labs repo.
+
+---
+
+## A normal refresh — run these three, in this order
+
+| Order | Script | Cadence | Time |
+|---|---|---|---|
+| 0 | `trendlyne_preflight.js` | every time | 15 sec |
+| 1 | `trendlyne_dvm_harvester.js` | **weekly** | ~20 min |
+| 2 | `trendlyne_harvester_megacap.js` | monthly | ~10 min |
+
+**0. Preflight.** Answers one question before you spend 30 minutes: does this session actually
+return DVM data? Prints `GREEN - go` or `RED - stop`. It exists because on 2026-09-05 the
+subscription had lapsed and the harvest came back with prices and fundamentals but empty
+`d/v/m` — 30 minutes for nothing.
+
+**1. DVM harvester.** The one that matters. D/V/M score history — what every DVM/factor strategy
+ranks on. The only thing that genuinely goes stale and cannot be automated.
+
+**2. Megacap.** The base screener silently drops the top ~100 index names (measured 2026-09-07:
+99 names, **94 of which the base list misses**). Without it a refresh deletes megacaps.
+
+**Why weekly is only ~20 minutes:** `pit_mcap` and `universe_membership` are built from
+**Bhavcopy**, not Trendlyne OHLCV (`rebuild_pit_mcap_ca.py:106`, `build_pit_mcap.py:40`). Bhavcopy
+is free and already automated. So script 1 alone keeps the factors current.
+
+### Situational — not part of a normal refresh
+
+| Script | When |
+|---|---|
+| `trendlyne_harvester_ohlcv.js` (~40 min) | Only when you want Trendlyne's **native price history extended**. NOT needed for freshness — Bhavcopy carries prices to today and `adjusted_close_panel` splices it on. Skipping it is normal; the ingest will report ~1,880 `ohlcv` names as "preserved", which is correct, not a truncation. |
+| `trendlyne_harvester_gapfill.js` (~2–5 min) | When the ingest dry-run names specific stocks as missing or shrinking. **Its `SYMBOLS` list is scratch — repointed per incident, never a stable list.** Check it targets the names you actually mean before running. |
+
+### Fundamentals snapshot
+
+Not a script — Trendlyne → **Data Downloader** → `.xlsx`. The exact 24 columns the ingest reads
+are in `FUNDAMENTALS-EXPORT-COLUMNS.md`. Roughly quarterly; a cron nags past 35 days.
+
+---
+
+## Gotchas that each cost a bug once
+
+- **Run 1 AND 2 together on a refresh.** A DVM-only ingest would have deleted 806k rows and 138
+  megacaps (iter-22).
+- **If the DVM harvester reports fewer than ~1,800 stocks, the screener list truncated** — re-run
+  it, do not ingest. A healthy run reads ~1,899 (2026-09-07: 1,901).
+- **Watch the progress line.** `parts` climbing = working, expect 4–5 files at ~48MB. `errs`
+  climbing with `parts` stuck at 0 = the DVM endpoint is refusing — stop, don't burn 20 minutes.
+  That is what a lapsed subscription looks like.
+- **A harvester reporting `NO PK` for a name** — say which one, don't assume it's absent. Names
+  the symbol search can't resolve (e.g. "BSE", pk 52884) must be addressed as `{sym, pk}`.
+- **The megacap `SYMBOLS` list is hardcoded and drifts.** Jul 2026 it was missing
+  CIPLA/ZYDUSLIFE/LUPIN/LODHA; Sep 2026 it was missing MARICO/SBICARD. When the ingest dry-run
+  shows a big live name under "preserved" or "shrinking", that's this.
+
+---
+
+## Fixed 2026-09-07 — the silent partial-harvest bug
+
+**Symptom:** gapfill felt like it was needed on *every* refresh.
+
+**It was never a Trendlyne coverage problem.** Both harvesters discarded their own failures:
+
+- `trendlyne_dvm_harvester.js` — `hist()` gave up after 3 retries at CONC=6, did `errs++`, and
+  dropped that `(pk, param)` with no record of which one.
+- `trendlyne_harvester_megacap.js` — worse: `if (d && d.length) { push }` with **no else**. A
+  failed param wasn't pushed, counted, or reported.
+
+Each stock is three separate fetches (`d`, `v`, `m`). Losing one or two left the stock **looking
+populated while carrying a third of its history**. Because `ingest_refresh.py` replaces a covered
+pk's rows wholesale, those partials would have *deleted* real history — its shrink guard caught
+it. Measured on the 2026-09-07 refresh: 24 stocks with zero rows, **62 more with 1-of-3 params**,
+including GODREJCP, VOLTAS, MOTHERSON, JSWENERGY, ATGL, MAZDOCK, BLUEDART.
+
+**Fix:** both scripts now track every failed `(pk, param)` and run a **recovery sweep** at CONC=1
+with patient backoff before writing anything. Whatever still fails is written to
+`tl_dvm_misses.csv` / `tl_dvm_misses_megacap.csv` and named in the panel — visible, not a number
+in `errs`. Proof it was only ever a retry problem: all 24 zero-row names were present in the
+screener the whole time, and 23 of 24 returned full history on a gentle retry.
+
+Tracked as to-do #831; the companion reporting bug in `ingest_refresh.py` (shrink guard says
+"10 pks" no matter how many there are — `LIMIT 10` counted as the total) is #832.
+
+**Consequence:** gapfill should now be rare — reach for it when the megacap list has drifted, not
+every month.
+
+---
+
+## `_done/` — one-offs whose output is already in the database
+
+Kept because they are the **only way to rebuild those tables**: `ingest_refresh.py` handles only
+`dvm_history`, `ohlcv` and `stocks`. The fundamentals CSVs these produce (`valuation_ratios`,
+`growth_quality`, `pnl_quarterly`, `ownership`, `shareholding_summary`, …) have no monthly ingest
+path — only the original bulk loader `load_trendlyne.py` reads them. Don't delete them.
+
+| Script | What it built |
+|---|---|
+| `trendlyne_harvester_leg1.js` | daily valuation ratios + quarterly P&L / growth / ownership |
+| `trendlyne_harvester_leg1_5.js` | corporate actions, result dates, shareholding |
+| `trendlyne_harvester_leg2.js` | full annual statements (11 yrs) |
+| `trendlyne_harvester_recover.js` | ~226 stocks with a blank NSE symbol in the screener |
+| `trendlyne_harvester_completeness.js` | SREEL, RKSWAMY (≥₹500cr but absent) |
+| `trendlyne_harvester_parity5.js` | 13 historically-liquid names below the ₹500cr floor |
+
+`_done/_superseded/` holds `trendlyne_harvester_megacap_fill.js` — a re-pull of 6 files Chrome's
+download throttle blocked in Jun 2026, obsolete since the megacap script started spacing its
+downloads.
+
+**Known gap (unwired, not by design):** because those fundamentals CSVs have no refresh path,
+**shares outstanding** — which `pit_mcap` derives as NP/EPS from `pnl_quarterly` — is updated only
+by a manual reload. Shares move slowly, so this degrades gently rather than breaking.
