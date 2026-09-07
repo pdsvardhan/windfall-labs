@@ -106,27 +106,39 @@ con.execute("""CREATE OR REPLACE TEMP VIEW bc_raw AS
   FROM bc.bhavcopy_prices b JOIN tl_sym m ON upper(regexp_replace(b.ticker,'\\.NS$',''))=m.sym
   WHERE b.series='EQ' AND b.close>0""")
 con.execute("DROP TABLE IF EXISTS pit_mcap")
-# POINT-IN-TIME share counts (iter-172, to-do #89). This used to multiply every historical close
-# by `shares_now` — TODAY's share count — for the name's whole history. `pit_shares` has held a real
-# (pk, from_date, shares_cr) time series all along; it just was not used here.
+# CURRENT share count, deliberately — see the identity in the module docstring. `y.close` is
+# Trendlyne's close BACK-ADJUSTED across the whole history, so the only share series consistent with
+# it is one expressed in current (post-all-splits) units. That is `shares_now`. Multiplying an
+# adjusted price by a point-in-time share count mixes two unit systems and double-counts every split.
 #
-# Measured 2026-09-07 over 3,786,147 cells since 2015: 86.4% have an as-of reading, and today's
-# count is off by more than 2x on 18.1% of them and by 25-100% on another 19.3%. A company that
-# issued shares to survive looks, in history, as large as it became — so it sat in the Rs500cr
-# universe during years when it was tiny. Net effect on eligibility: 2.92% of universe decisions
-# flip, running about 6:1 toward WRONGLY INCLUDED (65,513 cells) over wrongly excluded (9,848).
+# REVERTED 2026-09-08 (to-do #862/#860). iter-172's #89 changed this to
+# `COALESCE(ps.shares_cr, s.shares_cr)` via an ASOF join on `pit_shares`, to capture genuine share
+# issuance. The intent is right and the mechanism cannot work here, because `pit_shares` is derived
+# from NP/EPS and Trendlyne's EPS switches to post-split units at the EPS PERIOD-END, while the price
+# is back-adjusted from the EX-DATE. Between those two dates the two disagree by exactly the split
+# ratio. Measured on EICHERMOT (1:10, ex 2020-08-24): pit_shares stepped 2.73 -> 27.3 at the
+# 2020-06-30 period end, so May 2020 paired an adjusted price with a pre-split count and reported
+# Rs4,519cr where the truth was ~Rs45,180cr. This is the same 10x error iter-28 was written to fix.
 #
-# ASOF LEFT JOIN takes the most recent share reading at or before each price bar. COALESCE keeps
-# `shares_now` for the 13.6% of cells with no reading yet at that date (mostly pre-2000 history and
-# names whose first filing postdates their first price) — no worse than before, never worse.
+# Measured impact of reverting, over the whole table:
+#   worst monthly mcap step   EICHERMOT 11.08 -> 1.47   BAJFINANCE 99.94 -> 2.02
+#                             TATASTEEL 11.93 -> 2.04   RELIANCE 4.24 -> 1.42
+#                             HDFCBANK   5.55 -> 1.37   (the last two were wrong and untested)
+#   latest mcap vs Trendlyne  90.3% within 15% -> 100.0%;  names off by >50%: 53 -> 0
+#   universe eligibility      4.15% of cells flip, 228,399 newly eligible vs 7,706 newly excluded
+# The eligibility swing is one-directional because the mixed formula shrank historical mcaps inside
+# every split window, excluding names that genuinely qualified.
+#
+# #89's real point stands: holding today's count constant ignores genuine issuance, and a company
+# that issued shares to survive looks as large in history as it later became. Fixing that needs a
+# share series in CONSISTENT units — a per-quarter shares-outstanding source, which is exactly what
+# to-do #860 concluded is missing. Until that exists, split-correctness wins: the CA error is 10x,
+# the issuance error is second-order, and only one of them moves a name by an order of magnitude.
 con.execute("""CREATE TABLE pit_mcap AS
-  SELECT y.pk, y.date, r.raw_close,
-         COALESCE(ps.shares_cr, s.shares_cr) AS shares_cr,
-         y.close * COALESCE(ps.shares_cr, s.shares_cr) AS mcap_cr
+  SELECT y.pk, y.date, r.raw_close, s.shares_cr,
+         y.close * s.shares_cr AS mcap_cr
   FROM ohlcv y JOIN shares_now s USING(pk)
   LEFT JOIN bc_raw r ON r.pk=y.pk AND r.date=y.date
-  ASOF LEFT JOIN (SELECT pk, from_date, shares_cr FROM pit_shares WHERE shares_cr > 0) ps
-    ON ps.pk = y.pk AND ps.from_date <= y.date
   WHERE y.close > 0""")
 con.execute("CREATE INDEX idx_pitmcap ON pit_mcap(pk,date)")
 
