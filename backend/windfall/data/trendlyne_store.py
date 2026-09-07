@@ -673,6 +673,22 @@ def sector_map() -> dict[str, str]:
     return {s: sec for s, sec in rows}
 
 
+@functools.lru_cache(maxsize=1)
+def industry_map() -> dict[str, str]:
+    """NSE symbol -> industry (Trendlyne `sector_map.industry`, pk-keyed).
+
+    Finer than `sector_map`: 125 industries against 29 sectors, so an industry peer group is a much
+    tighter comparison for a valuation multiple. Added iter-172 so `industry_pe` can be computed
+    from data we hold rather than read from a snapshot that covers 79% of the universe.
+    """
+    rows = _con().execute("""
+        SELECT m.sym, coalesce(sm.industry, 'Unknown') FROM sector_map sm
+        JOIN (SELECT pk, upper(nsecode) sym FROM stocks WHERE nsecode<>''
+              UNION SELECT pk, upper(nse_symbol) FROM recovered_symbols WHERE nse_symbol<>'') m
+          ON sm.pk=m.pk""").fetchall()
+    return {s: ind for s, ind in rows}
+
+
 def benchmark_series(name: str, start=None, end=None) -> pd.Series:
     """Real index close from Trendlyne `index_ohlcv` (e.g. Nifty 500), not a yfinance proxy."""
     pk = _BENCH_PK.get(name.upper().replace(" ", ""), 1893)

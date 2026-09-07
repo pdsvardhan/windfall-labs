@@ -101,6 +101,56 @@ def _ffill_daily_tl(panel, name, idx, cols, warnings) -> pd.DataFrame:
     return out
 
 
+# Peer-relative features COMPUTED from panels we already hold, rather than read from the Trendlyne
+# snapshot (iter-172). The snapshot versions were snapshot-only — NaN before the export date, so
+# useless in a backtest, which resolve.py already warned about for pe_to_sector — and covered 79% of
+# the universe, because the Data Downloader caps at 2,000 rows and truncates alphabetically at M.
+# Computing them gives full history and every name. No saved strategy referenced any of these
+# fields (checked: 0 of 289), so nothing re-baselines.
+#
+# These are OUR definitions, not Trendlyne's published numbers, and will not tie out to them
+# exactly. resolve() says so in warnings[] the first time one is used.
+_PEER_PE = {"sector_pe": "sector", "industry_pe": "industry"}
+_REL_SPEC = {"rs_nifty_1m": (21, "NIFTY50"), "rs_nifty_3m": (63, "NIFTY50"),
+             "rs_sector_1m": (21, None), "rs_sector_3m": (63, None)}
+
+
+def _peer_stat(panel, groups, idx, cols, positive_only: bool) -> pd.DataFrame:
+    """Cross-sectional MEDIAN of `panel` within each peer group, broadcast back to every member.
+
+    Median, not mean: P/E distributions have violent right tails (a company earning almost nothing
+    prints a multiple in the thousands), and one such name would drag a sector mean far from
+    anything a human would call "the sector's P/E".
+    """
+    vals = panel.reindex(index=idx, columns=cols)
+    if positive_only:
+        vals = vals.where(vals > 0)     # a non-positive multiple is not a valuation
+    out = pd.DataFrame(np.nan, index=idx, columns=cols, dtype=float)
+    buckets: dict[str, list[str]] = {}
+    for c in cols:
+        buckets.setdefault(groups.get(c, "Unknown"), []).append(c)
+    for members in buckets.values():
+        med = vals[members].median(axis=1, skipna=True)
+        for c in members:
+            out[c] = med
+    return out
+
+
+def _relative_return(close, window: int, bench=None, groups=None) -> pd.DataFrame:
+    """`window`-day return minus a reference's return over the same window, in percentage POINTS.
+
+    `bench` given -> measured against that index. Otherwise measured against the median return of
+    the name's own peer group, which is the closest thing we can build to a sector index without
+    one.
+    """
+    ret = close.pct_change(window)
+    if bench is not None:
+        b = bench.reindex(close.index).ffill().pct_change(window)
+        return ret.sub(b, axis=0) * 100.0
+    peer = _peer_stat(ret, groups or {}, close.index, list(close.columns), positive_only=False)
+    return (ret - peer) * 100.0
+
+
 def _percentile_blend(factors, mask, eval_expr, idx, cols, warnings) -> pd.DataFrame | None:
     """Cross-sectional percentile blend over the eligible set, per rebalance date.
 
@@ -211,6 +261,28 @@ def resolve(cfg: StrategyConfig) -> ResolvedStrategy:
 
     sectors_map = ts.sector_map() if use_tl else store.sector_map(index)
     cache: dict[str, pd.DataFrame] = {}
+    _computed_noted: set[str] = set()
+
+    def _note_computed(name: str) -> None:
+        """Disclose that a peer-relative feature is OUR calculation, not Trendlyne's published one.
+
+        These used to come from the Data Downloader snapshot. Computing them buys full history and
+        full coverage, but the numbers will not tie out to Trendlyne's to the decimal — different
+        peer definition, different window convention. Saying so once per feature is the difference
+        between a documented approximation and a silent one.
+        """
+        if name in _computed_noted:
+            return
+        _computed_noted.add(name)
+        how = ("median tl_pe across the name's peer group, per date"
+               if name in _PEER_PE else
+               f"{_REL_SPEC[name][0]}-day return minus "
+               + (f"the {_REL_SPEC[name][1]} index" if _REL_SPEC[name][1]
+                  else "the sector's median return"))
+        warnings.append(
+            f"'{name}' is COMPUTED here ({how}), not read from the Trendlyne snapshot. It covers "
+            f"the full history and every name, but will not match Trendlyne's published value "
+            f"exactly.")
 
     def feat(name: str) -> pd.DataFrame:
         if name in cache:
@@ -251,14 +323,29 @@ def resolve(cfg: StrategyConfig) -> ResolvedStrategy:
             df = ind.macd(close)[1]
         elif name == "macd_hist":
             df = ind.macd(close)[2]
+        elif name in _PEER_PE and use_tl:
+            # Median tl_pe across the name's sector / industry, per date. Replaces the snapshot
+            # field, which existed only from its export date and covered 79% of the universe.
+            groups = (sectors_map if _PEER_PE[name] == "sector" else ts.industry_map())
+            df = _peer_stat(feat("tl_pe"), groups, close.index, tickers, positive_only=True)
+            _note_computed(name)
+        elif name in _REL_SPEC and use_tl:
+            window, bench_name = _REL_SPEC[name]
+            if bench_name:
+                bench = ts.benchmark_series(bench_name, cfg.start, cfg.end)
+                df = _relative_return(close, window, bench=bench) if not bench.empty else None
+                if df is None:
+                    warnings.append(f"'{name}' needs the {bench_name} index, which is not in "
+                                    f"index_ohlcv — feature is all-NaN here")
+            else:
+                df = _relative_return(close, window, groups=sectors_map)
+            _note_computed(name)
         elif name == "pe_to_sector":
-            # sector_pe is snapshot-only (no historical sector-PE feed), so pe_to_sector is all-NaN
-            # before the snapshot and a backtest using it trades nothing over history (audit #95).
-            # Honest surface here rather than a silent empty book; use it on /signals or rank on tl_pe/pe.
-            warnings.append(
-                "pe_to_sector uses sector_pe, which is snapshot-only (no historical sector-PE data) — it "
-                "is NaN before the snapshot, so a historical backtest holds nothing. Use it on live "
-                "signals, or rank on tl_pe / pe instead.")
+            # Now computable over history: sector_pe is derived from the daily tl_pe panel rather
+            # than the snapshot, so this no longer collapses to NaN before an export date. The old
+            # warning here ("snapshot-only ... a historical backtest holds nothing", audit #95) is
+            # retired; what remains worth saying is that the denominator is our own median, not
+            # Trendlyne's published sector P/E — which _note_computed already says.
             df = feat("pe") / feat("sector_pe").replace(0.0, np.nan)
         elif name == "peg":
             # P/E ÷ EPS-growth% — growth-adjusted cheapness, guarded to profitable & growing names.
