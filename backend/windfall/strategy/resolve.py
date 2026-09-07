@@ -175,7 +175,7 @@ def resolve(cfg: StrategyConfig) -> ResolvedStrategy:
                 f"benchmark '{cfg.benchmark}' history starts {bench_raw.index.min().date()}; dates before "
                 f"it have no index to compare against, so regime/active-return are blind over that early "
                 f"window (source a longer index history to extend it).")
-        membership_mask = ts.membership_panel(tickers, close.index)
+        membership_mask = ts.membership_panel(tickers, close.index, warnings=warnings)
         n_uncertain = len(set(tickers) & ts.ca_uncertain_symbols())
         warnings.append(
             f"survivorship-free Trendlyne layer: {len(tickers)} names ever >Rs{int(ts.MCAP_FLOOR_CR)}cr "

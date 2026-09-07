@@ -37,7 +37,7 @@ is free and already automated. So script 1 alone keeps the factors current.
 
 | Script | When |
 |---|---|
-| `trendlyne_harvester_ohlcv.js` (~40 min) | Only when you want Trendlyne's **native price history extended**. NOT needed for freshness — Bhavcopy carries prices to today and `adjusted_close_panel` splices it on. Skipping it is normal; the ingest will report ~1,880 `ohlcv` names as "preserved", which is correct, not a truncation. |
+| `trendlyne_harvester_ohlcv.js` (~40 min) | Run it monthly. It extends Trendlyne's **native price history** AND is what keeps  ->  moving, i.e. which stocks are ELIGIBLE to be picked. Skipping it no longer freezes the candidate list (adr-046 falls back to Bhavcopy), but eligibility then rests on unadjusted closes. The old note here said it was NOT needed for freshness — Bhavcopy carries prices to today and `adjusted_close_panel` splices it on. Skipping it is normal; the ingest will report ~1,880 `ohlcv` names as "preserved", which is correct, not a truncation. |
 | `trendlyne_harvester_gapfill.js` (~2–5 min) | When the ingest dry-run names specific stocks as missing or shrinking. **Its `SYMBOLS` list is scratch — repointed per incident, never a stable list.** Check it targets the names you actually mean before running. |
 
 ### Fundamentals snapshot
