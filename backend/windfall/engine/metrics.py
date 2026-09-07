@@ -49,6 +49,9 @@ def compute_summary(
 
     dd = drawdown_series(nav)
     s.max_drawdown = round(float(dd.min()), 6)
+    # Calmar = CAGR / |max drawdown|. Undefined with no drawdown, so 0.0 rather than inf — a
+    # drawdown-free curve is almost always too short to rate, not a risk-free strategy.
+    s.calmar = round(s.cagr / abs(s.max_drawdown), 4) if s.max_drawdown < 0 else 0.0
     trough = dd.idxmin()
     peak = nav.loc[:trough].idxmax() if trough in nav.index else nav.index[0]
     s.max_dd_dates = [str(pd.Timestamp(peak).date()), str(pd.Timestamp(trough).date())]

@@ -93,14 +93,43 @@ def _to_date(v):
         return None
 
 
+_HEADER_SCAN_ROWS = 10          # the banner has never pushed the header past row 4; 10 is slack
+
+
 def _read_sheet(path: str):
+    """Read a Trendlyne Data Downloader export, finding the header row rather than assuming it.
+
+    The header is NOT always on row 4. A CURTAILED export (the subscription cap is hit) opens with
+    "* The results has been curtailed to 2000 rows..." plus two blank rows, so the header lands on
+    row 4. An export that fits under the cap has NO banner and the header is on row 1.
+
+    This used to hardcode `min_row=4`, because every export the code had ever seen was curtailed —
+    the banner got mistaken for part of the file format. The failure was silent and bad: fed a
+    complete export, it read row 4 (a data row) as the header, matched zero known columns, and
+    produced a snapshot of empty values. Measured 2026-09-07: four clean band exports parsed to
+    0 of 24 mapped columns while the one curtailed file in the same batch parsed 21 of 24.
+
+    Anchor on the 'NSE Code' column, which every export carries and which is also the join key.
+    """
     import openpyxl
     wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
-    ws = wb.active
-    hdr = [str(h).strip() if h is not None else ""
-           for h in next(ws.iter_rows(min_row=4, max_row=4, values_only=True))]
-    rows = [r for r in ws.iter_rows(min_row=5, values_only=True) if r[1]]  # NSE Code present
-    wb.close()
+    try:
+        ws = wb.active
+        hdr, hdr_row = None, None
+        for i, row in enumerate(ws.iter_rows(min_row=1, max_row=_HEADER_SCAN_ROWS,
+                                             values_only=True), start=1):
+            cells = [str(c).strip() if c is not None else "" for c in row]
+            if any(c.lower() in ("nse code", "nsecode") for c in cells):
+                hdr, hdr_row = cells, i
+                break
+        if hdr is None:
+            raise ValueError(
+                f"{path}: no 'NSE Code' header found in the first {_HEADER_SCAN_ROWS} rows — "
+                f"is this a Trendlyne Data Downloader export?")
+        rows = [r for r in ws.iter_rows(min_row=hdr_row + 1, values_only=True)
+                if r[1]]  # NSE Code present
+    finally:
+        wb.close()
     return hdr, rows
 
 

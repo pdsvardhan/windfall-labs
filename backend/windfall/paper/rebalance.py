@@ -32,22 +32,27 @@ from .book import (close_position, commit_pending_signal, list_positions, mark_t
 # The owner's decision (iter-171, item 1236) is to run these books at Rs5L, matching the real account
 # size the strategies are designed for: at Rs1L a 20-40 name book allocates Rs2.5-5K per name, less
 # than one share of many NSE stocks, so fill_pending's granularity rule voided those entries and left
-# 11-26% of every book in idle cash (measured min-cash: Rs25,758 of Rs1L on BLEND_70_30) while the
-# backtests assume invest_fully.
+# idle cash the backtests never assume — they invest_fully. The drag was WORST on the widest books
+# (min-cash Rs25,758 of Rs1L, 25.8%, on the 40-name BLEND_70_30; 28 unfillable-granularity voids, 24
+# of them BLEND at Rs1,500-3,500 slices). It was NOT uniform: measured min-cash across the eight was
+# 1.26% (DVM_user) to 25.8% (BLEND), and CMP_valmom_m_20 ran slightly NEGATIVE at -0.86%. Earlier
+# notes in this file said "11-26% of every book"; that overstated four of the eight.
 #
-# It is still Rs1L here, on purpose, because the step has an ORDER (measured 2026-09-04): raising the
-# notional alone does not resize existing holdings, so a book keeps its Rs1L of positions and simply
-# carries Rs4L of idle cash — DVM_user came out 80% in cash, which is a worse distortion than the
-# drag being fixed. The notional is only meaningful together with resize_book(), and resizing means
-# re-entering the whole book at whatever the current signals say. Those signals are frozen at
-# 2026-07-22 until the Trendlyne refresh lands (item 1238), so re-entering now would lock all eight
-# books into a six-week-old ranking.
+# FLIPPED 2026-09-08 (iter-173, to-do #819). The flip had a required ORDER, because raising the
+# notional alone does not resize existing holdings — a book would keep its Rs1L of positions and
+# carry Rs4L of idle cash (measured 2026-09-04: DVM_user came out 80% cash), a worse distortion than
+# the drag being fixed. Each precondition was checked before this line changed:
+#   1. Trendlyne refresh landed (iter-172) — prices, valuation_ratios and fundamentals all current.
+#   2. adr-046 restored the selectable universe from 293 to 1,946 names. This mattered: every
+#      persisted signal run was generated 2026-09-07 07:23-07:26 IST, ~11h BEFORE adr-046 landed at
+#      18:35, so resizing against those runs would have re-entered all eight books into baskets
+#      chosen from 14% of the market.
+#   3. A fresh signal run per book returned as_of 2026-09-07, data_age_days 0, no stale warnings.
+#   4. resize_book() flattened each book, then a forced rebalance re-entered it at the new size.
 #
-# Sequence: refresh Trendlyne -> confirm a signal run returns a current as_of -> set this to 500000
-# -> POST /api/paper/resize per book -> next rebalance re-enters fully invested at the new size.
-# Everything except the flip is built and tested; PAPER_TARGET_NOTIONAL records the intent.
-BOOK_NOTIONAL = 100000.0
-PAPER_TARGET_NOTIONAL = 500000.0
+# Resizing re-bases a live track record and costs a full round-trip of modelled brokerage/STT, so it
+# stays a deliberate operator action (resize_book is never a side effect of this constant).
+BOOK_NOTIONAL = 500000.0
 
 # The tracked paper slate (started 2026-07-06). BLEND_70_30 is a synthetic id (no single strategy
 # row) — a fixed 70/30 sleeve blend.
@@ -181,13 +186,20 @@ def _target_book(entry: dict) -> tuple[dict, dict]:
 
 
 def available_cash(sid: str, notional: float) -> float:
-    """What the book can actually spend right now.
+    """What the book can actually spend right now, GROSS of modelled costs.
 
-    True cash, not notional-minus-open-cost: every entry ever made leaves the account and every
-    exit returns its proceeds, so realized P&L belongs in the balance. Sizing off open cost alone
+    Cash, not notional-minus-open-cost: every entry ever made leaves the account and every exit
+    returns its proceeds, so realized P&L belongs in the balance. Sizing off open cost alone
     ignores realized LOSSES and overstates capacity by exactly the amount lost — measured at up to
     Rs6,279 on MOM_roc252_m_10 — which is how a book overdrew in the first place (item 1235).
     Pending entries are money already committed to a fill, so they are held back too.
+
+    KNOWN OVERSTATEMENT (measured 2026-09-08, iter-173): entry and exit are raw prices, so the
+    balance carries GROSS realized P&L and never pays the modelled brokerage/STT the scoreboard
+    does net out. DVM_user reads Rs12,190.20 of cash against net_pnl Rs11,578.46 — Rs611.74 the
+    book will never actually have; Rs5,321.05 across the eight books, and it scaled 5x with the
+    Rs5L flip. It errs toward over-funding a book, never under-funding it. Netting costs here is
+    a behaviour change to the sizing path, so it is tracked separately rather than slipped in.
     """
     cash = notional
     for p in list_positions(sid):

@@ -39,6 +39,15 @@ _TL_SHARE = {"tl_pledge", "tl_fii", "tl_dii"}   # quarterly shareholding %, resu
 _TL_MCAP = {"mcap"}                              # point-in-time survivorship-free market cap (Rs cr)
 _TL_FEATURES = _TL_DAILY | _TL_LAGGED | _TL_SHARE | _TL_MCAP
 
+# A _TL_DAILY panel is ffilled onto the price index, which is correct while its source table is
+# being refreshed and silently wrong when it is not: the strategy keeps ranking on the last value
+# it ever saw, and the signal run still reports a current as_of. Measured 2026-09-07 (iter-172):
+# valuation_ratios had been frozen at 2026-07-15 for 54 days while dvm_history was current to
+# 2026-09-04, so CMP_valmom_m_20 — a live paper book — ranked half its book on stale multiples and
+# nothing in warnings[] said so. 14 days matches the pit_universe membership lookback the refresh
+# runbook is already written around, so a panel past it is stale by the project's own definition.
+_STALE_FACTOR_DAYS = 14
+
 
 @dataclass
 class ResolvedStrategy:
@@ -60,6 +69,86 @@ class ResolvedStrategy:
 
 def _trading_dates(close: pd.DataFrame) -> pd.DatetimeIndex:
     return close.index
+
+
+def _ffill_daily_tl(panel, name, idx, cols, warnings) -> pd.DataFrame:
+    """Reindex a daily Trendlyne panel onto the price index and ffill, warning when its source
+    table stops well short of the price tail.
+
+    The ffill itself is right — these are daily published series, and a public holiday or a missed
+    scrape should carry the last published value forward. What is wrong is doing it silently across
+    weeks: a caller cannot tell a fresh panel from an abandoned one, because both come back fully
+    populated to the last bar. So measure the distance from the panel's newest real observation to
+    the newest price bar and say so past `_STALE_FACTOR_DAYS`.
+
+    Panel-wide by design, not per-symbol: the failure this catches is a table that stopped being
+    refreshed, which moves every column together. Individually stale names inside an otherwise
+    current table are a different and much noisier problem (to-do #845), deliberately not covered.
+    """
+    if panel is None or getattr(panel, "empty", True):
+        return pd.DataFrame(index=idx, columns=cols, dtype=float)
+    out = panel.reindex(index=idx, columns=cols).ffill()
+    observed = panel.dropna(how="all")
+    if observed.empty or len(idx) == 0:
+        return out
+    last_obs, last_bar = observed.index.max(), idx.max()
+    age = (last_bar - last_obs).days
+    if age > _STALE_FACTOR_DAYS:
+        warnings.append(
+            f"stale factor: '{name}' was last published {last_obs.date()} but prices run to "
+            f"{last_bar.date()} — {age} days carried forward. Any ranking or filter using it is "
+            f"acting on {last_obs.date()} values, not current ones. Refresh its source table.")
+    return out
+
+
+# Peer-relative features COMPUTED from panels we already hold, rather than read from the Trendlyne
+# snapshot (iter-172). The snapshot versions were snapshot-only — NaN before the export date, so
+# useless in a backtest, which resolve.py already warned about for pe_to_sector — and covered 79% of
+# the universe, because the Data Downloader caps at 2,000 rows and truncates alphabetically at M.
+# Computing them gives full history and every name. No saved strategy referenced any of these
+# fields (checked: 0 of 289), so nothing re-baselines.
+#
+# These are OUR definitions, not Trendlyne's published numbers, and will not tie out to them
+# exactly. resolve() says so in warnings[] the first time one is used.
+_PEER_PE = {"sector_pe": "sector", "industry_pe": "industry"}
+_REL_SPEC = {"rs_nifty_1m": (21, "NIFTY50"), "rs_nifty_3m": (63, "NIFTY50"),
+             "rs_sector_1m": (21, None), "rs_sector_3m": (63, None)}
+
+
+def _peer_stat(panel, groups, idx, cols, positive_only: bool) -> pd.DataFrame:
+    """Cross-sectional MEDIAN of `panel` within each peer group, broadcast back to every member.
+
+    Median, not mean: P/E distributions have violent right tails (a company earning almost nothing
+    prints a multiple in the thousands), and one such name would drag a sector mean far from
+    anything a human would call "the sector's P/E".
+    """
+    vals = panel.reindex(index=idx, columns=cols)
+    if positive_only:
+        vals = vals.where(vals > 0)     # a non-positive multiple is not a valuation
+    out = pd.DataFrame(np.nan, index=idx, columns=cols, dtype=float)
+    buckets: dict[str, list[str]] = {}
+    for c in cols:
+        buckets.setdefault(groups.get(c, "Unknown"), []).append(c)
+    for members in buckets.values():
+        med = vals[members].median(axis=1, skipna=True)
+        for c in members:
+            out[c] = med
+    return out
+
+
+def _relative_return(close, window: int, bench=None, groups=None) -> pd.DataFrame:
+    """`window`-day return minus a reference's return over the same window, in percentage POINTS.
+
+    `bench` given -> measured against that index. Otherwise measured against the median return of
+    the name's own peer group, which is the closest thing we can build to a sector index without
+    one.
+    """
+    ret = close.pct_change(window)
+    if bench is not None:
+        b = bench.reindex(close.index).ffill().pct_change(window)
+        return ret.sub(b, axis=0) * 100.0
+    peer = _peer_stat(ret, groups or {}, close.index, list(close.columns), positive_only=False)
+    return (ret - peer) * 100.0
 
 
 def _percentile_blend(factors, mask, eval_expr, idx, cols, warnings) -> pd.DataFrame | None:
@@ -136,7 +225,7 @@ def resolve(cfg: StrategyConfig) -> ResolvedStrategy:
                 f"benchmark '{cfg.benchmark}' history starts {bench_raw.index.min().date()}; dates before "
                 f"it have no index to compare against, so regime/active-return are blind over that early "
                 f"window (source a longer index history to extend it).")
-        membership_mask = ts.membership_panel(tickers, close.index)
+        membership_mask = ts.membership_panel(tickers, close.index, warnings=warnings)
         n_uncertain = len(set(tickers) & ts.ca_uncertain_symbols())
         warnings.append(
             f"survivorship-free Trendlyne layer: {len(tickers)} names ever >Rs{int(ts.MCAP_FLOOR_CR)}cr "
@@ -172,6 +261,28 @@ def resolve(cfg: StrategyConfig) -> ResolvedStrategy:
 
     sectors_map = ts.sector_map() if use_tl else store.sector_map(index)
     cache: dict[str, pd.DataFrame] = {}
+    _computed_noted: set[str] = set()
+
+    def _note_computed(name: str) -> None:
+        """Disclose that a peer-relative feature is OUR calculation, not Trendlyne's published one.
+
+        These used to come from the Data Downloader snapshot. Computing them buys full history and
+        full coverage, but the numbers will not tie out to Trendlyne's to the decimal — different
+        peer definition, different window convention. Saying so once per feature is the difference
+        between a documented approximation and a silent one.
+        """
+        if name in _computed_noted:
+            return
+        _computed_noted.add(name)
+        how = ("median tl_pe across the name's peer group, per date"
+               if name in _PEER_PE else
+               f"{_REL_SPEC[name][0]}-day return minus "
+               + (f"the {_REL_SPEC[name][1]} index" if _REL_SPEC[name][1]
+                  else "the sector's median return"))
+        warnings.append(
+            f"'{name}' is COMPUTED here ({how}), not read from the Trendlyne snapshot. It covers "
+            f"the full history and every name, but will not match Trendlyne's published value "
+            f"exactly.")
 
     def feat(name: str) -> pd.DataFrame:
         if name in cache:
@@ -195,29 +306,46 @@ def resolve(cfg: StrategyConfig) -> ResolvedStrategy:
                 warnings.append(f"'{name}' needs data_source='trendlyne' — feature is all-NaN here")
                 df = None
             elif name in ("tl_durability", "tl_valuation", "tl_momentum"):
-                df = ts.dvm_panel(name, tickers).reindex(index=close.index, columns=tickers).ffill()
+                df = _ffill_daily_tl(ts.dvm_panel(name, tickers), name,
+                                     close.index, tickers, warnings)
             elif name in ("tl_pe", "tl_peg", "tl_pbv"):
-                df = ts.valuation_panel(name, tickers).reindex(index=close.index, columns=tickers).ffill()
+                df = _ffill_daily_tl(ts.valuation_panel(name, tickers), name,
+                                     close.index, tickers, warnings)
             elif name in _TL_MCAP:  # point-in-time survivorship-free market cap (Rs cr)
                 df = ts.mcap_panel(tickers, close.index).reindex(index=close.index, columns=tickers)
             elif name in _TL_SHARE:  # quarterly shareholding %, result-lag-gated (no look-ahead)
-                df = ts.shareholding_panel(name, tickers, close.index).reindex(columns=tickers)
+                df = ts.shareholding_panel(name, tickers, close.index, warnings).reindex(columns=tickers)
             else:  # result-lag-gated raw annual/quarterly fundamentals (no look-ahead per adr-016)
-                df = ts.raw_fundamental_panel(name, tickers, close.index).reindex(columns=tickers)
+                df = ts.raw_fundamental_panel(name, tickers, close.index, warnings).reindex(columns=tickers)
         elif name == "macd":
             df = ind.macd(close)[0]
         elif name == "macd_signal":
             df = ind.macd(close)[1]
         elif name == "macd_hist":
             df = ind.macd(close)[2]
+        elif name in _PEER_PE and use_tl:
+            # Median tl_pe across the name's sector / industry, per date. Replaces the snapshot
+            # field, which existed only from its export date and covered 79% of the universe.
+            groups = (sectors_map if _PEER_PE[name] == "sector" else ts.industry_map())
+            df = _peer_stat(feat("tl_pe"), groups, close.index, tickers, positive_only=True)
+            _note_computed(name)
+        elif name in _REL_SPEC and use_tl:
+            window, bench_name = _REL_SPEC[name]
+            if bench_name:
+                bench = ts.benchmark_series(bench_name, cfg.start, cfg.end)
+                df = _relative_return(close, window, bench=bench) if not bench.empty else None
+                if df is None:
+                    warnings.append(f"'{name}' needs the {bench_name} index, which is not in "
+                                    f"index_ohlcv — feature is all-NaN here")
+            else:
+                df = _relative_return(close, window, groups=sectors_map)
+            _note_computed(name)
         elif name == "pe_to_sector":
-            # sector_pe is snapshot-only (no historical sector-PE feed), so pe_to_sector is all-NaN
-            # before the snapshot and a backtest using it trades nothing over history (audit #95).
-            # Honest surface here rather than a silent empty book; use it on /signals or rank on tl_pe/pe.
-            warnings.append(
-                "pe_to_sector uses sector_pe, which is snapshot-only (no historical sector-PE data) — it "
-                "is NaN before the snapshot, so a historical backtest holds nothing. Use it on live "
-                "signals, or rank on tl_pe / pe instead.")
+            # Now computable over history: sector_pe is derived from the daily tl_pe panel rather
+            # than the snapshot, so this no longer collapses to NaN before an export date. The old
+            # warning here ("snapshot-only ... a historical backtest holds nothing", audit #95) is
+            # retired; what remains worth saying is that the denominator is our own median, not
+            # Trendlyne's published sector P/E — which _note_computed already says.
             df = feat("pe") / feat("sector_pe").replace(0.0, np.nan)
         elif name == "peg":
             # P/E ÷ EPS-growth% — growth-adjusted cheapness, guarded to profitable & growing names.

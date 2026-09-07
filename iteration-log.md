@@ -216,3 +216,117 @@ bug restored); it now drives `book_equity` and was mutation-checked failing at �
   no feature_claims row (pre-existing anti-gaslight HARD violations).
 - `docs/orientation/` (CODE-MAP.md, CONCEPTS.md, dated 22 Jul) is still untracked and of unclear
   provenance — asked about but not resolved.
+
+---
+
+## Session 2026-09-07/08 — iter-172 · data honesty + the full Trendlyne refresh
+
+**Stage:** Stage 4 iteration (#173, items 1245-1249) + owner-directed follow-ups
+**Duration:** ~10 hrs · **Commits:** 13 · **Tests:** 290 → 308, 0 skipped · **ADRs:** adr-045, adr-046
+
+### How it started, and what it actually was
+
+The session opened as "regenerate signals on the fresh data" (#844). All 8 paper books came back
+`as_of=2026-09-04` with healthy buy/hold/sell splits, and by the project's own acceptance test the
+refresh had worked. It had not. **Every one of 140 held/bought positions across the eight books came
+from 293 of 2,190 stocks — 14% of the market — and nothing said so.**
+
+That finding drove the rest of the session.
+
+### The two silent-input failures, and what they have in common
+
+**adr-045 — a forward-filled factor now declares its age.** `valuation_ratios` (PE/PEG/PBV) had no
+refresh path at all: `ingest_refresh.py` handled three tables, the runbook never named it, and
+`trendlyne_harvester_megacap.js` had been emitting its CSV every month into a directory the ingest
+then wiped. Frozen at 2026-07-15 for 54 days while `dvm_history` ran to 2026-09-04. Because
+`resolve()` ffills the daily panels, `CMP_valmom_m_20` — a live book — ranked half its holdings on
+July multiples with a current `as_of`. 48 of 289 saved strategies read those factors.
+
+**adr-046 — universe eligibility falls back to Bhavcopy.** `harvesters/README.md` told the owner
+that skipping the ~40-minute OHLCV harvest was normal and "NOT needed for freshness — Bhavcopy
+carries prices to today". True of PRICES, false of ELIGIBILITY: the same table feeds
+`rebuild_pit_mcap_ca` → `pit_mcap` → `universe_membership`. The owner followed the documentation
+exactly and it froze the candidate list.
+
+It only surfaced because the failure needs a PARTIAL refresh. While everything was equally stale the
+`ffill(limit=10)` bridge covered the whole universe and signals resolved on an older bar with all
+~1,921 names — stale but complete and disclosed. Refreshing 257 megacaps dragged the newest usable
+bar from 2026-07-15 to 2026-09-04 and pushed the other ~1,900 outside the bridge. **A partial
+refresh was worse than no refresh.** The existing guard asks "is the eligible set EMPTY?"; 293 is
+not empty.
+
+The common shape, and the reason both ADRs exist: the project's rails are built around not trusting
+a NUMBER. Neither of these was a wrong number. Every figure was internally consistent and every run
+passed its own acceptance check. What was missing was a statement about an input's PROVENANCE.
+
+### Built (iteration #173, all verifier-approved)
+
+- **#850** stale-factor disclosure on ffilled daily panels (14d, the pit_universe window)
+- **#849** `valuation_ratios` into the ingest, keyed per `(pk, metric)`; then generalised over
+  `METRIC_TABLES` so `pnl_quarterly` / `growth_quality` / `ownership` stop being downloaded and
+  discarded
+- **#250** three `/api/rotation` defects. `calmar` was never a zero — it was never a FIELD; the
+  iter-23 harnesses read `s.get("calmar")` and printed `(... or 0)`, so an absent metric rendered as
+  a zero one. The "transient NoneType, fine on retry" reproduced as a real race: `lru_cache` guards
+  its dict but not the wrapped call, so 12 concurrent first-callers of `_con()` all ran its
+  check-then-ATTACH and 11 died
+- **#246** transitive rename chains (`TATAMTRDVR > TATAMOTORS > TMPV`), 1 chain in 127 rows
+- **#820** per-symbol price splice — and it collapsed adr-044's feared re-baseline: `extend_live` is
+  only true when `cfg.end is None`, so a dated backtest never enters that path
+- **#251** walk-forward folds under a quarter excluded from the averages
+- **#92** `mcap_panel` and `membership_panel` now share `_pit_mcap_wide` — they had the same query
+  written twice and adr-046 fixed only one
+- **#89** point-in-time share counts via ASOF join. Measured: today's count off by >2x on 18.1% of
+  3.79M cells; **5.29% of Rs500cr universe decisions change**, 195,302 out against 4,843 in
+- **#851/#852/#853** leg1 promoted + quarterly staleness disclosure + the conftest fix
+- **sector_pe / industry_pe / rs_nifty_* / rs_sector_*** computed from panels we hold instead of
+  read from a snapshot that covered 79% of the universe. 0 of 289 strategies used them, so nothing
+  re-baselined
+
+### The refresh itself
+
+Owner ran DVM + megacap + OHLCV + leg1-lite, plus 10 Data Downloader exports.
+
+| | before | after |
+|---|---|---|
+| stocks priced to 2026-08-28 | 257 | **1,972** |
+| `valuation_ratios` | frozen 2026-07-15 | **live to 2026-09-04** |
+| eligible universe | 293 | **1,937** |
+| fundamentals snapshot | 81 days stale, 1,138 tickers | **age 0, 2,365 tickers** |
+
+`CMP_valmom_m_20` now returns `as_of=2026-09-07` with **zero stale-factor warnings** — the alarm
+built that morning fell silent because the problem was fixed. Bhavcopy fallback dropped from 1,599
+names to 49.
+
+### Two things that did NOT work, kept as findings
+
+- **Data Downloader**: caps at 2,000 rows and truncates ALPHABETICALLY at M — RELIANCE, TCS and SBIN
+  simply absent. Two stock groups appear to be OR-ed, so "NSE-listed" + a cap band returned the same
+  unfiltered list five times. Fix is ONE group per export, run per market-cap band. Forward-PE is
+  unobtainable this way: every cell reads the literal `"Export NA"` (#857).
+- **#860 pit_shares seeding**: built, measured, ROLLED BACK. 85.6% → 85.9% agreement and it broke
+  PRAJIND (6,395 → 3). Three reasons recorded in the script so the next attempt starts there.
+
+### Friction
+
+- *tooling* — SSH heredocs mangled JSON/JS repeatedly (backticks shell-expanded, `$` interpolated,
+  reserved words `asof`/`days` in DuckDB). Every non-trivial payload should be written locally and
+  SCP'd, which is already operating rule 6; I kept forgetting it.
+- *env-limitation* — `windfall.duckdb` is held by the API, so any in-process `resolve()` or
+  `fundamentals` read fails with a lock error. Verification has to go through the API or read the
+  source files.
+- *process* — my first `#89` before/after check was worthless: the price ingest moved 1,715 stocks
+  in the same window, so the comparison could not isolate the share-count effect. The trustworthy
+  number was the read-only one measured BEFORE any ingest.
+
+### Next session
+
+1. **#819 — the Rs5L flip / simulation from 29 June.** Fully unblocked; every input it waited on is
+   current. Owner's intent: re-run the books from 29 June at Rs5L and show it alongside the real
+   Rs1L record. `resize` closes all 106 open positions, so force an immediate rebalance or 7 of 8
+   books sit in cash until 1 October.
+2. **#857 — forward-PE via the browser harvester.** Export route confirmed dead. Find the Forecaster
+   endpoint in devtools on a stock page, model on `trendlyne_harvester_megacap.js`.
+3. **Tidying** — #854, #858 (point the runbook at leg1-lite), #288, #818, #185, #841/#846.
+4. Pre-existing HARD anti-gaslight: `cockpit-dashboard` and `strategy-editor` at `status=done` with
+   no `feature_claims` row. Unchanged since iter-147, still unaddressed.

@@ -106,10 +106,27 @@ con.execute("""CREATE OR REPLACE TEMP VIEW bc_raw AS
   FROM bc.bhavcopy_prices b JOIN tl_sym m ON upper(regexp_replace(b.ticker,'\\.NS$',''))=m.sym
   WHERE b.series='EQ' AND b.close>0""")
 con.execute("DROP TABLE IF EXISTS pit_mcap")
+# POINT-IN-TIME share counts (iter-172, to-do #89). This used to multiply every historical close
+# by `shares_now` — TODAY's share count — for the name's whole history. `pit_shares` has held a real
+# (pk, from_date, shares_cr) time series all along; it just was not used here.
+#
+# Measured 2026-09-07 over 3,786,147 cells since 2015: 86.4% have an as-of reading, and today's
+# count is off by more than 2x on 18.1% of them and by 25-100% on another 19.3%. A company that
+# issued shares to survive looks, in history, as large as it became — so it sat in the Rs500cr
+# universe during years when it was tiny. Net effect on eligibility: 2.92% of universe decisions
+# flip, running about 6:1 toward WRONGLY INCLUDED (65,513 cells) over wrongly excluded (9,848).
+#
+# ASOF LEFT JOIN takes the most recent share reading at or before each price bar. COALESCE keeps
+# `shares_now` for the 13.6% of cells with no reading yet at that date (mostly pre-2000 history and
+# names whose first filing postdates their first price) — no worse than before, never worse.
 con.execute("""CREATE TABLE pit_mcap AS
-  SELECT y.pk, y.date, r.raw_close, s.shares_cr, y.close * s.shares_cr AS mcap_cr
+  SELECT y.pk, y.date, r.raw_close,
+         COALESCE(ps.shares_cr, s.shares_cr) AS shares_cr,
+         y.close * COALESCE(ps.shares_cr, s.shares_cr) AS mcap_cr
   FROM ohlcv y JOIN shares_now s USING(pk)
   LEFT JOIN bc_raw r ON r.pk=y.pk AND r.date=y.date
+  ASOF LEFT JOIN (SELECT pk, from_date, shares_cr FROM pit_shares WHERE shares_cr > 0) ps
+    ON ps.pk = y.pk AND ps.from_date <= y.date
   WHERE y.close > 0""")
 con.execute("CREATE INDEX idx_pitmcap ON pit_mcap(pk,date)")
 

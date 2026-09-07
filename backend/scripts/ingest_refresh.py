@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Merge a Trendlyne harvest (DVM + OHLCV + stocks) into trendlyne.duckdb — refresh ingest.
+"""Merge a Trendlyne harvest (DVM + OHLCV + stocks + valuation ratios) into trendlyne.duckdb.
 
 MERGE, NEVER REPLACE (iter-22 rule, adr-030): a harvest only covers names in the screener
 universe TODAY. Replacing tables deletes the history of names that legitimately fell below
@@ -8,7 +8,8 @@ exists to avoid. Correct op: for every KEY the harvest covers, drop those rows a
 (each harvest is full history per series, so it supersedes); every other key is untouched.
 
 The replace key is per-table, and it is NOT always the pk (changed 2026-09-07):
-    dvm_history -> (pk, score)     ohlcv -> (pk)     stocks -> (pk)
+    dvm_history -> (pk, score)     valuation_ratios -> (pk, metric)
+    ohlcv -> (pk)                  stocks -> (pk)
 dvm_history holds three independent series per stock (d/v/m), fetched as three separate
 requests. A rate-limited harvest routinely returns only some of them. Replacing per pk
 therefore DELETED the series the harvest happened to miss: on 2026-09-07 that silently
@@ -16,6 +17,19 @@ dropped 446 series across 445 stocks (SRF, BERGEPAINT, NAUKRI, YESBANK...), and 
 shrink guard stayed quiet because losing 1 of 3 series is a ~35% row drop, under its 50%
 bar. Replacing per (pk, score) makes a partial harvest harmless by construction: an
 absent series is simply not touched. See tests/test_ingest_refresh_partial.py.
+
+valuation_ratios (PE_TTM / PEG_TTM / PBV_A) joined the ingest on 2026-09-07 (iter-172, to-do
+#849) with the same shape and for the same reason. It had NO refresh path at all: this script
+handled three tables, the runbook never named it, and `trendlyne_harvester_megacap.js` has been
+emitting tl_valuation_ratios_megacap.csv every month into a directory the ingest then wiped. The
+table sat frozen at 2026-07-15 while dvm_history ran to 2026-09-04, and because resolve() ffills
+the daily factor panels, 48 of 289 saved strategies — one of them a LIVE paper book — kept ranking
+on multiples that stopped moving in July, with no warning anywhere. Keyed per (pk, metric) so a
+harvest carrying only PE_TTM cannot delete a stock's PEG_TTM and PBV_A.
+
+Megacap-only coverage is expected and safe: the megacap leg carries ~99 names, and the per-key
+replace leaves the other ~1,800 stocks' valuation history untouched rather than deleting it.
+Full coverage needs _done/trendlyne_harvester_leg1.js promoted back into the monthly set.
 
 NEVER ingests index_ohlcv — the automated NSE index feed (adr-038, scripts/index_ingest.py
 in the EOD cron) is fresher than Trendlyne's index OHLC; a harvest would move it backwards.
@@ -33,6 +47,7 @@ Input files (from the browser harvesters, see docs/ops/trendlyne-refresh-runbook
     tl_dvm_history_part*.csv / tl_dvm_history_megacap.csv / tl_dvm_history_gapfill.csv
     tl_ohlcv_part*.csv       / tl_ohlcv_megacap.csv       / tl_ohlcv_gapfill.csv
     tl_stocks.csv            / tl_stocks_megacap.csv      / tl_stocks_gapfill.csv
+    tl_valuation_ratios_megacap.csv (+ tl_valuation_ratios_part*.csv if the leg1 harvester runs)
     (tl_index_ohlcv.csv / tl_index_map.csv are ignored on purpose)
 
 Encoded gotchas from the 2026-07-16 refresh (the previous script lived only in a scratchpad):
@@ -52,6 +67,11 @@ import duckdb
 
 DB = Path(__file__).resolve().parents[1] / "data" / "trendlyne.duckdb"
 MIN_STOCKS = 1000  # mirrors the harvester's own truncation guard
+
+# Tables shaped (pk, metric, date, value) — every one the leg1 harvester emits. All replace per
+# (pk, metric) for the same reason dvm_history replaces per (pk, score): each metric is fetched
+# separately, so a harvest that returns only some of them must not delete the rest.
+METRIC_TABLES = ("valuation_ratios", "pnl_quarterly", "growth_quality", "ownership")
 
 
 def _files(src: Path, pattern_stem: str) -> list[Path]:
@@ -85,11 +105,17 @@ def main():
     src = Path(args.src).expanduser()
 
     dvm_f, ohlcv_f, stocks_f = _files(src, "dvm_history"), _files(src, "ohlcv"), _files(src, "stocks")
+    # Every (pk, metric, date, value) table the leg1 harvester produces, keyed identically. They
+    # were all in the same position valuation_ratios was: emitted by a harvester, ignored by this
+    # script, then deleted by Phase 3 step 5. Wiring one and leaving three is just a slower version
+    # of the same bug (iter-172, to-dos #849/#851).
+    metric_f = {t: _files(src, t) for t in METRIC_TABLES}
     ignored = sorted(src.glob("tl_index_*.csv"))
     if ignored:
         print(f"ignoring on purpose (adr-038 index feed is fresher): {[p.name for p in ignored]}")
-    if not (dvm_f or ohlcv_f or stocks_f):
-        sys.exit(f"no tl_dvm_history*/tl_ohlcv*/tl_stocks* files in {src}")
+    if not (dvm_f or ohlcv_f or stocks_f or any(metric_f.values())):
+        sys.exit(f"no tl_dvm_history*/tl_ohlcv*/tl_stocks*/"
+                 f"tl_{{{','.join(METRIC_TABLES)}}}* files in {src}")
 
     mode = "rw" if args.apply else "ro"
     if args.apply:
@@ -123,6 +149,21 @@ def main():
         plans.append(("dvm_history", "h_dvm_d",
                       'INSERT INTO dvm_history SELECT pk, score, "date", "value" FROM h_dvm_d',
                       ("pk", "score")))
+    for tbl, files in metric_f.items():
+        if not files:
+            continue
+        raw, typed = f"h_{tbl}", f"h_{tbl}_d"
+        _read_union(con, files, raw)
+        con.execute(f"""
+            CREATE OR REPLACE TEMP VIEW {typed} AS
+            SELECT CAST(pk AS BIGINT) pk, CAST(metric AS VARCHAR) metric,
+                   CAST("date" AS DATE) "date", CAST("value" AS DOUBLE) "value"
+            FROM {raw}
+            QUALIFY row_number() OVER (PARTITION BY pk, metric, "date" ORDER BY {PRIO} DESC) = 1
+        """)
+        plans.append((tbl, typed,
+                      f'INSERT INTO {tbl} SELECT pk, metric, "date", "value" FROM {typed}',
+                      ("pk", "metric")))
     if ohlcv_f:
         _read_union(con, ohlcv_f, "h_ohlcv")
         con.execute(f"""

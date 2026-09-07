@@ -30,7 +30,8 @@ silently excludes the top ~100 index names).
 | 1 | `trendlyne_dvm_harvester.js` | ~15–20 min | `tl_dvm_history_partNN.csv`, `tl_stocks.csv` |
 | 2 | `trendlyne_harvester_megacap.js` | ~10 min | `tl_*_megacap.csv` (covers the index-megacap crack) |
 | 3 | `trendlyne_harvester_ohlcv.js` | ~35–45 min | `tl_ohlcv_partNN.csv`, `tl_index_ohlcv.csv`, `tl_index_map.csv` |
-| 4 | `trendlyne_harvester_gapfill.js` — only if specific names froze | ~2 min | `tl_*_gapfill.csv` |
+| 4 | `trendlyne_harvester_leg1.js` | ~25 min | `tl_valuation_ratios_partNN.csv`, `tl_pnl_quarterly_*`, `tl_growth_quality_*`, `tl_ownership_*` |
+| 5 | `trendlyne_harvester_gapfill.js` — only if specific names froze | ~2 min | `tl_*_gapfill.csv` |
 
 Gotchas (all cost a bug once):
 - The megacap `SYMBOLS` list is **hardcoded and drifts** — 2026-07-16 it was missing
@@ -59,6 +60,10 @@ cd /mnt/storage/websites/windfall-labs/backend
 .venv/bin/python scripts/ingest_refresh.py data/refresh_staging
 
 #    Read it like this:
+#    - the report must list FOUR tables: dvm_history, ohlcv, stocks, valuation_ratios. A missing
+#      valuation_ratios line means neither leg1 nor the megacap harvester's CSV landed — do NOT proceed to
+#      step 5 (which deletes the staging dir), because that is exactly how the table went 54 days
+#      stale unnoticed (#849).
 #    - "preserved" pks are EXPECTED (names below the Rs500cr floor + delisted stay untouched —
 #      that is the survivorship-safety working, ~40–60 names normal)
 #    - preserved in the HUNDREDS = truncated harvest -> STOP, re-run the harvester
@@ -98,6 +103,27 @@ ssh pdsv@192.168.1.10 'cd /mnt/storage/websites/windfall-labs/backend && \
 
 ## What this feeds
 
-`dvm_history` + `ohlcv` + `stocks` (merged per-pk, never replaced) → `rebuild_pit_mcap_ca.py`
-→ `pit_mcap` → `build_membership.py` → `universe_membership` → live signals + backtests.
+`dvm_history` + `ohlcv` + `stocks` + `valuation_ratios` (merged per key, never replaced) →
+`rebuild_pit_mcap_ca.py` → `pit_mcap` → `build_membership.py` → `universe_membership` →
+live signals + backtests.
 Index prices come from the automated EOD cron (adr-038), never from a harvest.
+
+### `valuation_ratios` — added to the ingest 2026-09-07 (iter-172, to-do #849)
+
+`PE_TTM` / `PEG_TTM` / `PBV_A`, the daily multiples behind the `tl_pe` / `tl_peg` / `tl_pbv`
+factors. **This table was not in the ingest until now**, and the omission was invisible: the
+megacap harvester (step 2 above) has always emitted `tl_valuation_ratios_megacap.csv`, the ingest
+ignored it, and step 5 of Phase 3 deleted it with the rest of the staging dir. It froze at
+2026-07-15 while DVM reached 2026-09-04. 48 of 289 saved strategies rank on these factors and one
+of them — `CMP_valmom_m_20` — is a live paper book that was ranking half its holdings on
+seven-week-old P/Es while reporting a current `as_of`.
+
+- Replaced per **(pk, metric)**, the same shape as `dvm_history`'s (pk, score): a harvest carrying
+  only `PE_TTM` cannot delete a stock's `PEG_TTM` and `PBV_A`.
+- The monthly megacap leg covers ~99 names. **Full coverage needs
+  `_done/trendlyne_harvester_leg1.js` run as well** — it is the only script that pulls valuation
+  ratios for the whole ~1,800-name universe. Until it is promoted back into the monthly set, the
+  non-megacap names keep ageing.
+- Since iter-172 a stale factor is no longer silent: `resolve()` emits a `stale factor: ...`
+  warning on any daily panel carried forward more than 14 days. If you see one after a refresh,
+  the corresponding table did not land — check the staging dir before deleting it.
