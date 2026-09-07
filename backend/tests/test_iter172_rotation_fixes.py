@@ -26,18 +26,49 @@ def test_rotation_still_requires_two_sleeves_to_ROTATE():
         run_rotation([{"name": "only"}], weights=None)
 
 
-def test_single_sleeve_is_accepted_in_FIXED_weight_mode():
-    """weights=[1.0] is well-posed: the single-sleeve baseline a blend is measured against.
+def test_single_sleeve_guard_no_longer_rejects_a_fixed_weight_call():
+    """The narrow assertion: the sleeve-count floor is not applied in fixed-weight mode.
 
-    Asserts the guard no longer rejects it. The call still fails later for want of real price data
-    in a bare test environment - what must NOT happen is the 'needs at least 2 sleeves' rejection.
+    Deliberately tolerant of downstream data/config failures - it pins the guard alone. The AC
+    ("returns 200 with a valid summary") is proved END TO END by the test below, on real data;
+    this one exists so the guard has a check that still runs in a bare environment with no
+    Trendlyne store. Keeping only this one would be the weaker choice: the API wraps run_rotation
+    in a blanket `except Exception -> HTTPException(400)`, so any latent single-sleeve failure
+    downstream would still surface as the very 400 this AC is about, and a swallow-everything
+    test would never see it. (Raised by the Stage 4.7 verifier on the first version of this file.)
     """
     try:
         run_rotation([{"name": "solo"}], weights=[1.0])
     except ValueError as exc:
         assert "at least 2 sleeves" not in str(exc), f"still rejected by the sleeve-count floor: {exc}"
-    except Exception:  # noqa: BLE001 — data/config failures are out of scope for this assertion
+    except Exception:  # noqa: BLE001 — downstream data failures are the other test's job
         pass
+
+
+def test_single_sleeve_fixed_weight_produces_a_real_summary_end_to_end():
+    """The actual AC: a single-sleeve weights=[1.0] call completes and returns a usable summary.
+
+    Uses the same real-data sleeve as tests/test_rotation.py rather than a stub, so this exercises
+    the whole path the API calls - resolve, backtest, NAV alignment, turnover, summary - with one
+    sleeve, which is where a lurking multi-sleeve assumption would surface.
+    """
+    ts = pytest.importorskip("windfall.data.trendlyne_store")
+    if not ts.available():
+        pytest.skip("trendlyne.duckdb not present in this environment")
+
+    from tests.test_rotation import SLEEVE_A
+
+    out = run_rotation([SLEEVE_A], weights=[1.0])
+
+    assert out["equity_curve"] and len(out["equity_curve"]) > 100
+    s = out["summary"]
+    assert pd.notna(s["cagr"]) and pd.notna(s["max_drawdown"])
+    assert np.isfinite(s["cagr"]) and np.isfinite(s["calmar"])
+    assert 0.0 <= s["exposure"] <= 1.0 + 1e-9
+    assert len(out["sleeves"]) == 1
+    assert out["config"]["mode"] == "fixed-weight"
+    assert out["config"]["weights"] == [1.0]
+    assert out["allocations"], "a fixed-weight book must still record its rebalances"
 
 
 def test_empty_sleeve_list_is_still_rejected():

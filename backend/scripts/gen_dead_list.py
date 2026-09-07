@@ -7,7 +7,7 @@ from pathlib import Path
 import duckdb
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from windfall.data.renames import resolve_rename_chains  # noqa: E402
+from windfall.data.renames import resolve_rename_chains, write_rename_map  # noqa: E402
 
 TL = "/mnt/storage/websites/windfall-labs/backend/data/trendlyne.duckdb"
 BC = "/mnt/storage/websites/windfall-labs/backend/data/bhavcopy.duckdb"
@@ -44,12 +44,7 @@ con.execute("""CREATE TABLE rename_map AS
 _raw = q("SELECT old_sym, isin, live_sym, live_in_tl FROM rename_map")
 _live = {r[0] for r in q("SELECT sym FROM tl_syms")}
 _resolved = resolve_rename_chains(_raw, _live)
-con.execute("DROP TABLE IF EXISTS rename_map")
-con.execute("CREATE TABLE rename_map (old_sym VARCHAR, isin VARCHAR, live_sym VARCHAR, "
-            "live_in_tl BOOLEAN, resolved_via VARCHAR)")
-con.executemany("INSERT INTO rename_map VALUES (?, ?, ?, ?, ?)",
-                [(r["old_sym"], r["isin"], r["live_sym"], r["live_in_tl"], r["resolved_via"])
-                 for r in _resolved])
+write_rename_map(con, _resolved)
 _chained = [r for r in _resolved if r["resolved_via"]]
 _rescued = [r for r in _chained if r["live_in_tl"]]
 print(f"rename chains followed: {len(_chained)} ({len(_rescued)} now resolve to a LIVE symbol)")

@@ -59,3 +59,24 @@ def resolve_rename_chains(rows, live_syms) -> list[dict]:
             "resolved_via": ">".join(hops) if hops else "",
         })
     return out
+
+
+def write_rename_map(con, resolved) -> int:
+    """Replace `rename_map` with `resolved` rows. Returns the row count written.
+
+    Lives here rather than inline in gen_dead_list.py so the empty case is testable: that script
+    executes everything at import, so nothing in it can be exercised without opening the live DB
+    read-write. The Stage 4.7 verifier caught exactly that gap — the first version of this rewrite
+    called `executemany` unconditionally, and DuckDB rejects an empty parameter list with
+    `InvalidInputException: executemany requires a non-empty list of parameter sets`. The old
+    CREATE-TABLE-AS-SELECT it replaced handled a zero-row result silently, so this was a real
+    regression, latent only because the table currently has 127 rows.
+    """
+    con.execute("DROP TABLE IF EXISTS rename_map")
+    con.execute("CREATE TABLE rename_map (old_sym VARCHAR, isin VARCHAR, live_sym VARCHAR, "
+                "live_in_tl BOOLEAN, resolved_via VARCHAR)")
+    rows = [(r["old_sym"], r["isin"], r["live_sym"], r["live_in_tl"], r["resolved_via"])
+            for r in resolved]
+    if rows:                      # an empty map is a valid outcome, not an error
+        con.executemany("INSERT INTO rename_map VALUES (?, ?, ?, ?, ?)", rows)
+    return len(rows)
