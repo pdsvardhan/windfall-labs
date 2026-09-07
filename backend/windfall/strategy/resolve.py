@@ -39,6 +39,15 @@ _TL_SHARE = {"tl_pledge", "tl_fii", "tl_dii"}   # quarterly shareholding %, resu
 _TL_MCAP = {"mcap"}                              # point-in-time survivorship-free market cap (Rs cr)
 _TL_FEATURES = _TL_DAILY | _TL_LAGGED | _TL_SHARE | _TL_MCAP
 
+# A _TL_DAILY panel is ffilled onto the price index, which is correct while its source table is
+# being refreshed and silently wrong when it is not: the strategy keeps ranking on the last value
+# it ever saw, and the signal run still reports a current as_of. Measured 2026-09-07 (iter-172):
+# valuation_ratios had been frozen at 2026-07-15 for 54 days while dvm_history was current to
+# 2026-09-04, so CMP_valmom_m_20 — a live paper book — ranked half its book on stale multiples and
+# nothing in warnings[] said so. 14 days matches the pit_universe membership lookback the refresh
+# runbook is already written around, so a panel past it is stale by the project's own definition.
+_STALE_FACTOR_DAYS = 14
+
 
 @dataclass
 class ResolvedStrategy:
@@ -60,6 +69,36 @@ class ResolvedStrategy:
 
 def _trading_dates(close: pd.DataFrame) -> pd.DatetimeIndex:
     return close.index
+
+
+def _ffill_daily_tl(panel, name, idx, cols, warnings) -> pd.DataFrame:
+    """Reindex a daily Trendlyne panel onto the price index and ffill, warning when its source
+    table stops well short of the price tail.
+
+    The ffill itself is right — these are daily published series, and a public holiday or a missed
+    scrape should carry the last published value forward. What is wrong is doing it silently across
+    weeks: a caller cannot tell a fresh panel from an abandoned one, because both come back fully
+    populated to the last bar. So measure the distance from the panel's newest real observation to
+    the newest price bar and say so past `_STALE_FACTOR_DAYS`.
+
+    Panel-wide by design, not per-symbol: the failure this catches is a table that stopped being
+    refreshed, which moves every column together. Individually stale names inside an otherwise
+    current table are a different and much noisier problem (to-do #845), deliberately not covered.
+    """
+    if panel is None or getattr(panel, "empty", True):
+        return pd.DataFrame(index=idx, columns=cols, dtype=float)
+    out = panel.reindex(index=idx, columns=cols).ffill()
+    observed = panel.dropna(how="all")
+    if observed.empty or len(idx) == 0:
+        return out
+    last_obs, last_bar = observed.index.max(), idx.max()
+    age = (last_bar - last_obs).days
+    if age > _STALE_FACTOR_DAYS:
+        warnings.append(
+            f"stale factor: '{name}' was last published {last_obs.date()} but prices run to "
+            f"{last_bar.date()} — {age} days carried forward. Any ranking or filter using it is "
+            f"acting on {last_obs.date()} values, not current ones. Refresh its source table.")
+    return out
 
 
 def _percentile_blend(factors, mask, eval_expr, idx, cols, warnings) -> pd.DataFrame | None:
@@ -195,9 +234,11 @@ def resolve(cfg: StrategyConfig) -> ResolvedStrategy:
                 warnings.append(f"'{name}' needs data_source='trendlyne' — feature is all-NaN here")
                 df = None
             elif name in ("tl_durability", "tl_valuation", "tl_momentum"):
-                df = ts.dvm_panel(name, tickers).reindex(index=close.index, columns=tickers).ffill()
+                df = _ffill_daily_tl(ts.dvm_panel(name, tickers), name,
+                                     close.index, tickers, warnings)
             elif name in ("tl_pe", "tl_peg", "tl_pbv"):
-                df = ts.valuation_panel(name, tickers).reindex(index=close.index, columns=tickers).ffill()
+                df = _ffill_daily_tl(ts.valuation_panel(name, tickers), name,
+                                     close.index, tickers, warnings)
             elif name in _TL_MCAP:  # point-in-time survivorship-free market cap (Rs cr)
                 df = ts.mcap_panel(tickers, close.index).reindex(index=close.index, columns=tickers)
             elif name in _TL_SHARE:  # quarterly shareholding %, result-lag-gated (no look-ahead)

@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import functools
 import os
+import threading
 from pathlib import Path
 
 import duckdb
@@ -74,18 +75,36 @@ def coverage(floor_cr: float = MCAP_FLOOR_CR) -> dict:
             "floor_cr": floor_cr}
 
 
+# Serialises the FIRST build of the shared connection. lru_cache is thread-safe for its own dict
+# but does not hold a lock across the wrapped call, so every thread that arrives on a cold cache
+# runs the body — including the check-then-ATTACH pair below, which is a TOCTOU. Measured
+# 2026-09-07 (iter-172, to-do #250): 12 threads on a cleared cache, 11 of them died with
+# `Binder Error: Failed to attach database: database with name "bc" already exists`. That is the
+# reported "transient 400 on a valid call, fine on retry" — it needs concurrent first-calls, which
+# is why it never showed up in single-threaded use or in the tests.
+_CON_LOCK = threading.Lock()
+
+
 @functools.lru_cache(maxsize=1)
 def _con() -> duckdb.DuckDBPyConnection:
     """Process-wide read-only connection; bhavcopy attached read-only for dead-name raw prices."""
-    con = duckdb.connect(str(TRENDLYNE_DB), read_only=True)
-    if BHAVCOPY_DB.exists():
-        # DuckDB shares one instance per file path within a process, so another read-only connection
-        # may have already attached `bc` — attach only if absent.
-        already = con.execute(
-            "SELECT count(*) FROM duckdb_databases() WHERE database_name='bc'").fetchone()[0]
-        if not already:
-            con.execute(f"ATTACH '{BHAVCOPY_DB}' AS bc (READ_ONLY)")
-    return con
+    with _CON_LOCK:
+        con = duckdb.connect(str(TRENDLYNE_DB), read_only=True)
+        if BHAVCOPY_DB.exists():
+            # DuckDB shares one instance per file path within a process, so another read-only
+            # connection may have already attached `bc` — attach only if absent. The probe stays
+            # (it is the cheap path), but the ATTACH is now idempotent as well: the lock cannot
+            # stop a DIFFERENT module holding its own connection to this file from attaching
+            # between our check and our act.
+            already = con.execute(
+                "SELECT count(*) FROM duckdb_databases() WHERE database_name='bc'").fetchone()[0]
+            if not already:
+                try:
+                    con.execute(f"ATTACH '{BHAVCOPY_DB}' AS bc (READ_ONLY)")
+                except duckdb.Error as exc:
+                    if "already exists" not in str(exc):
+                        raise
+        return con
 
 
 @functools.lru_cache(maxsize=1)

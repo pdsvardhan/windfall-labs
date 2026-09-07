@@ -37,8 +37,14 @@ def run_rotation(
     name: str = "rotation",
     weights: list[float] | None = None,
 ) -> dict:
-    if len(sleeves) < 2:
+    # Two sleeves is a floor for ROTATION only — there is nothing to rotate between with one. A
+    # FIXED-WEIGHT call is a different question ("hold this allocation, rebalanced, with fund-level
+    # switch costs"), and weights=[1.0] on a single sleeve is a perfectly well-posed one: it is the
+    # single-sleeve baseline every blend gets compared against. It used to 400 (to-do #250).
+    if weights is None and len(sleeves) < 2:
         raise ValueError("rotation needs at least 2 sleeves")
+    if not sleeves:
+        raise ValueError("at least one sleeve is required")
     if lookback_days < 2:
         raise ValueError("lookback_days must be at least 2")
 

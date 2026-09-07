@@ -11,6 +11,13 @@ class Summary(BaseModel):
     max_dd_dates: list[str] = Field(default_factory=list)
     sharpe: float = 0.0
     sortino: float = 0.0
+    # CAGR / |max drawdown| — return per unit of worst peak-to-trough pain. Added 2026-09-07
+    # (iter-172, to-do #250). It was NEVER computed: the iter-23 research harnesses
+    # (docs/validation/*_iter23.py) all read `s.get("calmar")` off this summary and rendered
+    # `(r.get('calmar') or 0)`, so every table they printed carried a calmar column of zeros and
+    # the zero was read as a bug in the metric rather than its absence. 0.0 when max_drawdown is 0
+    # (no drawdown yet / too short a series) — the ratio is undefined there, not infinite.
+    calmar: float = 0.0
     volatility: float = 0.0
     win_rate: float = 0.0
     avg_win: float = 0.0

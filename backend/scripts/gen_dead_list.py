@@ -1,6 +1,14 @@
 """Write the 256 ISIN-dead symbols (peak turnover>50cr, not in TL, ISIN stopped) to a CSV
 for the screener scraper, and also persist a rename_map + dead_names registry into trendlyne.duckdb."""
-import duckdb, csv
+import csv
+import sys
+from pathlib import Path
+
+import duckdb
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from windfall.data.renames import resolve_rename_chains  # noqa: E402
+
 TL = "/mnt/storage/websites/windfall-labs/backend/data/trendlyne.duckdb"
 BC = "/mnt/storage/websites/windfall-labs/backend/data/bhavcopy.duckdb"
 OUT = "/mnt/storage/websites/windfall-labs/backend/data/dead_names.csv"
@@ -20,12 +28,34 @@ con.execute("""CREATE TEMP VIEW dead AS
   FROM bcsym b JOIN isin_active ia ON b.isin=ia.isin
   WHERE b.l < DATE '2025-12-01' AND b.pt>5e8 AND b.sym NOT IN (SELECT sym FROM tl_syms)""")
 
-# rename_map: old dead symbol -> live successor (ISIN still active)
+# rename_map: old dead symbol -> live successor (ISIN still active).
+#
+# The ISIN join is ONE HOP. A company that renamed twice under different ISINs leaves an
+# intermediate that is itself dead, and the row dead-ends there: TATAMTRDVR -> TATAMOTORS ->
+# TMPV, where only TMPV is live. Walk the chain afterwards so consumers (#89 dead-name
+# survivorship, #92 pit_mcap/adtv holes) get a symbol they can actually use. `resolved_via`
+# records the hops, so a followed row is visible rather than silently rewritten (iter-172, #246).
 con.execute("DROP TABLE IF EXISTS rename_map")
 con.execute("""CREATE TABLE rename_map AS
   SELECT sym AS old_sym, isin, latest_sym AS live_sym,
          (latest_sym IN (SELECT sym FROM tl_syms)) AS live_in_tl
   FROM dead WHERE last_any >= DATE '2026-01-01'""")
+
+_raw = q("SELECT old_sym, isin, live_sym, live_in_tl FROM rename_map")
+_live = {r[0] for r in q("SELECT sym FROM tl_syms")}
+_resolved = resolve_rename_chains(_raw, _live)
+con.execute("DROP TABLE IF EXISTS rename_map")
+con.execute("CREATE TABLE rename_map (old_sym VARCHAR, isin VARCHAR, live_sym VARCHAR, "
+            "live_in_tl BOOLEAN, resolved_via VARCHAR)")
+con.executemany("INSERT INTO rename_map VALUES (?, ?, ?, ?, ?)",
+                [(r["old_sym"], r["isin"], r["live_sym"], r["live_in_tl"], r["resolved_via"])
+                 for r in _resolved])
+_chained = [r for r in _resolved if r["resolved_via"]]
+_rescued = [r for r in _chained if r["live_in_tl"]]
+print(f"rename chains followed: {len(_chained)} ({len(_rescued)} now resolve to a LIVE symbol)")
+for r in _chained:
+    print(f"    {r['old_sym']} > {r['resolved_via']} > {r['live_sym']}"
+          f"{' (live)' if r['live_in_tl'] else ' (still dead-ends)'}")
 # dead_names registry: ISIN truly stopped
 con.execute("DROP TABLE IF EXISTS dead_names")
 con.execute("""CREATE TABLE dead_names AS
