@@ -446,3 +446,13 @@ decisions:
       - curated
       - cat:reliability
     body_path: docs/decisions/adr-046-windfall-bhavcopy-eligibility-fallback.md
+  - id: adr-047-windfall-forward-pe-coverage
+    project_slug: windfall-labs
+    title: Forward PE is harvested but not wired as a factor - analyst coverage
+      reaches 19.5% of what the books hold
+    status: accepted
+    date: 2026-09-08T00:00:00.000Z
+    tags:
+      - curated
+      - cat:product
+    body_path: docs/decisions/adr-047-windfall-forward-pe-coverage.md

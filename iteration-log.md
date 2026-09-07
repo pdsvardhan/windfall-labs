@@ -330,3 +330,94 @@ names to 49.
 3. **Tidying** — #854, #858 (point the runbook at leg1-lite), #288, #818, #185, #841/#846.
 4. Pre-existing HARD anti-gaslight: `cockpit-dashboard` and `strategy-editor` at `status=done` with
    no `feature_claims` row. Unchanged since iter-147, still unaddressed.
+
+---
+
+## Session 2026-09-08 — iter-173: the Rs5L flip, forward PE, and the mcap identity
+
+**Stage:** Stage 4 iteration (iteration 174, items 1250 + 1251)
+**Duration:** ~90 min
+**Branch:** `iter-172-data-honesty` merged into `master` (5a4577e), then five more commits on master.
+
+### What changed
+
+**#819 — the eight paper books flipped Rs1L → Rs5L.** Sequenced, not a config bump. The trap that
+was avoided: every *persisted* signal run had been generated 2026-09-07 07:23–07:26 IST, ~11 hours
+**before** adr-046 landed at 18:35, so resizing against the stored runs would have re-entered all
+eight books into baskets picked from 14% of the market. Signals were re-derived live instead
+(as_of 2026-09-07, data age 0, 1,946-name universe). 118 positions closed, 8 pendings voided, 140
+re-entered; each book committed exactly Rs500,000.00 with `underfunded_skips` 0. Verified
+independently — report 1072, APPROVE, 0 hard failures. Residual cash equals cumulative realized P&L
+to the paisa, and the equity curve unitized across the step (max deviation 5e-07, no fake 5x jump).
+
+**#857 — forward PE, which #26 has wanted since June.** It cannot be exported: 2,235 of 2,235 cells
+read the literal string `Export NA`. The route turned out to be much cleaner than the to-do assumed
+— the Forecaster page is **server-rendered**, with the whole estimate set inside the document on
+`data-consensusjson`, and the URL wildcards its slug so `pk` alone addresses it. No API token, no
+headless browser, no XHR to intercept. New `trendlyne_harvester_forecaster.js` +
+`scripts/ingest_forecaster.py` (insert-only, 5 tests) + adr-047.
+
+**Verifier caught a real miss on #857 (ITERATE, 2 hard failures).** The harvest used the base
+screener, which drops the top ~100 index names — a defect *already documented in this repo*, and
+the reason `trendlyne_harvester_megacap.js` exists. RELIANCE, HDFCBANK, LT, TITAN and ~90 others
+were never requested, so there was no error to notice, and 12 live holdings were counted as
+*uncovered* when they had never been *asked*. Fixed same session: megacap top-up run and ingested
+(+4,832 rows), and every coverage number restated. Live-holdings coverage was **36.5%, not 19.5%**;
+BLEND_70_30 went 10/40 → 20/38 = 52.6%, which the wrong number had buried. The decision (harvest,
+do not wire a factor) survives — the sub-Rs2,000cr collapse to 6.4% is untouched by the error — but
+the ADR now names BLEND as an honest exception rather than implying the case is uniform.
+
+**Five bugs fixed, and two of them were one bug.**
+- **#862 + #860** — `rebuild_pit_mcap_ca.py` was multiplying Trendlyne's *back-adjusted* close by a
+  *point-in-time* share count (iter-172's #89), mixing two unit systems and double-counting every
+  split. `pit_shares` flips to post-split units at the EPS period-end while the price is adjusted
+  from the ex-date, so between those dates they disagree by exactly the split ratio. Restoring the
+  identity the module docstring already derives: worst monthly mcap step EICHERMOT 11.08 → 1.47,
+  BAJFINANCE 99.94 → 2.02, and **RELIANCE 4.24 → 1.42 and HDFCBANK 5.55 → 1.37, neither of which is
+  in the test's parametrize list** — the breakage was wider than the names being checked. Latest
+  mcap vs Trendlyne went 90.3% → **100.0%** within 15%, and names off by >50% went **53 → 0**, so
+  #860 needed no share-count seeding at all.
+- **#861** — the splice test compared whole series including the index, which a second later-trading
+  name legitimately lengthens. Engine was right; assertion was too strict and snapshot-dependent.
+  Now compares on shared dates and asserts the thing that matters: no forward-marking past a name's
+  own last bar.
+- **#863** — a type that lied (`entry`/`shares` declared non-null on a pending row) meant queued
+  entries were counted as *closed* and rendered with a red "closed" pill at Rs0. All eight books
+  looked liquidated. Now shows "10 queued · Rs5,00,000 committed · fills next open".
+- **#864** — `available_cash` carried gross realized P&L and never paid the brokerage/STT the
+  scoreboard deducts (Rs5,321 across eight books, scaled 5x by the flip). Now nets only costs
+  actually *paid*, which is deliberately different from `_net_pnl`.
+
+**Full backend suite: 314 passed, 0 failed.** The four failures carried in from iter-172 are gone.
+
+### Decisions
+
+- **adr-047** — forward PE is harvested but not wired as a factor; coverage collapses below
+  Rs2,000cr (6.4%), where the books trade. Corrected same day after verification.
+
+### Friction
+
+- *tooling* — Git Bash truncates a `-c` string past ~8 KB, so two large heredocs died with
+  "unexpected EOF" before anything ran. Already rule 6 in the skill; hit it twice anyway. Writing
+  the file with the Write tool and SCP'ing is the reliable path.
+- *tooling* — the Chrome tab group was closed out from under the session twice mid-harvest, losing
+  a ~30 min run. Recovered by relaunching; the harvest itself takes ~2 min, so the loss was small.
+- *env-limitation* — `windfall.duckdb` is single-writer and held by uvicorn, so all state reads had
+  to go through the HTTP API rather than a second client.
+- *data-mismatch* — the running API container was a commit behind `master` twice (the notional fix,
+  then the cost fix). Caught by md5-comparing the container's file against the repo. Worth making
+  that a standing check.
+
+### Next session
+
+1. **#865 — confirm the flip actually worked.** The idle-cash drag it was for is not measurable
+   until the 140 pending entries fill at the next open. Compare `min_cash_pct` per book and count
+   new `unfillable-granularity` voids; at Rs5L the BLEND slices are Rs17,500/Rs7,500 rather than
+   Rs3,500/Rs1,500, so they should go to ~zero. If they do not, #819 should reopen.
+2. **#867 — the measurement adr-047 asks for.** Re-test the 0.44 ceiling on the 813 covered names,
+   and scope a BLEND-only experiment given its 52.6% coverage.
+3. **#876 — the real #89.** Point-in-time share counts still need a per-quarter shares-outstanding
+   source; the ASOF mechanism must not be re-applied without one.
+4. **Tidying** — #854, #858, #288, #818, #185, #841/#846.
+5. Pre-existing HARD anti-gaslight: `cockpit-dashboard` and `strategy-editor` at `status=done` with
+   no `feature_claims` row. Unchanged since iter-147, still unaddressed.
