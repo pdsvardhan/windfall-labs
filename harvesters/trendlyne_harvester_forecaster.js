@@ -92,6 +92,12 @@
   // gates growth_quality: the engine reads annual, and quarterly triples the rows
   // for nothing. Flip when a strategy actually asks for it.
   const FETCH_QUARTERLY = false;
+
+  // 'download' writes CSV parts to Downloads (the normal human-run monthly path).
+  // 'memory' keeps them in window.__WF_FORECASTER.est / .cov instead, for a run
+  // driven from a tool session that reads the rows out and writes them serverside
+  // directly — no Downloads round-trip, no "allow multiple downloads" prompt.
+  const EMIT = 'download';
   // --------------------------------------------------------------------------
 
   const csrf  = (document.cookie.match(/(?:^|;)\s*csrftoken\s*=\s*([^;]+)/) || [])[1] || '';
@@ -148,17 +154,22 @@
   }
   log(`${stocks.length} stocks · ${Object.keys(METRICS).length} metric groups · 1 request each`);
 
-  // 2) buffers
+  // 2) buffers. Progress + rows are published on window so a driving session can
+  // read them without waiting on a single long-running call.
+  const P = window.__WF_FORECASTER = { total: stocks.length, done: 0, covered: 0,
+    rows: 0, errs: 0, throttled: 0, finished: false, as_of: AS_OF, est: [], cov: [] };
   let estBuf = ['pk,metric,period_end,as_of,value'], estPart = 1, estRows = 0;
   let covBuf = ['pk,as_of,covered,annual_rows,http_status'], covPart = 1, covRows = 0;
   const flushEst = () => {
     if (!estRows) return;
-    download(`tl_forecaster_estimates_part${String(estPart).padStart(2, '0')}.csv`, estBuf.join('\n') + '\n');
+    if (EMIT === 'memory') { P.est.push(estBuf.join('\n')); }
+    else download(`tl_forecaster_estimates_part${String(estPart).padStart(2, '0')}.csv`, estBuf.join('\n') + '\n');
     estPart++; estBuf = ['pk,metric,period_end,as_of,value']; estRows = 0;
   };
   const flushCov = () => {
     if (!covRows) return;
-    download(`tl_forecaster_coverage_part${String(covPart).padStart(2, '0')}.csv`, covBuf.join('\n') + '\n');
+    if (EMIT === 'memory') { P.cov.push(covBuf.join('\n')); }
+    else download(`tl_forecaster_coverage_part${String(covPart).padStart(2, '0')}.csv`, covBuf.join('\n') + '\n');
     covPart++; covBuf = ['pk,as_of,covered,annual_rows,http_status']; covRows = 0;
   };
 
@@ -218,9 +229,11 @@
       if (estRows >= FLUSH_ROWS) flushEst();
 
       done++;
+      P.done = done; P.covered = covered; P.rows = totalRows; P.errs = errs; P.throttled = throttled;
       if (done % 10 === 0 || done === stocks.length) {
         const rate = done / ((Date.now() - t0) / 1000);
         const eta = Math.round((stocks.length - done) / Math.max(rate, 0.01) / 60);
+        P.eta_min = eta;
         log(`stocks ${done}/${stocks.length} · covered ${covered} (${Math.round(100 * covered / done)}%) · `
           + `rows ${totalRows.toLocaleString()} · errs ${errs} · 429s ${throttled} · ETA ~${eta}m`);
       }
@@ -228,6 +241,7 @@
   }
   await Promise.all(Array.from({ length: CONC }, worker));
   flushEst(); flushCov();
+  P.finished = true;
   log(`DONE · ${done} stocks · covered ${covered} (${Math.round(100 * covered / Math.max(done, 1))}%) · `
     + `${totalRows.toLocaleString()} rows · parts est(${estPart - 1}) cov(${covPart - 1}) · `
     + `errs ${errs} · 429s ${throttled}`);
