@@ -8,8 +8,11 @@ import { Card, Pill, StatCard } from "@/components/ui";
 import { EquityChart } from "@/components/charts";
 
 // Fallback notional only. The API reports each book's own notional (equity.books[sid].notional),
-// which is what the page uses — the constant would silently misrender every chart and cash figure
-// the moment the books move off ₹1L, which is the planned next step (iter-171).
+// which is what the page uses — a constant would silently misrender every chart and cash figure
+// once the books moved off ₹1L. They DID move: all eight went to ₹5L on 2026-09-08 (iter-173,
+// to-do #819), and the page rendered it correctly because it reads the API. The fallback stays at
+// the historical ₹1L on purpose — it is only ever reached when a book has no equity row at all,
+// and inception for every current book was at ₹1L.
 const NOTIONAL_FALLBACK = 100000;
 
 // Books started before this date are the original 6-Jul cohort; at/after it, the survivor cohort.
