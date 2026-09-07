@@ -81,23 +81,31 @@ NUMBER_OF_ANALYSTS`, with `periodtype` ("FY27") and `qtr_end_date` ("2027-03-31"
 are available; the harvester takes EPS and TARGET_PRICE, and the parser is generic — add a key to
 `METRICS` and it is harvested.
 
-**Coverage is the catch, and it decides whether #26 is even answerable.** Measured 2026-09-08,
-n=40 stratified across the `mcapq>500` universe:
+**RUN THE MEGACAP COMPANION, or you silently omit the ~100 largest names.** This harvester takes
+its stock list from the base screener, and the base screener drops the top ~100 index names — the
+same defect `trendlyne_harvester_megacap.js` exists to fix. On the first run (2026-09-08) that
+omitted RELIANCE, HDFCBANK, LT, TITAN, ICICIBANK and ~90 others, and because they were never
+*requested* there was no error to notice: 0 errors, 0 429s, and a coverage table that read ~19%
+where the truth was ~36%. Feed the megacap symbol list through the same endpoint and re-ingest with
+`--allow-small`, which exists for exactly this top-up.
 
-| Market cap | Covered |
-|---|---|
-| > ₹50,000cr | 3/3 — 100% |
-| ₹10,000–50,000cr | 7/8 — 88% |
-| ₹2,000–10,000cr | 6/14 — 43% |
-| ₹500–2,000cr | **0/15 — 0%** |
-| overall | 16/40 — 40% |
+**Coverage is the catch, and it decides whether #26 is even answerable.** Full harvest 2026-09-08,
+2,005 stocks probed, banded strictly against the ₹500cr universe:
 
-Analysts do not cover small caps, and small caps are where the live DVM books pick — DVM_user holds
-BHAGYANGR, CUPID, FREDUN, KAPSTON, SALSTEEL and SIGMAADV, and **none of them has a single estimate**.
-A forward-PE factor from this source can only ever apply to the large/mid-cap subset. An uncovered
-stock is not an error: it returns HTTP 200 with an empty `RANGE_ESTIMATES` and a ~75KB page against
-~600KB for a covered one, and the harvester records it as a miss in the coverage CSV so a thin
-harvest is measured rather than inferred.
+| Market cap | Covered / probed / in universe | % of universe |
+|---|---|---|
+| > ₹50,000cr | 186 / 202 / 206 | 90.3% |
+| ₹10,000–50,000cr | 296 / 388 / 390 | 75.9% |
+| ₹2,000–10,000cr | 281 / 630 / 632 | 44.5% |
+| ₹500–2,000cr | 50 / 738 / 781 | **6.4%** |
+| overall | 813 / 2,005 | 40.5% |
+
+Coverage does not decline gently, it collapses: below ₹2,000cr it is effectively absent, and that
+band is 39% of the universe. Of the 77 names the live books held on 2026-09-08, 27 are covered
+(36.5% of the 74 that resolve to a pk); `MOM_roc252_m_10` is 0 of 8. An uncovered stock is not an
+error — it returns HTTP 200 with an empty `RANGE_ESTIMATES` and a ~75KB page against ~600KB for a
+covered one, and the harvester records it as a miss in the coverage CSV so a thin harvest is
+measured rather than inferred. See adr-047.
 
 **When the ingest is written it must MERGE, never replace per `(pk, metric)`.** This endpoint returns
 only *today's* estimates — there is no history, and estimates revise. Every row therefore carries both

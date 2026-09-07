@@ -20,16 +20,18 @@ date cannot answer it, and using period_end alone would silently give a future r
 decision — look-ahead, in the exact form the engine exists to avoid.
 
 COVERAGE — READ THIS BEFORE BUILDING A FACTOR ON THIS TABLE
-Measured on the full 2026-09-08 harvest (n=1,910, not a sample): 725 stocks (38.0%) have a forward
-EPS estimate at all.
-    > Rs50,000cr      98/108   90.7%
-    Rs10-50,000cr    296/388   76.3%
-    Rs2-10,000cr     281/630   44.6%
-    Rs500-2,000cr     50/775    6.5%
-And of the 77 distinct names the eight live paper books re-entered on 2026-09-08, just 15 are
-covered — 19.5%, with MOM_roc252_m_10 at 0 of 10. A forward-PE factor cannot rank a book whose
-names have no estimates, so this table is research input first; wiring it into a live strategy
-would silently shrink that strategy's universe to the large/mid-cap subset. See to-do #26.
+Full 2026-09-08 harvest, 2,005 stocks probed (base screener PLUS the megacap companion — without
+that companion the top ~100 names are silently absent and the numbers below read far worse):
+813 stocks (40.5%) have a forward EPS estimate, banded against the Rs500cr universe —
+    > Rs50,000cr     186/206   90.3%
+    Rs10-50,000cr    296/390   75.9%
+    Rs2-10,000cr     281/632   44.5%
+    Rs500-2,000cr     50/781    6.4%
+Coverage collapses rather than declines, and the bottom band is 39% of the universe. Of the 77
+names the eight live paper books held on 2026-09-08, 27 are covered — 36.5% of the 74 that resolve
+to a pk, with MOM_roc252_m_10 at 0 of 8 and BLEND_70_30 the outlier at 52.6%. A forward-PE factor
+cannot rank a book whose names have no estimates, so this table is research input first; wiring it
+into a live strategy would silently shrink that strategy's universe. See adr-047 and to-do #26.
 
 Usage (server, host venv — the api opens this DB read-only, so --apply needs it stopped):
     cd /mnt/storage/websites/windfall-labs/backend

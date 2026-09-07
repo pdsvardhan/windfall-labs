@@ -35,18 +35,27 @@
    We take EPS and TARGET_PRICE. The rest are available if a strategy ever wants
    them — add to METRICS below; the parser is generic.
 
-   COVERAGE IS THE HEADLINE, AND IT IS NOT GOOD (measured 2026-09-08, n=40
-   stratified across the mcapq>500 universe):
-       > Rs50,000cr    3/3   100%
-       Rs10-50,000cr   7/8    88%
-       Rs2-10,000cr    6/14   43%
-       Rs500-2,000cr   0/15    0%
-       overall        16/40   40%
-   Analyst coverage simply does not exist for small caps, and small caps are
-   where the live DVM books actually pick (DVM_user currently holds BHAGYANGR,
-   CUPID, FREDUN, KAPSTON, SALSTEEL, SIGMAADV — zero coverage on every one).
-   A forward-PE factor built on this can only ever apply to the large/mid-cap
-   subset. Read #26 with that in mind before assuming this lifts the 0.44 ceiling.
+   COVERAGE IS THE HEADLINE, AND IT IS NOT GOOD (full harvest 2026-09-08, 2,005
+   stocks probed, banded strictly against the Rs500cr universe):
+       > Rs50,000cr     186/206   90.3%
+       Rs10-50,000cr    296/390   75.9%
+       Rs2-10,000cr     281/632   44.5%
+       Rs500-2,000cr     50/781    6.4%
+       overall          813/2,005 40.5%
+   Coverage does not decline gently, it collapses. Below Rs2,000cr it is
+   effectively absent, and that band is 39% of the universe. Of the 77 names the
+   eight live books held that day, 27 are covered (36.5% of those resolving to a
+   pk); MOM_roc252_m_10 is 0 of 8, BLEND_70_30 the outlier at 52.6%. Read #26
+   and adr-047 with that in mind before assuming this lifts the 0.44 ceiling.
+
+   RUN THE MEGACAP COMPANION. This harvester takes its stock list from the base
+   screener, and the base screener drops the top ~100 index names - the same
+   defect trendlyne_harvester_megacap.js exists to fix. The first 2026-09-08 run
+   omitted RELIANCE, HDFCBANK, LT, TITAN, ICICIBANK and ~90 more, and because
+   they were never REQUESTED there was no error to see: 0 errors, 0 429s, and a
+   coverage headline reading ~19% where the truth was ~36%. Feed the megacap
+   symbol list through this same endpoint and re-ingest with --allow-small.
+
    An uncovered stock is NOT an error: it returns HTTP 200 with an empty
    RANGE_ESTIMATES and a ~75KB page (vs ~600KB covered). We record it as a miss.
 
