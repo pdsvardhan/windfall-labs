@@ -195,17 +195,37 @@ def adjusted_close_panel(symbols, start=None, end=None, field: str = "close",
         if extend_live:
             # Extend live names with Bhavcopy EOD beyond the last Trendlyne bar (back-adjusted series'
             # tail = raw price, so no split adjustment needed for the recent window).
-            last_tl = con.execute(
-                f"SELECT MAX(date) FROM ohlcv WHERE pk IN ({','.join(['?'] * len(pks))})", pks).fetchone()[0]
+            #
+            # PER SYMBOL, not per batch (iter-172, to-do #820 / adr-044). This used to take ONE
+            # scalar — MAX(date) across every requested pk — and splice only `date > last_tl` for
+            # everybody. Any name whose own history ended earlier than the batch maximum got no
+            # Bhavcopy rows for the gap between its last bar and last_tl, so its column carried
+            # leading NaNs that .ffill() cannot repair. The same stock returned different data
+            # depending on who else you asked for: SCPL alone was a clean series from 2026-06-29;
+            # SCPL inside the 98-name paper batch was NaN until 2026-07-09, and book_equity valued
+            # it at entry price for its whole holding period (+14.9% reported as a flat 0.0%).
+            # Measured 2026-09-07: 1,529 of 1,782 names lagged the batch maximum.
             fcol = {"close": "close", "open": "open", "high": "high", "low": "low"}.get(field, "close")
             syms_live = list(live.keys())
-            if last_tl is not None and syms_live:
-                ext = con.execute(
-                    f"SELECT upper(regexp_replace(ticker,'\\.NS$','')) symbol, date, {fcol} v "
-                    f"FROM bc.bhavcopy_prices WHERE series IN {_MAINBOARD_SQL_IN} AND {fcol}>0 "
-                    f"AND date > ? "
-                    f"AND upper(regexp_replace(ticker,'\\.NS$','')) IN ({','.join(['?'] * len(syms_live))})",
-                    [last_tl] + syms_live).fetchdf()
+            if syms_live:
+                ph_pk = ",".join(["?"] * len(pks))
+                ph_sym = ",".join(["?"] * len(syms_live))
+                ext = con.execute(f"""
+                    WITH sym AS (
+                        SELECT upper(nsecode) s, pk FROM stocks WHERE nsecode <> ''
+                        UNION SELECT upper(nse_symbol), pk FROM recovered_symbols
+                        WHERE nse_symbol <> ''),
+                    tails AS (
+                        SELECT pk, MAX(date) AS last_tl FROM ohlcv
+                        WHERE pk IN ({ph_pk}) GROUP BY pk)
+                    SELECT m.s AS symbol, b.date, b.{fcol} AS v
+                    FROM bc.bhavcopy_prices b
+                    JOIN sym m ON upper(regexp_replace(b.ticker, '\\.NS$', '')) = m.s
+                    JOIN tails t ON t.pk = m.pk
+                    WHERE b.series IN {_MAINBOARD_SQL_IN} AND b.{fcol} > 0
+                      AND b.date > t.last_tl
+                      AND m.s IN ({ph_sym})
+                """, pks + syms_live).fetchdf()
                 if not ext.empty:
                     parts.append(ext[["date", "symbol", "v"]])
 
@@ -291,6 +311,56 @@ def _bhavcopy_mcap_panel(symbols, idx) -> pd.DataFrame:
               .sort_index().reindex(index=idx))
 
 
+def _pit_mcap_wide(syms, idx, warnings: list | None = None):
+    """Wide date x symbol point-in-time market cap (Rs cr), with the Bhavcopy tail fallback.
+
+    Extracted so `membership_panel` and `mcap_panel` cannot disagree (iter-172, to-do #92). They had
+    the same query and the same `ffill(limit=10)` written out twice, and adr-046 added the fallback
+    to only one of them — leaving the `mcap` FEATURE holed on exactly the dates the ELIGIBILITY gate
+    had just been taught to repair. Membership is derived from market cap; two copies of that
+    derivation drifting apart is a bug waiting for a rebalance.
+
+    Returns None when the store has nothing for these symbols, so callers can pick their own empty
+    shape (all-False mask vs empty frame).
+    """
+    df = _con().execute(
+        "SELECT symbol, date, mcap_cr FROM universe_membership WHERE symbol IN ("
+        + ",".join(["?"] * len(syms)) + ")", syms).fetchdf()
+    if df.empty:
+        return None
+    df["date"] = pd.to_datetime(df["date"])
+    wide = df.pivot_table(index="date", columns="symbol", values="mcap_cr").sort_index()
+    # Each symbol's last genuine reading, BEFORE any reindex/ffill invents shape around it.
+    last_obs = wide.apply(lambda c: c.last_valid_index())
+    # Bridge small daily gaps (≈2 trading weeks) but DO NOT forward-fill past a name's last
+    # observation — a delisted name must drop out of the universe, not look perpetually eligible.
+    wide = wide.reindex(wide.index.union(idx)).ffill(limit=10).reindex(idx)
+
+    stale = [s for s in wide.columns
+             if pd.notna(last_obs.get(s)) and wide[s].isna().any()
+             and last_obs[s] < idx.max()]
+    if stale:
+        fb = _bhavcopy_mcap_panel(stale, idx)
+        filled_obs = []
+        for s in stale:
+            if s not in fb.columns:
+                continue
+            # Only dates strictly after this symbol's own last real reading, and only where
+            # Bhavcopy genuinely priced it — so a delisted name is never resurrected.
+            cells = wide[s].isna() & (idx > last_obs[s]) & fb[s].notna()
+            if cells.any():
+                wide.loc[cells, s] = fb.loc[cells, s]
+                filled_obs.append(last_obs[s])
+        if filled_obs and warnings is not None:
+            gap = (idx.max() - min(filled_obs)).days
+            warnings.append(
+                f"universe eligibility: {len(filled_obs)} of {len(wide.columns)} names had no "
+                f"point-in-time market cap past their last Trendlyne bar (the oldest {gap} days "
+                f"back) and were priced from Bhavcopy instead (adr-046). Run the Trendlyne OHLCV "
+                f"harvest to restore split-adjusted membership.")
+    return wide
+
+
 def membership_panel(symbols, dates, floor_cr: float = MCAP_FLOOR_CR,
                      warnings: list | None = None) -> pd.DataFrame:
     """Bool date x symbol panel: True where the symbol's point-in-time mcap > floor on that date.
@@ -321,47 +391,10 @@ def membership_panel(symbols, dates, floor_cr: float = MCAP_FLOOR_CR,
        property the original docstring was written to protect.
     """
     syms = [s.upper() for s in symbols]
-    df = _con().execute(
-        "SELECT symbol, date, mcap_cr FROM universe_membership WHERE symbol IN ("
-        + ",".join(["?"] * len(syms)) + ")", syms).fetchdf()
     idx = pd.DatetimeIndex(sorted(pd.to_datetime(dates).unique()))
-    if df.empty:
+    wide = _pit_mcap_wide(syms, idx, warnings)
+    if wide is None:
         return pd.DataFrame(False, index=idx, columns=syms)
-    df["date"] = pd.to_datetime(df["date"])
-    wide = df.pivot_table(index="date", columns="symbol", values="mcap_cr").sort_index()
-    # Each symbol's last genuine reading, BEFORE any reindex/ffill invents shape around it.
-    last_obs = wide.apply(lambda c: c.last_valid_index())
-    # Bridge small daily gaps (≈2 trading weeks) but DO NOT forward-fill past a name's last
-    # observation — a delisted name must drop out of the universe, not look perpetually eligible.
-    wide = wide.reindex(wide.index.union(idx)).ffill(limit=10).reindex(idx)
-
-    stale = [s for s in wide.columns
-             if pd.notna(last_obs.get(s)) and wide[s].isna().any()
-             and last_obs[s] < idx.max()]
-    if stale:
-        fb = _bhavcopy_mcap_panel(stale, idx)
-        filled_obs = []
-        for s in stale:
-            if s not in fb.columns:
-                continue
-            # Property 2: only dates strictly after this symbol's own last real reading.
-            tail = idx > last_obs[s]
-            cells = wide[s].isna() & tail & fb[s].notna()
-            if cells.any():
-                wide.loc[cells, s] = fb.loc[cells, s]
-                filled_obs.append(last_obs[s])
-        if filled_obs and warnings is not None:
-            # Age is measured over the names ACTUALLY filled, not over every stale candidate. The
-            # candidate set includes names delisted years ago, whose last reading is a decade old
-            # and which the fallback correctly does not resurrect (no Bhavcopy rows) — averaging
-            # them in produced a true-but-meaningless "3689 days back" on the first cut.
-            gap = (idx.max() - min(filled_obs)).days
-            warnings.append(
-                f"universe eligibility: {len(filled_obs)} of {len(wide.columns)} names had no "
-                f"point-in-time market cap past their last Trendlyne bar (the oldest {gap} days "
-                f"back) and were priced from Bhavcopy instead (adr-046). Run the Trendlyne OHLCV "
-                f"harvest to restore split-adjusted membership.")
-
     out = (wide > floor_cr).reindex(columns=syms).fillna(False)
     bad = [s for s in out.columns if s not in _nse_symbols()]  # NSE-only gate (adr-024)
     if bad:
@@ -587,21 +620,15 @@ def raw_fundamental_panel(metric: str, symbols, dates, warnings: list | None = N
     return wide * _FUND_SCALE.get(metric, 1.0)
 
 
-def mcap_panel(symbols, dates) -> pd.DataFrame:
+def mcap_panel(symbols, dates, warnings: list | None = None) -> pd.DataFrame:
     """Point-in-time market cap (Rs cr), SURVIVORSHIP-FREE: from universe_membership.mcap_cr (the same
     PIT series that feeds the >500cr universe floor, live + delisted). Exposed as a feature so a
     backtest can reproduce Trendlyne 'Market Capitalization' bands (e.g. mcap > 1000, mcap < 50000)
     over history, not just the snapshot value. Forward-filled (<=2 wks) within each name's window."""
     syms = [s.upper() for s in symbols]
-    df = _con().execute(
-        "SELECT symbol, date, mcap_cr FROM universe_membership WHERE symbol IN ("
-        + ",".join(["?"] * len(syms)) + ")", syms).fetchdf()
     idx = pd.DatetimeIndex(sorted(pd.to_datetime(dates).unique()))
-    if df.empty:
-        return pd.DataFrame(index=idx)
-    df["date"] = pd.to_datetime(df["date"])
-    wide = df.pivot_table(index="date", columns="symbol", values="mcap_cr").sort_index()
-    return wide.reindex(wide.index.union(idx)).ffill(limit=10).reindex(idx)
+    wide = _pit_mcap_wide(syms, idx, warnings)
+    return pd.DataFrame(index=idx) if wide is None else wide
 
 
 _SHARE_CAT = {"tl_pledge": "Pledged", "tl_fii": "FII", "tl_dii": "DII"}
