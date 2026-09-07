@@ -97,10 +97,24 @@ every month.
 
 ## `_done/` — one-offs whose output is already in the database
 
-Kept because they are the **only way to rebuild those tables**: `ingest_refresh.py` handles only
-`dvm_history`, `ohlcv` and `stocks`. The fundamentals CSVs these produce (`valuation_ratios`,
-`growth_quality`, `pnl_quarterly`, `ownership`, `shareholding_summary`, …) have no monthly ingest
-path — only the original bulk loader `load_trendlyne.py` reads them. Don't delete them.
+Kept because they are the **only way to rebuild most of those tables**: `ingest_refresh.py` handles
+`dvm_history`, `ohlcv`, `stocks` and — since 2026-09-07 — `valuation_ratios`. The *other*
+fundamentals CSVs these produce (`growth_quality`, `pnl_quarterly`, `ownership`,
+`shareholding_summary`, …) still have no monthly ingest path; only the original bulk loader
+`load_trendlyne.py` reads them. Don't delete them.
+
+**`valuation_ratios` is the cautionary tale (iter-172, to-do #849).** It sat in that "no ingest
+path" list for months while `trendlyne_harvester_megacap.js` — an *active* monthly step — kept
+emitting `tl_valuation_ratios_megacap.csv` into the staging dir, which the ingest ignored and
+Phase 3 step 5 then deleted. The table froze at 2026-07-15 while `dvm_history` ran to 2026-09-04,
+and because `resolve()` forward-fills the daily factor panels, 48 of 289 saved strategies (one a
+LIVE paper book) kept ranking on July multiples with nothing in `warnings[]` to say so. The lesson
+generalises to every row still in this table: **an unwired table does not announce itself.** If a
+harvester emits a CSV the ingest does not read, that is a silent staleness bug waiting for a
+consumer, not a harmless extra file.
+
+Megacap coverage only, for now: the monthly leg carries ~99 names. `leg1` is what covers the full
+~1,800, and promoting it back into the monthly set is the remaining half of #849.
 
 | Script | What it built |
 |---|---|
