@@ -24,6 +24,7 @@ import datetime as dt
 from .. import store_meta
 from ..signals_live.generate import generate_blend_signals, generate_signals
 from ..store_meta import _init, new_id
+from ..engine.backtest import DP_FLAT, NSE_BUY_RATE, NSE_SELL_RATE
 from .book import (close_position, commit_pending_signal, list_positions, mark_to_market,
                    void_pending)
 
@@ -186,7 +187,7 @@ def _target_book(entry: dict) -> tuple[dict, dict]:
 
 
 def available_cash(sid: str, notional: float) -> float:
-    """What the book can actually spend right now, GROSS of modelled costs.
+    """What the book can actually spend right now, net of modelled costs.
 
     Cash, not notional-minus-open-cost: every entry ever made leaves the account and every exit
     returns its proceeds, so realized P&L belongs in the balance. Sizing off open cost alone
@@ -194,19 +195,25 @@ def available_cash(sid: str, notional: float) -> float:
     Rs6,279 on MOM_roc252_m_10 — which is how a book overdrew in the first place (item 1235).
     Pending entries are money already committed to a fill, so they are held back too.
 
-    KNOWN OVERSTATEMENT (measured 2026-09-08, iter-173): entry and exit are raw prices, so the
-    balance carries GROSS realized P&L and never pays the modelled brokerage/STT the scoreboard
-    does net out. DVM_user reads Rs12,190.20 of cash against net_pnl Rs11,578.46 — Rs611.74 the
-    book will never actually have; Rs5,321.05 across the eight books, and it scaled 5x with the
-    Rs5L flip. It errs toward over-funding a book, never under-funding it. Netting costs here is
-    a behaviour change to the sizing path, so it is tracked separately rather than slipped in.
+    NET OF MODELLED COSTS since 2026-09-08 (to-do #864). It used to net none of them: entry and
+    exit are raw prices, so the balance carried GROSS realized P&L and never paid the brokerage/STT
+    the scoreboard deducts. DVM_user read Rs12,190.20 against net_pnl Rs11,578.46 — Rs611.74 of
+    cash the book would never actually have, Rs5,321.05 across the eight books, and it scaled 5x
+    with the Rs5L flip.
+
+    Only costs that have ACTUALLY been paid are deducted, which is where this differs from
+    book._net_pnl: that function marks a position to market and therefore models the exit cost of a
+    sale that has not happened. A cash balance must not. So an open position pays only its buy
+    cost, and the sell cost appears when the position closes.
     """
     cash = notional
     for p in list_positions(sid):
         if p["status"] in ("open", "closed") and p["entry"] and p["shares"]:
-            cash -= p["entry"] * p["shares"]
+            gross = p["entry"] * p["shares"]
+            cash -= gross + gross * NSE_BUY_RATE          # the buy, and what it cost to place it
         if p["status"] == "closed" and p["exit"] and p["shares"]:
-            cash += p["exit"] * p["shares"]
+            proceeds = p["exit"] * p["shares"]
+            cash += proceeds - (proceeds * NSE_SELL_RATE + DP_FLAT)
         if p["status"] == "pending":
             cash -= p.get("planned_capital") or 0.0
     return cash

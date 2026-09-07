@@ -72,13 +72,36 @@ def test_available_cash_counts_realised_losses(monkeypatch):
     """Sizing off notional-minus-open-cost ignores realised losses and overstates capacity.
 
     Book: bought 10,000, sold it for 6,000 (a 4,000 realised loss), and holds 20,000 more at cost.
-    Cost-basis view would say 100,000 - 20,000 = 80,000 available. True cash is 76,000.
+    Cost-basis view would say 100,000 - 20,000 = 80,000 available. Gross of costs it is 76,000.
+
+    Since #864 the balance is also NET of modelled costs, so the expectation is derived from the
+    cost constants rather than written as a number — if the cost model changes, this test should
+    follow it instead of failing. Only costs actually PAID are charged: both buys pay entry cost,
+    the closed position pays its sell cost, and the open position does not (it has not sold).
     """
     monkeypatch.setattr(rebalance, "list_positions", lambda sid: [
         {"status": "closed", "entry": 100.0, "shares": 100.0, "exit": 60.0},
         {"status": "open", "entry": 200.0, "shares": 100.0, "exit": None},
     ])
-    assert rebalance.available_cash(SID, 100000.0) == pytest.approx(76000.0)
+    costs = (10_000 * rebalance.NSE_BUY_RATE                       # buy the closed position
+             + 20_000 * rebalance.NSE_BUY_RATE                     # buy the open position
+             + 6_000 * rebalance.NSE_SELL_RATE + rebalance.DP_FLAT)  # sell the closed one
+    assert rebalance.available_cash(SID, 100000.0) == pytest.approx(76_000.0 - costs)
+    assert 0 < costs < 500, f"modelled costs on Rs36k of turnover look wrong: {costs}"
+
+
+def test_available_cash_does_not_charge_an_unsold_position_a_sell_cost(monkeypatch):
+    """#864: a cash balance pays for trades that happened, not for one the book might make.
+
+    This is the difference from book._net_pnl, which marks to market and so models the exit cost
+    of a sale that has not occurred. Charging it here would understate spendable cash and could
+    make a rebalance skip a name it can actually afford.
+    """
+    monkeypatch.setattr(rebalance, "list_positions", lambda sid: [
+        {"status": "open", "entry": 100.0, "shares": 100.0, "exit": None},
+    ])
+    expected = 100_000.0 - 10_000.0 - 10_000.0 * rebalance.NSE_BUY_RATE
+    assert rebalance.available_cash(SID, 100_000.0) == pytest.approx(expected)
 
 
 def test_available_cash_holds_back_pending_commitments(monkeypatch):

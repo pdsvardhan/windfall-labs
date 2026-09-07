@@ -59,8 +59,28 @@ def test_both_names_reach_the_latest_bhavcopy_bar():
 
 
 def test_backtests_are_untouched_because_extend_live_is_off():
-    """A dated backtest never enters the splice path, so this fix cannot move published results."""
+    """A dated backtest never enters the splice path, so this fix cannot move published results.
+
+    Compared on the SHARED dates, not on the whole series. A DataFrame has one index, so asking
+    for a second name that trades later legitimately lengthens it — that is the shape of the
+    panel, not a change to the column. What must not happen is a VALUE moving, or a price
+    appearing for a name on a date it did not trade; both are asserted below.
+
+    (Measured 2026-09-08: comparing the full series made this test depend on which name pair the
+    snapshot happened to yield. 3IINFOLTD alone ran to 2026-06-16; paired with 20MICRONS the index
+    ran to 2026-06-30 with 9 NaNs. Values were identical on all 31 shared dates and nothing was
+    forward-marked, so the engine was right and the assertion was too strict — to-do #861.)
+    """
     stale, fresh = _stale_and_fresh()
     a = ts.adjusted_close_panel([stale], start=START, end="2026-06-30", extend_live=False)
     b = ts.adjusted_close_panel([stale, fresh], start=START, end="2026-06-30", extend_live=False)
-    pd.testing.assert_series_equal(a[stale], b[stale], check_names=False)
+
+    shared = a.index.intersection(b.index)
+    assert len(shared) == len(a.index), "the solo panel gained dates it should not have"
+    pd.testing.assert_series_equal(a.loc[shared, stale], b.loc[shared, stale], check_names=False)
+
+    # the real risk: a batch inventing prices for a name past its own last bar
+    extra = b.index.difference(a.index)
+    assert b.loc[extra, stale].isna().all(), (
+        f"{stale} was marked forward on {b.loc[extra, stale].notna().sum()} date(s) it never "
+        f"traded, purely because {fresh} was in the same batch")
