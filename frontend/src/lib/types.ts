@@ -95,12 +95,18 @@ export interface PaperPosition {
   id: string;
   strategy_id: string | null;
   ticker: string;
+  /** "pending" | "open" | "closed" | "void". A PENDING row is queued by a rebalance and fills at
+   *  the next session's open, so it has no entry_date, entry or shares yet — only planned_capital.
+   *  These were typed non-null until 2026-09-08 (#863), which is how pending rows came to be
+   *  counted as closed and rendered with a red "closed" pill at Rs0. */
   status: string;
-  entry_date: string;
-  entry: number;
+  entry_date: string | null;
+  entry: number | null;
   stop: number | null;
   target: number | null;
-  shares: number;
+  shares: number | null;
+  /** Capital committed to a not-yet-filled entry. Only present on pending rows. */
+  planned_capital?: number | null;
   last_price: number | null;
   last_date: string | null;
   exit: number | null;

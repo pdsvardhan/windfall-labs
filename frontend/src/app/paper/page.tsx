@@ -35,8 +35,9 @@ const LABELS: Record<string, { name: string; note: string }> = {
 };
 
 interface Agg {
-  sid: string; positions: PaperPosition[]; open: number; closed: number;
-  invested: number; openCost: number; value: number; pnl: number; pnlPct: number;
+  sid: string; positions: PaperPosition[]; open: number; closed: number; pending: number;
+  invested: number; openCost: number; pendingCapital: number; committed: number;
+  value: number; pnl: number; pnlPct: number;
   wins: number; marked: number; start: string; days: number;
 }
 
@@ -45,23 +46,34 @@ function daysBetween(a: string, b: string): number {
 }
 
 function aggregate(sid: string, ps: PaperPosition[], today: string): Agg {
-  let invested = 0, openCost = 0, value = 0, wins = 0, open = 0, closed = 0, marked = 0;
-  let start = ps[0]?.entry_date ?? today;
+  let invested = 0, openCost = 0, pendingCapital = 0, value = 0;
+  let wins = 0, open = 0, closed = 0, pending = 0, marked = 0;
+  let start = ps.find((p) => p.entry_date)?.entry_date ?? today;
   for (const p of ps) {
+    // A pending row has no entry, shares or price yet — it is capital COMMITTED to a fill at the
+    // next session's open, not capital deployed. It contributes nothing to invested/value/P&L, and
+    // it is emphatically not "closed" (#863: it used to fall into the else branch below, so after
+    // the Rs5L resize all eight books reported every holding closed and nothing open).
+    if (p.status === "pending") {
+      pending++;
+      pendingCapital += p.planned_capital ?? 0;
+      continue;
+    }
+    if (p.entry == null || p.shares == null) continue;   // void, or an incomplete row
     const cost = p.entry * p.shares;
     const mark = (p.last_price ?? p.entry) * p.shares;
     invested += cost; value += mark;
     // `invested` is every rupee ever deployed, so on a book that has recycled capital it exceeds
     // the notional and reads as nonsense next to a cash figure (₹1,54,885 on a ₹1L book).
     // openCost is what is actually at work right now (iter-171).
-    if (p.status === "open") openCost += cost;
-    if (p.status === "open") open++; else closed++;
+    if (p.status === "open") { openCost += cost; open++; } else closed++;
     if (p.last_price != null) marked++;
     if ((p.return_pct ?? 0) > 0) wins++;
-    if (p.entry_date < start) start = p.entry_date;
+    if (p.entry_date && p.entry_date < start) start = p.entry_date;
   }
   const pnl = value - invested;
-  return { sid, positions: ps, open, closed, invested, openCost, value, pnl,
+  return { sid, positions: ps, open, closed, pending, invested, openCost, pendingCapital,
+    committed: openCost + pendingCapital, value, pnl,
     pnlPct: invested ? pnl / invested : 0, wins, marked, start, days: daysBetween(start, today) };
 }
 
@@ -116,19 +128,24 @@ function BookCard({ a, i, netPnl, score, equity, sim, isOpen, onToggle }: {
           <div className="text-[11px] text-faint">Nifty500</div>
         </div>
         <div className="text-right w-[64px] hidden md:block">
-          <div className="text-[13px] font-bold tn">{a.open}</div>
-          <div className="text-[11px] text-faint">open</div>
+          <div className="text-[13px] font-bold tn">{a.pending > 0 ? a.pending : a.open}</div>
+          <div className="text-[11px] text-faint">{a.pending > 0 ? "queued" : "open"}</div>
         </div>
         <div className="text-right w-[84px] hidden md:block">
-          <div className="text-[13px] font-bold tn">{money(a.openCost)}</div>
+          <div className="text-[13px] font-bold tn">{money(a.committed)}</div>
           <div className="text-[11px] text-faint">
-            {cashPct == null
-              ? `${Math.round(Math.max(0, 1 - a.openCost / notional) * 100)}% cash`
-              : cashPct < 0
-                // A negative floor is not idle cash — the book briefly spent money it did not
-                // have. Labelling it "-1% idle cash" hides an overdraw (iter-171, item 1235).
-                ? `overdrew ${money(Math.abs(st?.min_cash ?? 0))}`
-                : `${Math.round(cashPct * 100)}% idle cash`}
+            {/* While entries are queued the book is neither invested nor idle — the capital is
+                committed and fills at the next open. min_cash_pct is a HISTORICAL floor, so
+                showing it here would describe a book that no longer exists (#863). */}
+            {a.pending > 0
+              ? "committed · fills next open"
+              : cashPct == null
+                ? `${Math.round(Math.max(0, 1 - a.openCost / notional) * 100)}% cash`
+                : cashPct < 0
+                  // A negative floor is not idle cash — the book briefly spent money it did not
+                  // have. Labelling it "-1% idle cash" hides an overdraw (iter-171, item 1235).
+                  ? `overdrew ${money(Math.abs(st?.min_cash ?? 0))}`
+                  : `${Math.round(cashPct * 100)}% idle cash`}
           </div>
         </div>
         <span className="text-faint text-[15px] transition-transform" style={{ transform: isOpen ? "rotate(90deg)" : "none" }}>›</span>
@@ -201,19 +218,31 @@ function BookCard({ a, i, netPnl, score, equity, sim, isOpen, onToggle }: {
             {a.positions.slice().sort((x, y) => (y.return_pct ?? 0) - (x.return_pct ?? 0)).map((p) => (
               <div key={p.id} className="grid px-5 py-2 text-[12.5px] items-center tn border-t" style={{ gridTemplateColumns: "1fr .8fr .7fr .7fr .65fr .7fr .75fr .7fr .7fr", borderColor: "#f6f4fb" }}>
                 <span className="font-bold">{p.ticker}</span>
-                <span className="text-right text-faint">{dateShort(p.entry_date)}</span>
-                <span className="text-right">{num(p.entry, 1)}</span>
+                <span className="text-right text-faint">{p.entry_date ? dateShort(p.entry_date) : "—"}</span>
+                <span className="text-right">{p.entry != null ? num(p.entry, 1) : "—"}</span>
                 <span className="text-right">{p.last_price != null ? num(p.last_price, 1) : "—"}</span>
-                <span className={`text-right font-bold ${signClass(p.return_pct)}`}>{pctSigned(p.return_pct)}</span>
-                <span className="text-right text-faint">{p.shares}</span>
-                <span className="text-right text-faint">{money((p.last_price ?? p.entry) * p.shares)}</span>
+                <span className={`text-right font-bold ${signClass(p.return_pct)}`}>{p.return_pct != null ? pctSigned(p.return_pct) : "—"}</span>
+                <span className="text-right text-faint">{p.shares ?? "—"}</span>
+                <span className="text-right text-faint">
+                  {p.status === "pending"
+                    ? money(p.planned_capital ?? 0)
+                    : p.entry != null && p.shares != null
+                      ? money((p.last_price ?? p.entry) * p.shares)
+                      : "—"}
+                </span>
                 <span className="text-right text-faint text-[11px]">{p.stop != null ? num(p.stop, 0) : "—"}/{p.target != null ? num(p.target, 0) : "—"}</span>
                 <span className="text-right">
                   {p.status === "open"
                     ? <span className="text-faint">open</span>
-                    : <span title={p.exit_date ? `exited ${dateShort(p.exit_date)}` : undefined}>
-                        <Pill tone={p.reason === "target" ? "good" : "bad"}>{p.reason ?? "closed"}</Pill>
-                      </span>}
+                    : p.status === "pending"
+                      // Queued by a rebalance, fills at the next session's open. Showing this as a
+                      // red "closed" pill was #863 — it made a live book look liquidated.
+                      ? <span title="queued by the last rebalance — fills at the next session's open">
+                          <Pill tone="warn">queued</Pill>
+                        </span>
+                      : <span title={p.exit_date ? `exited ${dateShort(p.exit_date)}` : undefined}>
+                          <Pill tone={p.reason === "target" ? "good" : "bad"}>{p.reason ?? "closed"}</Pill>
+                        </span>}
                 </span>
               </div>
             ))}
