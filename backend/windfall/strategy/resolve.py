@@ -242,9 +242,9 @@ def resolve(cfg: StrategyConfig) -> ResolvedStrategy:
             elif name in _TL_MCAP:  # point-in-time survivorship-free market cap (Rs cr)
                 df = ts.mcap_panel(tickers, close.index).reindex(index=close.index, columns=tickers)
             elif name in _TL_SHARE:  # quarterly shareholding %, result-lag-gated (no look-ahead)
-                df = ts.shareholding_panel(name, tickers, close.index).reindex(columns=tickers)
+                df = ts.shareholding_panel(name, tickers, close.index, warnings).reindex(columns=tickers)
             else:  # result-lag-gated raw annual/quarterly fundamentals (no look-ahead per adr-016)
-                df = ts.raw_fundamental_panel(name, tickers, close.index).reindex(columns=tickers)
+                df = ts.raw_fundamental_panel(name, tickers, close.index, warnings).reindex(columns=tickers)
         elif name == "macd":
             df = ind.macd(close)[0]
         elif name == "macd_signal":

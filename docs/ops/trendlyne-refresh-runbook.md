@@ -30,7 +30,8 @@ silently excludes the top ~100 index names).
 | 1 | `trendlyne_dvm_harvester.js` | ~15–20 min | `tl_dvm_history_partNN.csv`, `tl_stocks.csv` |
 | 2 | `trendlyne_harvester_megacap.js` | ~10 min | `tl_*_megacap.csv` (covers the index-megacap crack) |
 | 3 | `trendlyne_harvester_ohlcv.js` | ~35–45 min | `tl_ohlcv_partNN.csv`, `tl_index_ohlcv.csv`, `tl_index_map.csv` |
-| 4 | `trendlyne_harvester_gapfill.js` — only if specific names froze | ~2 min | `tl_*_gapfill.csv` |
+| 4 | `trendlyne_harvester_leg1.js` | ~25 min | `tl_valuation_ratios_partNN.csv`, `tl_pnl_quarterly_*`, `tl_growth_quality_*`, `tl_ownership_*` |
+| 5 | `trendlyne_harvester_gapfill.js` — only if specific names froze | ~2 min | `tl_*_gapfill.csv` |
 
 Gotchas (all cost a bug once):
 - The megacap `SYMBOLS` list is **hardcoded and drifts** — 2026-07-16 it was missing
@@ -60,7 +61,7 @@ cd /mnt/storage/websites/windfall-labs/backend
 
 #    Read it like this:
 #    - the report must list FOUR tables: dvm_history, ohlcv, stocks, valuation_ratios. A missing
-#      valuation_ratios line means the megacap harvester's CSV did not land — do NOT proceed to
+#      valuation_ratios line means neither leg1 nor the megacap harvester's CSV landed — do NOT proceed to
 #      step 5 (which deletes the staging dir), because that is exactly how the table went 54 days
 #      stale unnoticed (#849).
 #    - "preserved" pks are EXPECTED (names below the Rs500cr floor + delisted stay untouched —

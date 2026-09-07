@@ -524,7 +524,41 @@ _RAW_FUND = {"tl_roe": ("ratios_annual", "ROE_A"), "tl_roce": ("ratios_annual", 
 _FUND_SCALE = {"tl_eyield": 100.0}
 
 
-def raw_fundamental_panel(metric: str, symbols, dates) -> pd.DataFrame:
+# Quarterly, result-lag-gated data refreshes every ~90 days plus a ~45-day announcement lag, so a
+# value roughly 135 days old is NORMAL and a 14-day rule like _STALE_FACTOR_DAYS would fire on every
+# healthy read. 270 days is three missed quarters: no longer a reporting cadence, a reporting gap.
+_STALE_FUNDAMENTAL_DAYS = 270
+
+
+def _ffill_periodic(wide, idx, name, warnings) -> pd.DataFrame:
+    """Forward-fill a quarterly/annual panel onto `idx`, disclosing a table-wide reporting gap.
+
+    Same reasoning as `_ffill_daily_tl` in resolve.py (adr-045), different clock. These panels are
+    keyed on the real announcement date, so carrying a value forward between results is not just
+    acceptable, it is the point — a Q2 number IS the best public knowledge until Q3 is published.
+    What is not acceptable is carrying it silently for years because the source table stopped
+    being refreshed (to-do #852: `valuation_ratios` did exactly that for 54 days undetected).
+
+    Table-wide, not per-symbol: one company that stopped reporting is a real-world event the
+    engine should reflect, not a data bug. Every company stopping at once is a data bug.
+    """
+    out = wide.reindex(wide.index.union(idx)).ffill().reindex(idx)
+    if warnings is None or wide.empty or len(idx) == 0:
+        return out
+    observed = wide.dropna(how="all")
+    if observed.empty:
+        return out
+    last_obs, last_bar = observed.index.max(), idx.max()
+    age = (last_bar - last_obs).days
+    if age > _STALE_FUNDAMENTAL_DAYS:
+        warnings.append(
+            f"stale fundamental: '{name}' has no reading published after {last_obs.date()} while "
+            f"prices run to {last_bar.date()} — {age} days, about {age // 90} quarters. Every name "
+            f"ranked or filtered on it is using pre-{last_obs.date()} figures.")
+    return out
+
+
+def raw_fundamental_panel(metric: str, symbols, dates, warnings: list | None = None) -> pd.DataFrame:
     """Point-in-time annual fundamental, readable only on/after its real result-announcement date.
 
     Joins the metric's period_end value to `result_lag.available_from` (board-meeting/result date,
@@ -549,7 +583,7 @@ def raw_fundamental_panel(metric: str, symbols, dates) -> pd.DataFrame:
     df["avail"] = pd.to_datetime(df["avail"])
     idx = pd.DatetimeIndex(sorted(pd.to_datetime(dates).unique()))
     wide = df.pivot_table(index="avail", columns="symbol", values="value").sort_index()
-    wide = wide.reindex(wide.index.union(idx)).ffill().reindex(idx)
+    wide = _ffill_periodic(wide, idx, metric, warnings)
     return wide * _FUND_SCALE.get(metric, 1.0)
 
 
@@ -573,7 +607,7 @@ def mcap_panel(symbols, dates) -> pd.DataFrame:
 _SHARE_CAT = {"tl_pledge": "Pledged", "tl_fii": "FII", "tl_dii": "DII"}
 
 
-def shareholding_panel(metric: str, symbols, dates) -> pd.DataFrame:
+def shareholding_panel(metric: str, symbols, dates, warnings: list | None = None) -> pd.DataFrame:
     """Quarterly shareholding % (promoter pledge / FII / DII) from shareholding_summary, readable only
     on/after the real result-announcement date (result_lag join) -> no look-ahead. FFilled to `dates`."""
     cat = _SHARE_CAT[metric]
@@ -594,7 +628,7 @@ def shareholding_panel(metric: str, symbols, dates) -> pd.DataFrame:
     df["avail"] = pd.to_datetime(df["avail"])
     idx = pd.DatetimeIndex(sorted(pd.to_datetime(dates).unique()))
     wide = df.pivot_table(index="avail", columns="symbol", values="value").sort_index()
-    return wide.reindex(wide.index.union(idx)).ffill().reindex(idx)
+    return _ffill_periodic(wide, idx, metric, warnings)
 
 
 _BENCH_PK = {"NIFTY50": 1887, "NIFTY500": 1893, "NIFTYNEXT50": 1888,

@@ -15,8 +15,25 @@ import os
 import tempfile
 from pathlib import Path
 
-# Capture the real data dir (container env) BEFORE redirecting WINDFALL_DATA_DIR to a throwaway dir.
-_real_dir = Path(os.environ.get("WINDFALL_DATA_DIR", "/app/data"))
+# Capture the real data dir BEFORE redirecting WINDFALL_DATA_DIR to a throwaway dir.
+#
+# The default used to be "/app/data" alone — the CONTAINER path. Run on the host without the env
+# var set (which is how anyone runs pytest from a shell), that directory does not exist, so neither
+# DB env var was set and EVERY real-data integration test skipped: the NSE-only gate (adr-024), the
+# NAVA<->NBVENTURES alias resolution, curated factor resolution, point-in-time mcap. They reported
+# as passing. Found 2026-09-07 (to-do #853) when the new concurrency regression test for #250 —
+# the one that reproduces an 11-of-12 thread failure — came back green while actually skipping.
+# A skipped test proves nothing and looks exactly like a passing one at a glance.
+#
+# Candidates in order: an explicit env var, the container path, then the repo's own backend/data.
+_CANDIDATE_DIRS = [
+    Path(os.environ["WINDFALL_DATA_DIR"]) if os.environ.get("WINDFALL_DATA_DIR") else None,
+    Path("/app/data"),                                   # inside the api container
+    Path(__file__).resolve().parents[1] / "data",        # backend/data on the host
+]
+_real_dir = next((d for d in _CANDIDATE_DIRS
+                  if d is not None and (d / "trendlyne.duckdb").exists()),
+                 Path("/app/data"))
 for _ev, _fn in (("WINDFALL_TRENDLYNE_DB", "trendlyne.duckdb"), ("WINDFALL_BHAVCOPY_DB", "bhavcopy.duckdb")):
     if _ev not in os.environ and (_real_dir / _fn).exists():
         os.environ[_ev] = str(_real_dir / _fn)

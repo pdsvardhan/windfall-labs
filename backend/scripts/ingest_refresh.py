@@ -68,6 +68,11 @@ import duckdb
 DB = Path(__file__).resolve().parents[1] / "data" / "trendlyne.duckdb"
 MIN_STOCKS = 1000  # mirrors the harvester's own truncation guard
 
+# Tables shaped (pk, metric, date, value) — every one the leg1 harvester emits. All replace per
+# (pk, metric) for the same reason dvm_history replaces per (pk, score): each metric is fetched
+# separately, so a harvest that returns only some of them must not delete the rest.
+METRIC_TABLES = ("valuation_ratios", "pnl_quarterly", "growth_quality", "ownership")
+
 
 def _files(src: Path, pattern_stem: str) -> list[Path]:
     out = [p for p in sorted(src.glob(f"tl_{pattern_stem}*.csv")) if "index" not in p.name]
@@ -100,12 +105,17 @@ def main():
     src = Path(args.src).expanduser()
 
     dvm_f, ohlcv_f, stocks_f = _files(src, "dvm_history"), _files(src, "ohlcv"), _files(src, "stocks")
-    val_f = _files(src, "valuation_ratios")
+    # Every (pk, metric, date, value) table the leg1 harvester produces, keyed identically. They
+    # were all in the same position valuation_ratios was: emitted by a harvester, ignored by this
+    # script, then deleted by Phase 3 step 5. Wiring one and leaving three is just a slower version
+    # of the same bug (iter-172, to-dos #849/#851).
+    metric_f = {t: _files(src, t) for t in METRIC_TABLES}
     ignored = sorted(src.glob("tl_index_*.csv"))
     if ignored:
         print(f"ignoring on purpose (adr-038 index feed is fresher): {[p.name for p in ignored]}")
-    if not (dvm_f or ohlcv_f or stocks_f or val_f):
-        sys.exit(f"no tl_dvm_history*/tl_ohlcv*/tl_stocks*/tl_valuation_ratios* files in {src}")
+    if not (dvm_f or ohlcv_f or stocks_f or any(metric_f.values())):
+        sys.exit(f"no tl_dvm_history*/tl_ohlcv*/tl_stocks*/"
+                 f"tl_{{{','.join(METRIC_TABLES)}}}* files in {src}")
 
     mode = "rw" if args.apply else "ro"
     if args.apply:
@@ -139,18 +149,20 @@ def main():
         plans.append(("dvm_history", "h_dvm_d",
                       'INSERT INTO dvm_history SELECT pk, score, "date", "value" FROM h_dvm_d',
                       ("pk", "score")))
-    if val_f:
-        _read_union(con, val_f, "h_val")
+    for tbl, files in metric_f.items():
+        if not files:
+            continue
+        raw, typed = f"h_{tbl}", f"h_{tbl}_d"
+        _read_union(con, files, raw)
         con.execute(f"""
-            CREATE OR REPLACE TEMP VIEW h_val_d AS
+            CREATE OR REPLACE TEMP VIEW {typed} AS
             SELECT CAST(pk AS BIGINT) pk, CAST(metric AS VARCHAR) metric,
                    CAST("date" AS DATE) "date", CAST("value" AS DOUBLE) "value"
-            FROM h_val
+            FROM {raw}
             QUALIFY row_number() OVER (PARTITION BY pk, metric, "date" ORDER BY {PRIO} DESC) = 1
         """)
-        plans.append(("valuation_ratios", "h_val_d",
-                      'INSERT INTO valuation_ratios SELECT pk, metric, "date", "value" '
-                      "FROM h_val_d",
+        plans.append((tbl, typed,
+                      f'INSERT INTO {tbl} SELECT pk, metric, "date", "value" FROM {typed}',
                       ("pk", "metric")))
     if ohlcv_f:
         _read_union(con, ohlcv_f, "h_ohlcv")

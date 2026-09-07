@@ -10,13 +10,27 @@ Full procedure (staging, ingest, rebuild, verify) lives on the server at
 
 ---
 
-## A normal refresh — run these three, in this order
+## A normal refresh — run these, in this order
 
 | Order | Script | Cadence | Time |
 |---|---|---|---|
 | 0 | `trendlyne_preflight.js` | every time | 15 sec |
 | 1 | `trendlyne_dvm_harvester.js` | **weekly** | ~20 min |
 | 2 | `trendlyne_harvester_megacap.js` | monthly | ~10 min |
+| 3 | `trendlyne_harvester_ohlcv.js` | **monthly** | ~35–45 min |
+| 4 | `trendlyne_harvester_leg1.js` | **monthly** | ~25 min |
+
+**3 and 4 were added 2026-09-07 (adr-046, to-do #851).** This table used to list only the first
+three and describe the OHLCV pull as optional. That is how the eligible universe silently collapsed
+to 293 of 2,190 stocks: `ohlcv` also feeds `pit_mcap` → `universe_membership`, so skipping it
+freezes *which stocks can be picked*, not just their price history. leg1 is here because it is the
+only script that refreshes `valuation_ratios` (the `tl_pe` / `tl_peg` / `tl_pbv` factors) for the
+whole universe rather than the ~99 megacaps — it had been parked in `_done/` while a live paper
+book ranked half its holdings on P/Es frozen since July.
+
+As of 2026-09-07 `ingest_refresh.py` reads every table leg1 produces — `valuation_ratios`,
+`pnl_quarterly`, `growth_quality`, `ownership` — each replaced per `(pk, metric)`. Before that it
+read three tables and Phase 3 step 5 deleted the rest of the download.
 
 **0. Preflight.** Answers one question before you spend 30 minutes: does this session actually
 return DVM data? Prints `GREEN - go` or `RED - stop`. It exists because on 2026-09-05 the
