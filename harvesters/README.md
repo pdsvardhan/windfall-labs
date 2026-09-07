@@ -53,6 +53,57 @@ is free and already automated. So script 1 alone keeps the factors current.
 |---|---|
 | `trendlyne_harvester_ohlcv.js` (~40 min) | **Run it monthly.** It extends Trendlyne's **native price history**, and that table is also what feeds `rebuild_pit_mcap_ca.py` -> `pit_mcap` -> `universe_membership` — i.e. which stocks are **eligible to be picked at all**. This row used to say it was "NOT needed for freshness" because Bhavcopy carries prices and `adjusted_close_panel` splices them on. That was true of PRICES and false of ELIGIBILITY, and on 2026-09-07 it cost the live books their universe: a partial harvest left 293 of 2,190 stocks selectable and every paper book picked from that slice (adr-046). Skipping it is now *survivable* — eligibility falls back to Bhavcopy and says so in `warnings[]` — but the fallback uses unadjusted closes, so run it monthly to keep membership split-adjusted. |
 | `trendlyne_harvester_gapfill.js` (~2–5 min) | When the ingest dry-run names specific stocks as missing or shrinking. **Its `SYMBOLS` list is scratch — repointed per incident, never a stable list.** Check it targets the names you actually mean before running. |
+| `trendlyne_harvester_forecaster.js` (~25-35 min) | **Analyst consensus estimates — forward EPS and target price (#857, for #26).** Not yet part of the monthly loop; read the coverage note below before spending 30 minutes on it. Output goes to `tl_forecaster_estimates_partNN.csv` (`pk,metric,period_end,as_of,value`) plus `tl_forecaster_coverage_partNN.csv`. **There is no ingest leg for it yet** — the CSVs land in Downloads and wait. |
+
+### Forecaster estimates — how it is reached, and why coverage limits it
+
+`FUNDAMENTALS-EXPORT-COLUMNS.md` #6 asks for `Forecaster Estimates 1Y forward PE`. It cannot be
+exported: measured 2026-09-07, all **2,235 of 2,235** cells read the literal string `Export NA`,
+across both parameter sets and all five market-cap bands. Trendlyne blocks Forecaster fields from
+the Data Downloader and says so on the page.
+
+The page itself is **server-rendered**, so there is no XHR to intercept — watch the network tab on a
+consensus page and you get static assets and `getLivePrice`, nothing else. The whole estimate set
+ships inside the document, HTML-escaped, on one attribute:
+
+```
+<div id="consensus-details" data-consensusjson="{ ... }">
+```
+
+so a plain credentialed `fetch` is enough. The slug wildcards, meaning **pk alone addresses it**:
+
+```
+https://trendlyne.com/equity/consensus-estimates/<pk>/x/x/
+```
+
+`RANGE_ESTIMATES.<METRIC>.ANNUAL[]` carries `ACTUAL / AVG / HIGH / LOW / MEDIAN /
+NUMBER_OF_ANALYSTS`, with `periodtype` ("FY27") and `qtr_end_date` ("2027-03-31"). Twelve metrics
+are available; the harvester takes EPS and TARGET_PRICE, and the parser is generic — add a key to
+`METRICS` and it is harvested.
+
+**Coverage is the catch, and it decides whether #26 is even answerable.** Measured 2026-09-08,
+n=40 stratified across the `mcapq>500` universe:
+
+| Market cap | Covered |
+|---|---|
+| > ₹50,000cr | 3/3 — 100% |
+| ₹10,000–50,000cr | 7/8 — 88% |
+| ₹2,000–10,000cr | 6/14 — 43% |
+| ₹500–2,000cr | **0/15 — 0%** |
+| overall | 16/40 — 40% |
+
+Analysts do not cover small caps, and small caps are where the live DVM books pick — DVM_user holds
+BHAGYANGR, CUPID, FREDUN, KAPSTON, SALSTEEL and SIGMAADV, and **none of them has a single estimate**.
+A forward-PE factor from this source can only ever apply to the large/mid-cap subset. An uncovered
+stock is not an error: it returns HTTP 200 with an empty `RANGE_ESTIMATES` and a ~75KB page against
+~600KB for a covered one, and the harvester records it as a miss in the coverage CSV so a thin
+harvest is measured rather than inferred.
+
+**When the ingest is written it must MERGE, never replace per `(pk, metric)`.** This endpoint returns
+only *today's* estimates — there is no history, and estimates revise. Every row therefore carries both
+the period it forecasts (`period_end`) and the date we learned it (`as_of`); history builds forward as
+snapshots accumulate. A wholesale replace would delete every prior snapshot on the first run, which is
+the same silent data loss fixed on 2026-09-07 in `0b0ecce`.
 
 ### Fundamentals snapshot
 
