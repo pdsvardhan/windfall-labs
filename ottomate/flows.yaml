@@ -3,7 +3,7 @@ flows:
     title: Run a backtest
     type: mixed
     priority: critical
-    test_status: not-tested
+    test_status: passing
     trigger: User selects or authors a strategy and clicks Run Backtest.
     expected_outcome: A standardized results payload is returned and the
       equity/drawdown curves, metrics and trade log are rendered.
@@ -96,7 +96,7 @@ flows:
     title: Paper-track a strategy
     type: mixed
     priority: important
-    test_status: not-tested
+    test_status: passing
     trigger: User commits a live signal to the paper book.
     expected_outcome: A simulated position is opened, marked-to-market daily, and
       visible on the paper scoreboard.

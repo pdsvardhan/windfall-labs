@@ -143,6 +143,10 @@ features:
     priority: P0
     size: M
     test_status: not-tested
+    notes: "iter-197: the Signals PAGE is hidden from the cockpit (owner, 2026-10-19
+      - the paper books run the strategies on their own). The signal engine
+      stays: paper rebalances and the replay call generate_signals, which now
+      also takes as_of."
     acceptance_criteria:
       - content: Running a saved strategy on the latest data emits a per-stock action
           (buy/hold/sell) with entry zone, stop, targets, weight and rank.
@@ -164,6 +168,17 @@ features:
     acceptance_criteria:
       - content: Each live signal can be persisted as a simulated open position with
           entry, stop and target.
+        test_status: not-tested
+        linked_test: null
+      - content: All tracked books share one record from 30 Jun 2026 on Rs5L; each
+          book's headline % equals its rupee P&L divided by the notional, and
+          the net % deducts every modelled cost without dilution across capital
+          changes.
+        test_status: not-tested
+        linked_test: null
+      - content: Opening a book shows its current holdings and, separately, a history of
+          closed trades with entry and exit dates, prices, return and exit
+          reason; voided entries are never shown.
         test_status: not-tested
         linked_test: null
       - content: Positions are marked-to-market daily and the log tracks per-strategy
@@ -221,6 +236,19 @@ features:
     acceptance_criteria:
       - content: A user can create, edit and save a strategy config from the UI and run
           a backtest on it.
+        test_status: not-tested
+        linked_test: null
+      - content: A backtest started from the builder (or Re-run / Cost sensitivity)
+          completes and opens its result even when it runs longer than 30
+          seconds; the running overlay stays up until it does.
+        test_status: not-tested
+        linked_test: null
+      - content: Every exit type picked in the builder is written to the config with a
+          value; an exit that would be inert (no value, or an R-multiple target
+          with no stop) blocks Save and Run.
+        test_status: not-tested
+        linked_test: null
+      - content: Deleting a strategy also deletes its backtests.
         test_status: not-tested
         linked_test: null
     dependencies: []
@@ -309,6 +337,10 @@ features:
     priority: P1
     size: M
     test_status: not-tested
+    notes: "Retired in iter-197 (adr-048): every book was replayed from 29 Jun on
+      Rs5L through the paper process's own rules, so the labelled SIM series and
+      the separate survivor cohort no longer exist on the page or in the data.
+      Pre-replay rows archived in paper_positions_archive_20261019_170254."
     acceptance_criteria:
       - content: SIM series are visibly labeled simulated and never mixed into live P&L
         test_status: not-tested

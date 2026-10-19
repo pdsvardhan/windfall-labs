@@ -456,3 +456,13 @@ decisions:
       - curated
       - cat:product
     body_path: docs/decisions/adr-047-windfall-forward-pe-coverage.md
+  - id: adr-048-windfall-paper-replay-from-june
+    project_slug: windfall-labs
+    title: All eight paper books replayed from 29 June on Rs5L through the paper
+      process own rules
+    status: accepted
+    date: 2026-10-19T00:00:00.000Z
+    tags:
+      - curated
+      - cat:product
+    body_path: docs/decisions/adr-048-windfall-paper-replay-from-june.md
