@@ -21,13 +21,13 @@ const LABELS: Record<string, string> = {
   CMP_valmom_m_20: "Value + Momentum · top 20 · monthly",
   DVM_all_w_10: "DVM (all three) · top 10 · weekly",
   DVM_all_m_10: "DVM (all three) · top 10 · monthly",
-  BLEND_70_30: "Momentum 70 / Low-vol 30 · top 20 each · monthly",
+  BLEND_70_30: "Momentum 70 / Low-vol 30 · top 20 + 20 · monthly",
 };
 
 // Every book also sits behind the engine's point-in-time ₹500cr membership floor, so the universe
 // text starts there for all eight; only the extra screens differ.
-const rule = (n: number | string, by: string, freq: string, extra: string) =>
-  `Top ${n} by ${by}, equal weight, rebalanced ${freq} · universe: mcap ≥ ₹500cr, ${extra}`;
+const rule = (n: number | string, by: string, freq: string, extra: string, weighting = "equal weight") =>
+  `Top ${n} by ${by}, ${weighting}, rebalanced ${freq} · universe: mcap ≥ ₹500cr, ${extra}`;
 const DVM3 = "Durability + Valuation + Momentum";
 const RULES: Record<string, string> = {
   DVM_user: rule(10, DVM3, "monthly", "ADTV ≥ ₹5cr, avg DVM ≥ 55"),
@@ -37,7 +37,9 @@ const RULES: Record<string, string> = {
   CMP_valmom_m_20: rule(20, "low PE + 6-month price change", "monthly", "ADTV ≥ ₹0.5cr"),
   DVM_all_w_10: rule(10, DVM3, "weekly", "ADTV ≥ ₹0.5cr"),
   DVM_all_m_10: rule(10, DVM3, "monthly", "ADTV ≥ ₹0.5cr"),
-  BLEND_70_30: rule("20 + 20", "12-month price change (70%) / low volatility (30%)", "monthly", "ADTV ≥ ₹0.5cr"),
+  // A 70/30 sleeve blend: each momentum name is 3.5% of the book, each low-vol name 1.5%.
+  BLEND_70_30: rule("20 + 20", "12-month price change (70%) / low volatility (30%)", "monthly",
+    "ADTV ≥ ₹0.5cr", "equal weight within each sleeve"),
 };
 
 const REASON_LABEL: Record<string, string> = { rebalance: "rebalance", stop: "stop-loss", target: "target hit", resize: "resize" };
@@ -169,8 +171,8 @@ function BookCard({ a, i, score, equity, isOpen, onToggle }: {
           <div className="text-[11px] text-faint">Nifty500</div>
         </div>
         <div className="text-right w-[64px] hidden md:block">
-          <div className="text-[13px] font-bold tn">{a.pending > 0 ? a.pending : a.open}</div>
-          <div className="text-[11px] text-faint">{a.pending > 0 ? "queued" : "open"}</div>
+          <div className="text-[13px] font-bold tn">{a.open}</div>
+          <div className="text-[11px] text-faint">{a.pending > 0 ? `open · ${a.pending} queued` : "open"}</div>
         </div>
         <div className="text-right w-[84px] hidden md:block">
           <div className="text-[13px] font-bold tn">{money(a.committed)}</div>
@@ -181,7 +183,8 @@ function BookCard({ a, i, score, equity, isOpen, onToggle }: {
             {a.pending > 0
               ? "committed · fills next open"
               : cashPct == null
-                ? `${Math.round(Math.max(0, 1 - a.openCost / notional) * 100)}% cash`
+                // No curve, no cash floor — show nothing rather than a different measure (item 1420).
+                ? "—"
                 : cashPct < 0
                   // A negative floor is not idle cash — the book briefly spent money it did not
                   // have. Labelling it "-1% idle cash" hides an overdraw (iter-171, item 1235).
