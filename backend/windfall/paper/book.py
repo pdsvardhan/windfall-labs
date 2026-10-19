@@ -257,11 +257,11 @@ def delete_positions(strategy_id: str) -> int:
 
 
 def list_positions(strategy_id: str | None = None, status: str | None = None) -> list[dict]:
-    con = connect(read_only=True)
+    con = _init()   # not connect(): the origin column (iter-197) must exist before it is selected
     try:
         q = ("SELECT id,strategy_id,ticker,status,entry_date,entry,stop,target,shares,"
-             "last_price,last_date,exit,exit_date,return_pct,r_multiple,reason,planned_capital "
-             "FROM paper_positions WHERE 1=1")
+             "last_price,last_date,exit,exit_date,return_pct,r_multiple,reason,planned_capital,"
+             "origin FROM paper_positions WHERE 1=1")
         params: list = []
         if strategy_id:
             q += " AND strategy_id=?"; params.append(strategy_id)
@@ -273,7 +273,7 @@ def list_positions(strategy_id: str | None = None, status: str | None = None) ->
         con.close()
     cols = ["id", "strategy_id", "ticker", "status", "entry_date", "entry", "stop", "target",
             "shares", "last_price", "last_date", "exit", "exit_date", "return_pct", "r_multiple",
-            "reason", "planned_capital"]
+            "reason", "planned_capital", "origin"]
     out = []
     for r in rows:
         d = dict(zip(cols, r))

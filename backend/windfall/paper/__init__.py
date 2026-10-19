@@ -4,3 +4,4 @@ from .book import (  # noqa: F401
 )
 from .equity import book_equity  # noqa: F401
 from .rebalance import rebalance_paper, resize_book, void_pending_entries  # noqa: F401
+from .replay import replay_paper  # noqa: F401

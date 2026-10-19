@@ -47,6 +47,11 @@ def _init():
     # Migration (iter-147 #248): DBs created before next-open entries lack planned_capital —
     # the capital a 'pending' row will size against once its next-session open is known.
     con.execute("ALTER TABLE paper_positions ADD COLUMN IF NOT EXISTS planned_capital DOUBLE")
+    # Migration (iter-197, adr-048): where a row came from — 'live' (written by the crons) or
+    # 'replay' (paper/replay.py rebuilt the book from 29 Jun). Recorded, deliberately not displayed.
+    con.execute("ALTER TABLE paper_positions ADD COLUMN IF NOT EXISTS origin VARCHAR DEFAULT 'live'")
+    con.execute(
+        "ALTER TABLE paper_rebalance_runs ADD COLUMN IF NOT EXISTS origin VARCHAR DEFAULT 'live'")
     return con
 
 
@@ -102,10 +107,18 @@ def list_strategies() -> list[dict]:
             for r in rows]
 
 
-def delete_strategy(sid: str) -> None:
+def delete_strategy(sid: str) -> int:
+    """Delete a strategy AND its backtests; returns how many backtests went with it.
+
+    The cockpit's Delete dialog has always promised both. Until iter-197 (item 1422) only the
+    strategy row was removed and its backtests stayed behind as orphans.
+    """
     con = _init()
     try:
+        n = con.execute("SELECT COUNT(*) FROM backtests WHERE strategy_id=?", [sid]).fetchone()[0]
+        con.execute("DELETE FROM backtests WHERE strategy_id=?", [sid])
         con.execute("DELETE FROM strategies WHERE id=?", [sid])
+        return int(n)
     finally:
         con.close()
 

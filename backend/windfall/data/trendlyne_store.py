@@ -86,7 +86,7 @@ _CON_LOCK = threading.Lock()
 
 
 @functools.lru_cache(maxsize=1)
-def _con() -> duckdb.DuckDBPyConnection:
+def _base_con() -> duckdb.DuckDBPyConnection:
     """Process-wide read-only connection; bhavcopy attached read-only for dead-name raw prices."""
     with _CON_LOCK:
         con = duckdb.connect(str(TRENDLYNE_DB), read_only=True)
@@ -105,6 +105,33 @@ def _con() -> duckdb.DuckDBPyConnection:
                     if "already exists" not in str(exc):
                         raise
         return con
+
+
+_TLS = threading.local()
+
+
+def _con() -> duckdb.DuckDBPyConnection:
+    """This thread's cursor on the shared read-only connection.
+
+    A DuckDBPyConnection is not safe to query from two threads at once: `execute()` returns the
+    connection itself and the result waits on it until fetched, so a second thread's execute in
+    between replaces the first thread's pending result and its `.fetchdf()` comes back None. That
+    is the intermittent /api/paper/equity 500 (iter-197, item 1420): `'NoneType' object has no
+    attribute 'empty'` in adjusted_close_panel, 1 of 8 loads over 72h, whenever the page's four
+    parallel requests overlapped. DuckDB's answer is one cursor per thread — cursors share the
+    database instance (and the attached `bc`) but each holds its own result.
+    """
+    base = _base_con()
+    cur = getattr(_TLS, "cur", None)
+    if cur is None or getattr(_TLS, "base", None) is not base:
+        cur = base.cursor()
+        _TLS.cur, _TLS.base = cur, base
+    return cur
+
+
+# Tests re-point TRENDLYNE_DB and clear the cache; clearing the base connection makes every
+# thread's cursor stale (the identity check above), so the next call re-opens on the new file.
+_con.cache_clear = _base_con.cache_clear
 
 
 @functools.lru_cache(maxsize=1)

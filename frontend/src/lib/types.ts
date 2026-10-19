@@ -114,6 +114,8 @@ export interface PaperPosition {
   return_pct: number | null;
   r_multiple: number | null;
   reason: string | null;
+  /** "live" | "replay" — never displayed (owner chose no visible marker). */
+  origin?: string;
 }
 
 export interface ScoreRow {
@@ -263,7 +265,8 @@ export interface StrategyConfig {
   max_hold_days?: number | null;
   max_position_adtv_pct?: number;
   regime_filter: { enabled: boolean; benchmark?: string | null; ma_period: number; mode: "binary" | "scale"; below_exposure: number };
-  costs_bps: { brokerage: number; stt: number; slippage: number };
+  /** Ignored by the engine (adr-020: fixed NSE schedule); old saved configs still carry it. */
+  costs_bps?: { brokerage: number; stt: number; slippage: number };
   capital: number;
   start: string;
   end: string | null;

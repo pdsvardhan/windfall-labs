@@ -39,6 +39,8 @@ export function StrategyBuilder({ initial }: { initial?: { id?: string; name: st
   const upd = (path: string[], v: any) => setCfg((c) => set(c, path, v));
   const sv = useMemo(() => survivorsOnly(cfg), [cfg]);
   const fullCfg = useMemo(() => ({ ...cfg, name }), [cfg, name]);
+  // display only: the engine ignores costs_bps (adr-020) but old saved configs still carry it
+  const viewCfg = useMemo(() => { const v = { ...fullCfg }; delete v.costs_bps; return v; }, [fullCfg]);
 
   // Merged filters: the engine ANDs universe.filters + entry_filters anyway, so we show ONE list and
   // write it all to universe.filters (clearing entry_filters) — no behaviour change, less confusion.
@@ -63,6 +65,15 @@ export function StrategyBuilder({ initial }: { initial?: { id?: string; name: st
       e.push("Max weight / stock must be between 0 and 100%.");
     if (cfg.max_hold_days != null && cfg.max_hold_days < 1) e.push("Max hold days must be at least 1.");
     if (cfg.sector_cap != null && cfg.sector_cap < 1) e.push("Sector cap must be at least 1.");
+    if (cfg.stop_loss.type === "pct" && cfg.stop_loss.value == null) e.push("Set a stop-loss %.");
+    if ((cfg.stop_loss.type === "atr" || cfg.stop_loss.type === "trailing") && cfg.stop_loss.mult == null)
+      e.push("Set a stop ATR multiple.");
+    if (cfg.take_profit.type === "pct" && cfg.take_profit.value == null) e.push("Set a take-profit %.");
+    if (cfg.take_profit.type === "r_multiple" && cfg.take_profit.r == null) e.push("Set a take-profit R multiple.");
+    // R is measured from the stop (engine _stop_target: target = entry + r × (entry − stop)), so an
+    // R target with no stop places no target at all.
+    if (cfg.take_profit.type === "r_multiple" && cfg.stop_loss.type === "none")
+      e.push("An R-multiple take profit needs a stop loss — R is measured from the stop.");
     return e;
   }, [name, cfg]);
 
@@ -79,15 +90,19 @@ export function StrategyBuilder({ initial }: { initial?: { id?: string; name: st
     return () => clearTimeout(t.current);
   }, [fullCfg]);
 
-  async function save(): Promise<string | null> {
-    setBusy("save"); setMsg(null);
+  // persist() leaves `busy` alone so run() can keep its overlay up across save + backtest.
+  async function persist(): Promise<string | null> {
     try { const s = await api.saveStrategy(name, fullCfg, sid ?? undefined); setSid(s.id); setMsg("Saved ✓"); return s.id; }
     catch (e) { setMsg(`save failed: ${(e as Error).message}`); return null; }
+  }
+  async function save(): Promise<string | null> {
+    setBusy("save"); setMsg(null);
+    try { return await persist(); }
     finally { setBusy(null); }
   }
   async function run() {
     setBusy("run"); setMsg(null);
-    const id = sid ?? (await save());
+    const id = sid ?? (await persist());
     try {
       const res = await api.runBacktest(fullCfg, id, true);
       if (res.backtest_id && id) router.push(`/strategies/${id}`);
@@ -197,7 +212,13 @@ export function StrategyBuilder({ initial }: { initial?: { id?: string; name: st
           <Card className="p-5">
             <SectionTitle dot="#f4855f">Exits</SectionTitle>
             <Field label="Stop loss">
-              <select className="wf-in mt-1.5" value={cfg.stop_loss.type} onChange={(e) => upd(["stop_loss", "type"], e.target.value)}>
+              <select className="wf-in mt-1.5" value={cfg.stop_loss.type} onChange={(e) => {
+                // write the shown default into the config — the engine applies no stop while it is null
+                const sl = { ...cfg.stop_loss, type: e.target.value as StrategyConfig["stop_loss"]["type"] };
+                if (sl.type === "pct" && sl.value == null) sl.value = 0.15;
+                if ((sl.type === "atr" || sl.type === "trailing") && sl.mult == null) sl.mult = 2.5;
+                upd(["stop_loss"], sl);
+              }}>
                 <option value="none">None</option><option value="pct">Percent</option><option value="atr">ATR multiple</option><option value="trailing">Trailing ATR</option>
               </select>
             </Field>
@@ -206,9 +227,17 @@ export function StrategyBuilder({ initial }: { initial?: { id?: string; name: st
                 <Slider value={cfg.stop_loss.mult ?? 2} min={0.5} max={5} step={0.1} onChange={(v) => upd(["stop_loss", "mult"], v)} /></>
             )}
             {cfg.stop_loss.type === "pct" && (
-              <Field label="Stop % (fraction, 0–1)"><input className="wf-in mt-1.5" type="number" step="0.01" min="0.01" max="0.99" value={cfg.stop_loss.value ?? 0.15} onChange={(e) => upd(["stop_loss", "value"], parseFloat(e.target.value))} /></Field>
+              <Field label="Stop % (fraction, 0–1)"><input className="wf-in mt-1.5" type="number" step="0.01" min="0.01" max="0.99" value={cfg.stop_loss.value ?? ""} onChange={(e) => upd(["stop_loss", "value"], e.target.value === "" ? null : parseFloat(e.target.value))} /></Field>
             )}
-            <Field label="Take profit"><select className="wf-in mt-1.5" value={cfg.take_profit.type} onChange={(e) => upd(["take_profit", "type"], e.target.value)}><option value="none">None</option><option value="pct">Percent</option><option value="r_multiple">R multiple</option></select></Field>
+            <Field label="Take profit"><select className="wf-in mt-1.5" value={cfg.take_profit.type} onChange={(e) => {
+              const tp = { ...cfg.take_profit, type: e.target.value as StrategyConfig["take_profit"]["type"] };
+              if (tp.type === "pct" && tp.value == null) tp.value = 0.3;
+              if (tp.type === "r_multiple" && tp.r == null) tp.r = 2;
+              upd(["take_profit"], tp);
+            }}><option value="none">None</option><option value="pct">Percent</option><option value="r_multiple">R multiple</option></select></Field>
+            {cfg.take_profit.type === "pct" && (
+              <Field label="Take profit % (fraction, e.g. 0.30)"><input className="wf-in mt-1.5" type="number" step="0.01" min="0.01" value={cfg.take_profit.value ?? ""} onChange={(e) => upd(["take_profit", "value"], e.target.value === "" ? null : parseFloat(e.target.value))} /></Field>
+            )}
             {cfg.take_profit.type === "r_multiple" && (
               <><div className="flex items-center justify-between mt-3.5"><span className="text-[12.5px] font-bold text-muted">Target R</span><span className="text-[18px] font-extrabold">{cfg.take_profit.r ?? 2}</span></div>
                 <Slider value={cfg.take_profit.r ?? 2} min={1} max={5} step={0.5} onChange={(v) => upd(["take_profit", "r"], v)} /></>
@@ -248,7 +277,7 @@ export function StrategyBuilder({ initial }: { initial?: { id?: string; name: st
             </div>
             <div className="grid grid-cols-2 gap-2 mt-3.5">
               <Field label="Start"><input className="wf-in mt-1.5" type="date" value={cfg.start} onChange={(e) => upd(["start"], e.target.value)} /></Field>
-              <Field label="End"><input className="wf-in mt-1.5" type="date" value={cfg.end ?? ""} onChange={(e) => upd(["end"], e.target.value)} /></Field>
+              <Field label="End (blank = latest data)"><input className="wf-in mt-1.5" type="date" value={cfg.end ?? ""} onChange={(e) => upd(["end"], e.target.value || null)} /></Field>
             </div>
             {cfg.end && cfg.start && cfg.end <= cfg.start && <div className="text-[11px] text-loss mt-1">End date must be after start date.</div>}
             <Field label="Benchmark"><select className="wf-in mt-1.5" value={cfg.benchmark} onChange={(e) => upd(["benchmark"], e.target.value)}>{BENCHMARKS.map((b) => <option key={b.value} value={b.value}>{b.label}</option>)}</select></Field>
@@ -265,7 +294,7 @@ export function StrategyBuilder({ initial }: { initial?: { id?: string; name: st
               <div className="flex items-center gap-2.5"><span className="w-2.5 h-2.5 rounded-full" style={{ background: "#c4e05a", boxShadow: "0 0 8px #c4e05a" }} /><span className="text-white font-bold text-[14px]">Live config</span></div>
               <span className="font-mono text-[11px]" style={{ color: "#6f6b82" }}>strategy.json</span>
             </div>
-            <JsonView value={fullCfg} />
+            <JsonView value={viewCfg} />
             <div className="flex gap-2 mt-3.5">
               <button className="btn flex-1" style={{ background: "#26252e", color: "#eceaf2" }} disabled={blocked} onClick={save}>{busy === "save" ? "saving…" : "Save"}</button>
               <button className="btn btn-acc flex-[1.4]" disabled={blocked} onClick={run}>{busy === "run" ? "running…" : "Run backtest →"}</button>

@@ -42,14 +42,25 @@ def _select(rs: ResolvedStrategy, i: int, cfg: StrategyConfig) -> dict[str, tupl
     return {tickers[j]: (float(rrow[j]), w) for j in chosen}
 
 
-def generate_signals(config) -> dict:
+def resolve_live(config) -> ResolvedStrategy:
+    """Resolve a strategy the way live signals do: through the latest data, with ~2.2yr of history
+    so long indicators (sma200, roc125, rel_strength) warm up regardless of the backtest start."""
     cfg = config if isinstance(config, StrategyConfig) else StrategyConfig(**config)
-    # Live signals run on the latest data, and load enough history (~2.2yr) for long indicators
-    # (sma200, roc125, rel_strength) to warm up regardless of the strategy's backtest start date.
     warmup_start = (dt.date.today() - dt.timedelta(days=820)).isoformat()
     start = min(cfg.start, warmup_start) if cfg.start else warmup_start
-    cfg = cfg.model_copy(update={"start": start, "end": None})
-    rs = resolve(cfg)
+    return resolve(cfg.model_copy(update={"start": start, "end": None}))
+
+
+def generate_signals(config, as_of: dt.date | None = None,
+                     rs: ResolvedStrategy | None = None) -> dict:
+    """Today's book — or, with `as_of`, the book this exact code would have produced on that day.
+
+    `as_of` (iter-197, the paper replay) only moves the bar the selection is read from; the resolved
+    panels are point-in-time (lagged fundamentals, point-in-time membership), so a past bar sees only
+    what was knowable then. `rs` lets a caller resolve once and ask for many days.
+    """
+    cfg = config if isinstance(config, StrategyConfig) else StrategyConfig(**config)
+    rs = rs if rs is not None else resolve_live(cfg)
     dates = rs.close_adj.index
     if len(dates) < 60:
         return {"as_of": None, "signals": [], "warnings": rs.warnings + ["insufficient history"]}
@@ -59,6 +70,11 @@ def generate_signals(config) -> dict:
     # False), which would collapse today's book to an all-sell list. Resolve as-of the last bar that
     # actually has an eligible universe, so live orders reflect a real, tradeable book.
     latest_i = len(dates) - 1
+    if as_of is not None:
+        latest_i = int((dates.date <= as_of).sum()) - 1
+        if latest_i < 60:
+            return {"as_of": None, "signals": [],
+                    "warnings": rs.warnings + [f"insufficient history before {as_of}"]}
     last_i = latest_i
     while last_i > 0 and not bool(rs.entry_mask.iloc[last_i].any()):
         last_i -= 1
@@ -100,8 +116,9 @@ def generate_signals(config) -> dict:
                      "last_close": round(entry, 2) if not math.isnan(entry) else None,
                      "note": "dropped out of top-N at this rebalance"})
 
-    as_of = dates[last_i].date()
-    days_stale = (dt.date.today() - as_of).days
+    as_of_bar = dates[last_i].date()
+    days_stale = ((as_of or dt.date.today()) - as_of_bar).days
+    as_of = as_of_bar
     warnings = list(rs.warnings)
     if cfg.stop_loss.type == "none":
         warnings.append("This strategy has no stop-loss — the signal list ships without stop "
@@ -119,7 +136,9 @@ def generate_signals(config) -> dict:
             "n_holdings": cfg.n_holdings, "signals": sigs, "warnings": warnings}
 
 
-def generate_blend_signals(sleeves: list, weights: list[float], name: str = "blend") -> dict:
+def generate_blend_signals(sleeves: list, weights: list[float], name: str = "blend",
+                           as_of: dt.date | None = None,
+                           rs_list: list[ResolvedStrategy] | None = None) -> dict:
     """Combine several sleeves' live signals into ONE buy/hold/sell order sheet at fixed blend weights.
 
     The deployable artifact for the adr-035 70/30 MOM/LV blend. Each sleeve produces its own
@@ -142,7 +161,7 @@ def generate_blend_signals(sleeves: list, weights: list[float], name: str = "ble
 
     runs, sleeve_meta, used = [], [], set()
     for idx, (cfg, bw) in enumerate(zip(sleeves, norm_w)):
-        run = generate_signals(cfg)
+        run = generate_signals(cfg, as_of=as_of, rs=rs_list[idx] if rs_list else None)
         nm = run.get("strategy") or f"sleeve_{idx}"
         if nm in used:                                          # disambiguate duplicate sleeve names
             nm = f"{nm}#{idx}"

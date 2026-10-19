@@ -121,7 +121,7 @@ export function survivorsOnly(cfg: Partial<StrategyConfig>): { survivorsOnly: bo
 
 // Blank slate (owner pref iter-30): nothing pre-screened, no entry rules, no sort, no default
 // exits/regime — the user builds everything explicitly. Only structural, non-opinionated defaults
-// remain (data source, holdings count, equal weighting, monthly rebalance, costs, window).
+// remain (data source, holdings count, equal weighting, monthly rebalance, window).
 export function defaultConfig(name = ""): StrategyConfig {
   return {
     name,
@@ -143,10 +143,9 @@ export function defaultConfig(name = ""): StrategyConfig {
     max_hold_days: null,
     max_position_adtv_pct: 0.1,
     regime_filter: { enabled: false, ma_period: 200, mode: "binary", below_exposure: 0.0 },
-    costs_bps: { brokerage: 3, stt: 10, slippage: 15 },
     capital: 100000,
     start: "2016-07-01",
-    end: "2024-12-31",
+    end: null, // null = run to the latest data
     benchmark: "NIFTY500",
   };
 }

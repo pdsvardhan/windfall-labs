@@ -64,7 +64,6 @@ export default function StrategyResult() {
             ]} />
           )}
           <Link href={`/strategies/${id}/edit`} className="btn btn-soft">Edit config</Link>
-          <Link href={`/signals?strategy=${id}`} className="btn btn-ink">Use for signals →</Link>
           <Menu align="right" items={[
             { label: "Duplicate", onClick: duplicate },
             { label: "Delete", danger: true, onClick: () => setConfirmDel(true) },
