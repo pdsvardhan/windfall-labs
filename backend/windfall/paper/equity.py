@@ -199,6 +199,11 @@ def book_equity(benchmark: str = "NIFTY500") -> dict:
         per_units: list[float] = []
         base = steps[0][1]
         units = base            # NAV per unit starts at 1.0
+        # The net series is its own fund and issues its own units at its own (net) NAV. Sharing the
+        # gross units diluted every cost paid before a contribution: the Rs1L->Rs5L step-up issued
+        # units at the GROSS price, so the Rs1L era's costs were spread over ~5x the units and the
+        # net return read 0.4-0.7 pts too high on all eight books (iter-197, item 1418).
+        units_net = base
         step_i = 1
         cash_floor = base
         cash_floor_pct = 1.0
@@ -216,9 +221,11 @@ def book_equity(benchmark: str = "NIFTY500") -> dict:
                 new_base = steps[step_i][1]
                 flow = new_base - base
                 if flow != 0 and units > 0:
-                    nav_before = _state(d, i, base)[0]
+                    nav_before, nav_net_before, _ = _state(d, i, base)
                     if nav_before > 0:
                         units += flow / (nav_before / units)
+                    if nav_net_before > 0 and units_net > 0:
+                        units_net += flow / (nav_net_before / units_net)
                 base = new_base
                 step_i += 1
 
@@ -228,7 +235,7 @@ def book_equity(benchmark: str = "NIFTY500") -> dict:
             cash_floor_pct = min(cash_floor_pct, cash / base if base else 0.0)
             if units > 0:
                 pts.append([d, round(nav / units - 1.0, 6)])
-                pts_net.append([d, round(nav_net / units - 1.0, 6)])
+                pts_net.append([d, round(nav_net / units_net - 1.0, 6)])
 
         notional = base   # the notional in force today
 

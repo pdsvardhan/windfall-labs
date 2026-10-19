@@ -65,6 +65,11 @@ BOOK_NOTIONAL = 500000.0
 # variants reported byte-identical returns. They are the three the 2026-07-17 robustness protocol
 # rated 'survivor', the only three that passed it. Their existing baskets are kept, so the track
 # record since June continues rather than restarting.
+#
+# REPLAYED 2026-10-19 (iteration 197, adr-048). The owner wanted all eight on one record from the
+# end of June, so paper/replay.py re-ran every book from 29 Jun on Rs5L through this module's own
+# rules (point-in-time selection, next-open fills, cadence, cash guard). The cohorts above no longer
+# exist in the data; the pre-replay rows are kept in paper_positions_archive_<stamp>.
 ROSTER = [
     {"sid": "DVM_user", "kind": "saved", "capital": BOOK_NOTIONAL},
     {"sid": "DVM_dm_m_20", "kind": "saved", "capital": BOOK_NOTIONAL},

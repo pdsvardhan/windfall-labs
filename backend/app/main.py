@@ -24,7 +24,7 @@ from windfall.engine.backtest import run_backtest, resolve_with_warmup
 from windfall.engine.rotation import run_rotation
 from windfall.paper import (
     book_equity, commit_signal, delete_positions, list_positions, mark_to_market, rebalance_paper,
-    resize_book, scoreboard, void_pending_entries,
+    replay_paper, resize_book, scoreboard, void_pending_entries,
 )
 from windfall.scripts_validation import run_validation
 from windfall.signals_live import generate_blend_signals, generate_signals
@@ -282,8 +282,8 @@ def strategies_get(sid: str):
 
 @app.delete("/api/strategies/{sid}")
 def strategies_delete(sid: str):
-    store_meta.delete_strategy(sid)
-    return {"deleted": sid}
+    n = store_meta.delete_strategy(sid)
+    return {"deleted": sid, "backtests_deleted": n}
 
 
 # ── backtests ────────────────────────────────────────────────────────────────
@@ -681,6 +681,32 @@ def paper_resize(body: ResizeIn):
         return clean(resize_book(body.strategy_id, body.notional))
     except ValueError as exc:
         raise HTTPException(404, str(exc))
+
+
+class ReplayIn(BaseModel):
+    start: str = "2026-06-29"
+    end: str | None = None
+    notional: float | None = None
+    apply: bool = False
+
+
+@app.post("/api/paper/replay")
+def paper_replay(body: ReplayIn):
+    """Replay every tracked book from `start` through the paper process's own rules (adr-048).
+
+    Dry run by default: returns what each book would hold and the problems found, writes nothing.
+    `apply=true` archives paper_positions + paper_rebalance_runs to timestamped tables and replaces
+    the tracked books' history with the replay; it refuses while any problem is open. Slow (several
+    minutes) — call the API port directly, not through the cockpit proxy.
+    """
+    import datetime as _dt
+    try:
+        return clean(replay_paper(
+            start=_dt.date.fromisoformat(body.start),
+            end=_dt.date.fromisoformat(body.end) if body.end else None,
+            notional=body.notional, apply=body.apply))
+    except ValueError as exc:
+        raise HTTPException(409, str(exc))
 
 
 class PurgeIn(BaseModel):
