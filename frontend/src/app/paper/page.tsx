@@ -2,42 +2,52 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
-import type { PaperEquity, PaperEquityBook, PaperPosition, PaperSim, ScoreRow } from "@/lib/types";
-import { dateShort, money, num, pctSigned, signClass } from "@/lib/format";
+import type { PaperEquity, PaperEquityBook, PaperPosition, ScoreRow } from "@/lib/types";
+import { dateShort, money, num, pct, pctSigned, signClass } from "@/lib/format";
 import { Card, Pill, StatCard } from "@/components/ui";
 import { EquityChart } from "@/components/charts";
 
 // Fallback notional only. The API reports each book's own notional (equity.books[sid].notional),
-// which is what the page uses — a constant would silently misrender every chart and cash figure
-// once the books moved off ₹1L. They DID move: all eight went to ₹5L on 2026-09-08 (iter-173,
-// to-do #819), and the page rendered it correctly because it reads the API. The fallback stays at
-// the historical ₹1L on purpose — it is only ever reached when a book has no equity row at all,
-// and inception for every current book was at ₹1L.
-const NOTIONAL_FALLBACK = 100000;
+// which is what the page uses. Every book is replayed from 29 Jun 2026 on a single ₹5L notional
+// (iter-197), so the fallback — reached only when a book has no equity row — matches it.
+const NOTIONAL_FALLBACK = 500000;
 
-// Books started before this date are the original 6-Jul cohort; at/after it, the survivor cohort.
-// The three 5y-study survivors were SEEDED 29 Jun but only joined the rebalancing roster on
-// 4 Sep (iter-171, item 1230) — until then they sat as frozen buy-and-hold baskets. They start
-// EARLIER than the original five, so a start-date cutoff can no longer separate the cohorts;
-// membership is explicit.
-const SURVIVOR_BOOKS = new Set(["MOM_roc252_m_10", "DVM_all_w_10", "DVM_all_m_10"]);
-
-// Friendly labels for the tracked strategies (strategy_id -> shown name + one-line what).
-const LABELS: Record<string, { name: string; note: string }> = {
-  DVM_user: { name: "DVM (yours)", note: "mcap>500 · avg(D,V,M)≥55 · top-10 by DVM blend" },
-  DVM_dm_m_20: { name: "DVM · durability+momentum", note: "top-20 · monthly" },
-  BLEND_70_30: { name: "Blend 70/30", note: "70% momentum + 30% low-vol" },
-  MOM_roc252_m_20: { name: "Momentum (12-mo)", note: "top-20 · monthly" },
-  CMP_valmom_m_20: { name: "Value + momentum", note: "top-20 · monthly" },
-  DVM_all_w_10: { name: "DVM all-3 · weekly", note: "5y-study survivor · top-10 · weekly" },
-  DVM_all_m_10: { name: "DVM all-3 · monthly", note: "5y-study survivor · top-10 · monthly" },
-  MOM_roc252_m_10: { name: "Momentum (12-mo) · top-10", note: "5y-study survivor · monthly" },
+// One naming pattern for every book: "<strategy> · top N · <frequency>".
+const LABELS: Record<string, string> = {
+  DVM_user: "DVM (your screen) · top 10 · monthly",
+  DVM_dm_m_20: "Durability + Momentum · top 20 · monthly",
+  MOM_roc252_m_20: "12-month Momentum · top 20 · monthly",
+  MOM_roc252_m_10: "12-month Momentum · top 10 · monthly",
+  CMP_valmom_m_20: "Value + Momentum · top 20 · monthly",
+  DVM_all_w_10: "DVM (all three) · top 10 · weekly",
+  DVM_all_m_10: "DVM (all three) · top 10 · monthly",
+  BLEND_70_30: "Momentum 70 / Low-vol 30 · top 20 each · monthly",
 };
+
+const rule = (n: number, by: string, freq: string, universe: string) =>
+  `Top ${n} by ${by}, equal weight, rebalanced ${freq} · universe: ${universe}`;
+const RULES: Record<string, string> = {
+  DVM_user: rule(10, "avg of Durability, Valuation, Momentum", "monthly", "mcap ≥ ₹500cr, ADTV ≥ ₹5cr, avg DVM ≥ 55"),
+  DVM_dm_m_20: rule(20, "Durability + Momentum", "monthly", "ADTV ≥ ₹0.5cr"),
+  MOM_roc252_m_20: rule(20, "12-month price change", "monthly", "ADTV ≥ ₹0.5cr"),
+  MOM_roc252_m_10: rule(10, "12-month price change", "monthly", "ADTV ≥ ₹0.5cr"),
+  CMP_valmom_m_20: rule(20, "low PE + 6-month price change", "monthly", "ADTV ≥ ₹0.5cr"),
+  DVM_all_w_10: rule(10, "Durability + Valuation + Momentum", "weekly", "ADTV ≥ ₹0.5cr"),
+  DVM_all_m_10: rule(10, "Durability + Valuation + Momentum", "monthly", "ADTV ≥ ₹0.5cr"),
+  BLEND_70_30: "70% in 12-month Momentum top 20, 30% in Low-volatility top 20, rebalanced monthly · universe: ADTV ≥ ₹0.5cr",
+};
+
+const REASON_LABEL: Record<string, string> = { rebalance: "rebalance", stop: "stop-loss", target: "target hit", resize: "resize" };
+const reasonLabel = (r: string | null) => (r ? REASON_LABEL[r] ?? r : "closed");
+const reasonTone = (r: string | null): "good" | "bad" | "neutral" => (r === "target" ? "good" : r === "stop" ? "bad" : "neutral");
+
+const HOLD_COLS = "1fr .8fr .7fr .7fr .7fr .6fr .8fr .6fr .8fr";
+const HIST_COLS = "1fr .7fr .7fr .7fr .7fr .7fr .8fr .5fr .8fr";
 
 interface Agg {
   sid: string; positions: PaperPosition[]; open: number; closed: number; pending: number;
   invested: number; openCost: number; pendingCapital: number; committed: number;
-  value: number; pnl: number; pnlPct: number;
+  value: number; pnl: number;
   wins: number; marked: number; start: string; days: number;
 }
 
@@ -73,24 +83,29 @@ function aggregate(sid: string, ps: PaperPosition[], today: string): Agg {
   }
   const pnl = value - invested;
   return { sid, positions: ps, open, closed, pending, invested, openCost, pendingCapital,
-    committed: openCost + pendingCapital, value, pnl,
-    pnlPct: invested ? pnl / invested : 0, wins, marked, start, days: daysBetween(start, today) };
+    committed: openCost + pendingCapital, value, pnl, wins, marked, start, days: daysBetween(start, today) };
 }
 
-function BookCard({ a, i, netPnl, score, equity, sim, isOpen, onToggle }: {
-  a: Agg; i: number; netPnl: number | null; score?: ScoreRow;
+// Current value of a holding: planned capital while queued, else marked at the last price.
+function holdingValue(p: PaperPosition): number | null {
+  if (p.status === "pending") return p.planned_capital ?? 0;
+  return p.entry != null && p.shares != null ? (p.last_price ?? p.entry) * p.shares : null;
+}
+
+function BookCard({ a, i, score, equity, isOpen, onToggle }: {
+  a: Agg; i: number; score?: ScoreRow;
   equity?: PaperEquityBook;
-  sim?: { points: [string, number][]; ret?: number | null; error?: string };
   isOpen: boolean; onToggle: () => void;
 }) {
-  const lab = LABELS[a.sid] ?? { name: a.sid, note: a.sid === "dvm-monthly" ? "older test book" : "" };
+  const [tab, setTab] = useState<"holdings" | "history">("holdings");
+  const title = LABELS[a.sid] ?? a.sid;
+  const rules = RULES[a.sid];
   const benchRet = equity?.benchmark?.length ? equity.benchmark[equity.benchmark.length - 1][1] : null;
-  // Headline return comes from the API's NAV curve, not from pnl/invested. Dividing by every rupee
-  // ever deployed counts recycled capital twice and diluted every rebalancing book — DVM_user read
-  // 7.67% where the account had made 11.88% (iter-171, item 1229). The local aggregate stays as the
-  // fallback for a book the equity endpoint has no curve for.
+  // Headline return comes from the API's NAV curve only. After the replay the curve and the rupee
+  // P&L share one basis (₹5L since the start); with no curve the % shows "—" rather than falling
+  // back to pnl/invested, a different and diluted measure (iter-197).
   const st = equity?.stats;
-  const grossRet = st ? st.gross_return : a.pnlPct;
+  const grossRet = st?.gross_return ?? null;
   const netRet = st?.net_return ?? null;
   // min_cash_pct is the LOWEST the cash balance ever got: capital that was never deployed even at
   // the book's most-invested moment, i.e. the permanent drag (iter-171, item 1236).
@@ -103,16 +118,37 @@ function BookCard({ a, i, netPnl, score, equity, sim, isOpen, onToggle }: {
   const chartBench = useMemo(
     () => (equity?.benchmark ?? []).map(([d, r]) => [d, (1 + r) * notional] as [string, number]),
     [equity, notional]);
-  const simRet = sim?.points?.length ? sim.points[sim.points.length - 1][1] : null;
+
+  const holdings = useMemo(() => {
+    const rows = a.positions.filter((p) => p.status === "open" || p.status === "pending")
+      .map((p) => ({ p, v: holdingValue(p) }))
+      .sort((x, y) => (y.v ?? 0) - (x.v ?? 0));
+    return { rows, total: rows.reduce((s, r) => s + (r.v ?? 0), 0) };
+  }, [a.positions]);
+
+  // Closed trades grouped by exit date, newest first.
+  const history = useMemo(() => {
+    const closed = a.positions.filter((p) => p.status === "closed");
+    const by: Record<string, PaperPosition[]> = {};
+    for (const p of closed) (by[p.exit_date ?? ""] ||= []).push(p);
+    const groups = Object.entries(by)
+      .sort(([x], [y]) => (x === y ? 0 : x === "" ? 1 : y === "" ? -1 : x < y ? 1 : -1))
+      .map(([date, ps]) => ({
+        date,
+        reasons: [...new Set(ps.map((p) => reasonLabel(p.reason)))].join(" / "),
+        rows: ps.slice().sort((x, y) => (y.return_pct ?? 0) - (x.return_pct ?? 0)),
+      }));
+    return { count: closed.length, groups };
+  }, [a.positions]);
 
   return (
     <Card className="overflow-hidden">
       <button type="button" onClick={onToggle} className="w-full text-left px-5 py-4 flex items-center gap-4 wf-row" aria-expanded={isOpen}>
         <span className="text-[13px] font-extrabold text-faint w-5 tn">{i + 1}</span>
         <div className="flex-1 min-w-0">
-          <div className="font-extrabold text-[15px]">{lab.name}</div>
+          <div className="font-extrabold text-[15px]">{title}</div>
           <div className="text-[11.5px] text-faint truncate">
-            {lab.note} · since <b>{dateShort(a.start)}</b> · {a.days}d
+            since <b>{dateShort(a.start)}</b> · {a.days} days
           </div>
         </div>
         <div className="text-right w-[92px]">
@@ -120,11 +156,11 @@ function BookCard({ a, i, netPnl, score, equity, sim, isOpen, onToggle }: {
           <div className="text-[11px] text-faint tn">{money(a.pnl)} gross</div>
         </div>
         <div className="text-right w-[92px] hidden sm:block">
-          <div className={`text-[13px] font-bold tn ${signClass(netRet ?? netPnl)}`}>{netRet != null ? pctSigned(netRet) : (netPnl != null ? money(netPnl) : "—")}</div>
+          <div className={`text-[13px] font-bold tn ${signClass(netRet)}`}>{pctSigned(netRet)}</div>
           <div className="text-[11px] text-faint">net of costs</div>
         </div>
         <div className="text-right w-[80px] hidden sm:block">
-          <div className={`text-[13px] font-bold tn ${signClass(benchRet)}`}>{benchRet != null ? pctSigned(benchRet) : "—"}</div>
+          <div className={`text-[13px] font-bold tn ${signClass(benchRet)}`}>{pctSigned(benchRet)}</div>
           <div className="text-[11px] text-faint">Nifty500</div>
         </div>
         <div className="text-right w-[64px] hidden md:block">
@@ -153,6 +189,7 @@ function BookCard({ a, i, netPnl, score, equity, sim, isOpen, onToggle }: {
 
       {isOpen && (
         <div className="border-t" style={{ borderColor: "#f0eef6" }}>
+          {rules && <div className="px-5 pt-4 text-[11.5px] text-faint">{rules}</div>}
           {unpriced.length > 0 && (
             <div className="mx-5 mt-4 px-3 py-2 rounded-[10px] text-[12px]" style={{ background: "#fdeeee" }}>
               <Pill tone="warn">UNPRICED</Pill>{" "}
@@ -186,12 +223,6 @@ function BookCard({ a, i, netPnl, score, equity, sim, isOpen, onToggle }: {
               )}
             </div>
           )}
-          {score && score.closed > 0 && (score.closed_win_rate ?? 1) < 0.5 && (score.book_win_rate ?? 0) >= 0.5 && (
-            <div className="mx-5 mt-2 px-3 py-2 rounded-[10px] text-[12px] text-faint" style={{ background: "#f4f3f8" }}>
-              A rotation book closes its losers and holds its winners, so the closed-trade rate reads
-              low by design — the whole-book figure is the one that describes what you own.
-            </div>
-          )}
           {chartStrategy.length > 1 && (
             <div className="px-5 pt-4">
               <div className="text-[11px] text-faint font-bold mb-1">
@@ -200,53 +231,83 @@ function BookCard({ a, i, netPnl, score, equity, sim, isOpen, onToggle }: {
               <EquityChart strategy={chartStrategy} benchmark={chartBench} height={180} />
             </div>
           )}
-          {(sim || simRet != null) && (
-            <div className="mx-5 mt-3 px-3 py-2 rounded-[10px] text-[12px]" style={{ background: "#fef7e8" }}>
-              <Pill tone="warn">SIMULATED</Pill>{" "}
-              entries from <b>29 Jun</b> would sit at{" "}
-              <b className={`tn ${signClass(simRet)}`}>{simRet != null ? pctSigned(simRet) : "n/a"}</b>
-              {sim?.error ? <span className="text-faint"> (sim unavailable: {sim.error})</span> : null}
-              <span className="text-faint"> — mechanical engine run, not the live record.</span>
+          <div className="px-5 pt-4 flex">
+            <div className="flex gap-0.5 p-0.5 rounded-lg" style={{ background: "#f1eef8" }}>
+              {(["holdings", "history"] as const).map((t) => (
+                <button key={t} type="button" className="wf-seg" data-active={tab === t ? "1" : "0"} style={{ padding: "6px 12px", fontSize: 12 }}
+                  onClick={() => setTab(t)}>
+                  {t === "holdings" ? `Holdings (${holdings.rows.length})` : `History (${history.count} closed)`}
+                </button>
+              ))}
             </div>
-          )}
-          <div className="grid px-5 py-2.5 mt-2 text-[11px] text-faint font-bold" style={{ gridTemplateColumns: "1fr .8fr .7fr .7fr .65fr .7fr .75fr .7fr .7fr" }}>
-            <span>Ticker</span><span className="text-right">Entered</span><span className="text-right">Entry</span>
-            <span className="text-right">Last</span><span className="text-right">Ret%</span><span className="text-right">Shares</span>
-            <span className="text-right">Value</span><span className="text-right">Stop/Tgt</span><span className="text-right">Status</span>
           </div>
-          <div className="scroll-y" style={{ maxHeight: 380 }}>
-            {a.positions.slice().sort((x, y) => (y.return_pct ?? 0) - (x.return_pct ?? 0)).map((p) => (
-              <div key={p.id} className="grid px-5 py-2 text-[12.5px] items-center tn border-t" style={{ gridTemplateColumns: "1fr .8fr .7fr .7fr .65fr .7fr .75fr .7fr .7fr", borderColor: "#f6f4fb" }}>
-                <span className="font-bold">{p.ticker}</span>
-                <span className="text-right text-faint">{p.entry_date ? dateShort(p.entry_date) : "—"}</span>
-                <span className="text-right">{p.entry != null ? num(p.entry, 1) : "—"}</span>
-                <span className="text-right">{p.last_price != null ? num(p.last_price, 1) : "—"}</span>
-                <span className={`text-right font-bold ${signClass(p.return_pct)}`}>{p.return_pct != null ? pctSigned(p.return_pct) : "—"}</span>
-                <span className="text-right text-faint">{p.shares ?? "—"}</span>
-                <span className="text-right text-faint">
-                  {p.status === "pending"
-                    ? money(p.planned_capital ?? 0)
-                    : p.entry != null && p.shares != null
-                      ? money((p.last_price ?? p.entry) * p.shares)
-                      : "—"}
-                </span>
-                <span className="text-right text-faint text-[11px]">{p.stop != null ? num(p.stop, 0) : "—"}/{p.target != null ? num(p.target, 0) : "—"}</span>
-                <span className="text-right">
-                  {p.status === "open"
-                    ? <span className="text-faint">open</span>
-                    : p.status === "pending"
-                      // Queued by a rebalance, fills at the next session's open. Showing this as a
-                      // red "closed" pill was #863 — it made a live book look liquidated.
-                      ? <span title="queued by the last rebalance — fills at the next session's open">
-                          <Pill tone="warn">queued</Pill>
-                        </span>
-                      : <span title={p.exit_date ? `exited ${dateShort(p.exit_date)}` : undefined}>
-                          <Pill tone={p.reason === "target" ? "good" : "bad"}>{p.reason ?? "closed"}</Pill>
-                        </span>}
-                </span>
+          {tab === "holdings" ? (
+            <>
+              <div className="grid px-5 py-2.5 mt-2 text-[11px] text-faint font-bold" style={{ gridTemplateColumns: HOLD_COLS }}>
+                <span>Ticker</span><span className="text-right">Since</span><span className="text-right">Entry</span>
+                <span className="text-right">Last</span><span className="text-right">Return</span><span className="text-right">Shares</span>
+                <span className="text-right">Value</span><span className="text-right">Weight</span><span className="text-right">Stop/Target</span>
               </div>
-            ))}
-          </div>
+              <div className="scroll-y" style={{ maxHeight: 380 }}>
+                {holdings.rows.length === 0 && <div className="px-5 py-6 text-[13px] text-faint border-t" style={{ borderColor: "#f6f4fb" }}>No holdings.</div>}
+                {holdings.rows.map(({ p, v }) => (
+                  <div key={p.id} className="grid px-5 py-2 text-[12.5px] items-center tn border-t" style={{ gridTemplateColumns: HOLD_COLS, borderColor: "#f6f4fb" }}>
+                    <span className="font-bold">{p.ticker}</span>
+                    <span className="text-right text-faint">
+                      {p.status === "pending"
+                        // Queued by a rebalance, fills at the next session's open. Showing this as a
+                        // red "closed" pill was #863 — it made a live book look liquidated.
+                        ? <span title="queued by the last rebalance — fills at the next session's open">
+                            <Pill tone="warn">queued</Pill>
+                          </span>
+                        : dateShort(p.entry_date)}
+                    </span>
+                    <span className="text-right">{p.entry != null ? num(p.entry, 1) : "—"}</span>
+                    <span className="text-right">{p.last_price != null ? num(p.last_price, 1) : "—"}</span>
+                    <span className={`text-right font-bold ${signClass(p.return_pct)}`}>{pctSigned(p.return_pct)}</span>
+                    <span className="text-right text-faint">{p.shares ?? "—"}</span>
+                    <span className="text-right text-faint">{money(v)}</span>
+                    <span className="text-right text-faint">{v != null && holdings.total > 0 ? pct(v / holdings.total, 1) : "—"}</span>
+                    <span className="text-right text-faint text-[11px]">{p.stop != null ? num(p.stop, 0) : "—"}/{p.target != null ? num(p.target, 0) : "—"}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="grid px-5 py-2.5 mt-2 text-[11px] text-faint font-bold" style={{ gridTemplateColumns: HIST_COLS }}>
+                <span>Ticker</span><span className="text-right">Bought</span><span className="text-right">Sold</span>
+                <span className="text-right">Entry</span><span className="text-right">Exit</span><span className="text-right">Return</span>
+                <span className="text-right">P&amp;L</span><span className="text-right">Held</span><span className="text-right">Why</span>
+              </div>
+              <div className="scroll-y" style={{ maxHeight: 380 }}>
+                {history.count === 0 && <div className="px-5 py-6 text-[13px] text-faint border-t" style={{ borderColor: "#f6f4fb" }}>No closed trades yet.</div>}
+                {history.groups.map((g) => (
+                  <div key={g.date || "undated"}>
+                    <div className="px-5 py-1.5 text-[11.5px] font-extrabold text-muted tn border-t" style={{ background: "#f7f5fc", borderColor: "#f0eef6" }}>
+                      {dateShort(g.date)} · {g.reasons} · {g.rows.length} sold
+                    </div>
+                    {g.rows.map((p) => {
+                      const pnl = p.exit != null && p.entry != null && p.shares != null ? (p.exit - p.entry) * p.shares : null;
+                      return (
+                        <div key={p.id} className="grid px-5 py-2 text-[12.5px] items-center tn border-t" style={{ gridTemplateColumns: HIST_COLS, borderColor: "#f6f4fb" }}>
+                          <span className="font-bold">{p.ticker}</span>
+                          <span className="text-right text-faint">{dateShort(p.entry_date)}</span>
+                          <span className="text-right text-faint">{dateShort(p.exit_date)}</span>
+                          <span className="text-right">{p.entry != null ? num(p.entry, 1) : "—"}</span>
+                          <span className="text-right">{p.exit != null ? num(p.exit, 1) : "—"}</span>
+                          <span className={`text-right font-bold ${signClass(p.return_pct)}`}>{pctSigned(p.return_pct)}</span>
+                          <span className={`text-right ${signClass(pnl)}`}>{money(pnl)}</span>
+                          <span className="text-right text-faint">{p.entry_date && p.exit_date ? `${daysBetween(p.entry_date, p.exit_date)}d` : "—"}</span>
+                          <span className="text-right"><Pill tone={reasonTone(p.reason)}>{reasonLabel(p.reason)}</Pill></span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
         </div>
       )}
     </Card>
@@ -257,17 +318,21 @@ export default function PaperPage() {
   const [positions, setPositions] = useState<PaperPosition[]>([]);
   const [scoreRows, setScoreRows] = useState<ScoreRow[]>([]);
   const [equity, setEquity] = useState<PaperEquity | null>(null);
-  const [sim, setSim] = useState<PaperSim | null>(null);
+  const [eqErr, setEqErr] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [markMsg, setMarkMsg] = useState<string | null>(null);
   const [open, setOpen] = useState<string | null>(null);
 
+  function loadEquity() {
+    setEqErr(null);
+    api.paperEquity().then(setEquity).catch((e) => setEqErr(e.message));
+  }
   function load() {
-    api.paperPositions().then(setPositions).catch((e) => setErr(e.message));
+    // void rows are never shown anywhere
+    api.paperPositions().then((ps) => setPositions(ps.filter((p) => p.status !== "void"))).catch((e) => setErr(e.message));
     api.scoreboard().then(setScoreRows).catch(() => {});
-    api.paperEquity().then(setEquity).catch(() => {});
-    api.paperSim().then(setSim).catch(() => {}); // optional: page works without the SIM file
+    loadEquity();
   }
   useEffect(load, []);
 
@@ -283,60 +348,36 @@ export default function PaperPage() {
   }
 
   const today = new Date().toISOString().slice(0, 10);
+  // Sorted by the headline % that is displayed (NAV gross return); books without a curve go last.
   const aggs = useMemo(() => {
     const by: Record<string, PaperPosition[]> = {};
     for (const p of positions) (by[p.strategy_id ?? "unassigned"] ||= []).push(p);
+    const ret = (sid: string) => equity?.books[sid]?.stats?.gross_return ?? null;
     return Object.entries(by).map(([sid, ps]) => aggregate(sid, ps, today))
-      .sort((a, b) => b.pnlPct - a.pnlPct);
-  }, [positions, today]);
+      .sort((a, b) => {
+        const ra = ret(a.sid), rb = ret(b.sid);
+        if (ra == null || rb == null) return ra == null ? (rb == null ? 0 : 1) : -1;
+        return rb - ra;
+      });
+  }, [positions, equity, today]);
 
-  const originals = aggs.filter((a) => !SURVIVOR_BOOKS.has(a.sid));
-  const survivors = aggs.filter((a) => SURVIVOR_BOOKS.has(a.sid));
-  const netBy = useMemo(() => Object.fromEntries(scoreRows.map((r) => [r.strategy_id, r.net_pnl ?? null])), [scoreRows]);
   const scoreBy = useMemo(() => Object.fromEntries(scoreRows.map((r) => [r.strategy_id, r])), [scoreRows]);
 
-  const lastMark = useMemo(() => {
-    const ds = positions.map((p) => p.last_date).filter(Boolean) as string[];
-    return ds.sort().at(-1) ?? null;
-  }, [positions]);
-
-  const expStart = originals.length ? originals.map((a) => a.start).sort()[0] : null;
+  // The earliest-starting book sets the experiment start and the benchmark period.
+  const first = useMemo(() => (aggs.length ? aggs.reduce((m, a) => (a.start < m.start ? a : m)) : null), [aggs]);
+  const expStart = first?.start ?? null;
   const totalPnl = aggs.reduce((a, x) => a + x.pnl, 0);
   const totalNet = scoreRows.reduce((a, x) => a + (x.net_pnl ?? 0), 0);
   const benchSince = useMemo(() => {
-    if (!equity || !originals.length) return null;
-    const b = equity.books[originals[0].sid]?.benchmark;
+    const b = first ? equity?.books[first.sid]?.benchmark : null;
     return b?.length ? b[b.length - 1][1] : null;
-  }, [equity, originals]);
-
-  const renderGroup = (label: string, list: Agg[], offset: number) => (
-    list.length > 0 && (
-      <div className="mb-5">
-        <div className="text-[12px] font-extrabold text-faint uppercase tracking-wide mb-2">{label}</div>
-        <div className="flex flex-col gap-2.5">
-          {list.map((a, i) => (
-            <BookCard
-              key={a.sid} a={a} i={offset + i} netPnl={netBy[a.sid] ?? null} score={scoreBy[a.sid]}
-              equity={equity?.books[a.sid]} sim={sim?.books[a.sid]}
-              isOpen={open === a.sid} onToggle={() => setOpen(open === a.sid ? null : a.sid)}
-            />
-          ))}
-        </div>
-      </div>
-    )
-  );
+  }, [equity, first]);
 
   return (
     <div>
       <div className="flex items-end justify-between mt-6 mb-4 animate-rise">
         <div>
           <h1 className="text-[34px] font-extrabold tracking-tight">Paper trades</h1>
-          <p className="text-muted text-[14px] mt-1.5 max-w-[640px]">
-            A zero-risk live dry-run on real NSE end-of-day prices — no money at stake. Two cohorts:
-            the original five (since 6 Jul) and the three 5y-study survivors (seeded 29 Jun, on the
-            rebalancing roster since 4 Sep — before that they were held, not traded). Watch them
-            compete before funding one.
-          </p>
         </div>
         <div className="text-right">
           <button className="btn btn-ink" disabled={busy} onClick={markNow}>{busy ? "marking…" : "↻ Mark to market"}</button>
@@ -345,6 +386,12 @@ export default function PaperPage() {
       </div>
 
       {err && <Card className="px-4 py-3 mb-4" style={{ background: "#fdeaf1" }}><span className="text-loss text-[13px]">{err}</span></Card>}
+      {eqErr && (
+        <Card className="px-4 py-3 mb-4 flex items-center justify-between gap-3" style={{ background: "#fdeaf1" }}>
+          <span className="text-loss text-[13px]">Return curves could not be loaded — returns show “—” until they do. ({eqErr})</span>
+          <button type="button" className="btn btn-soft shrink-0" style={{ padding: "7px 14px", fontSize: 12 }} onClick={loadEquity}>Retry</button>
+        </Card>
+      )}
 
       {/* the basics, up front */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-2.5 mb-4">
@@ -355,26 +402,17 @@ export default function PaperPage() {
         <StatCard label="Nifty500 same period" value={benchSince != null ? pctSigned(benchSince) : "—"} sub="benchmark return" />
       </div>
 
-      {/* honesty / freshness banner */}
-      <Card className="px-4 py-3 mb-4 text-[12px] text-muted" style={{ background: "#f7f5fc" }}>
-        <b className="text-ink">How this works:</b> prices are NSE Bhavcopy <b>end-of-day</b> (not intraday),
-        refreshed weekday nights; P&amp;L marks to the last trading day{lastMark ? <> — currently <b className="text-ink">{lastMark}</b></> : ""}.
-        Headline card P&amp;L is <b>gross of costs</b>; the net column deducts modelled brokerage/STT/slippage.
-        Rebalance entries fill at the <b>next session&apos;s open</b> (matching the backtest&apos;s
-        no-look-ahead fills; they show as <b>pending</b> until that bar exists); manual commits enter at
-        the latest close. Day-0 P&amp;L starts at zero either way. Books are only
-        partly invested when a name&apos;s weight rounds below one share — see <b>cash %</b> per strategy.
-        The yellow SIM blocks are <b>simulated</b> engine runs from 29 Jun, kept strictly apart from the
-        live record. You still place every real order yourself.
-      </Card>
-
       {positions.length === 0 ? (
         <Card className="px-5 py-10 text-center text-[13px] text-muted">No paper positions yet.</Card>
       ) : (
-        <>
-          {renderGroup("Originals — rebalanced since 6 Jul", originals, 0)}
-          {renderGroup("Survivors — 5y-study winners, seeded 29 Jun, rebalanced since 4 Sep", survivors, originals.length)}
-        </>
+        <div className="flex flex-col gap-2.5 mb-5">
+          {aggs.map((a, i) => (
+            <BookCard
+              key={a.sid} a={a} i={i} score={scoreBy[a.sid]} equity={equity?.books[a.sid]}
+              isOpen={open === a.sid} onToggle={() => setOpen(open === a.sid ? null : a.sid)}
+            />
+          ))}
+        </div>
       )}
     </div>
   );

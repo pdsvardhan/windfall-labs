@@ -186,11 +186,6 @@ export default function LeaderboardsPage() {
     <div>
       <div className="mt-6 mb-4 animate-rise">
         <h1 className="text-[34px] font-extrabold tracking-tight">Leaderboards</h1>
-        <p className="text-muted text-[14px] mt-1.5 max-w-[680px]">
-          Every board is net of costs on the survivorship-free data layer. A leaderboard is a
-          starting point, not a verdict — the <b>Verdicts</b> tab shows which winners survived the
-          robustness protocol and which were luck.
-        </p>
       </div>
 
       {err && (
@@ -212,9 +207,6 @@ export default function LeaderboardsPage() {
           {active && (
             <div className="animate-rise" key={board}>
               <BenchStrip b={active.benchmark} window={active.window} />
-              <Card className="px-4 py-2.5 mb-3 text-[12px] text-muted" style={{ background: "#f7f5fc" }}>
-                {active.caption}
-              </Card>
               {board === "families" ? (
                 <FamiliesBoard rows={active.rows as FamilyRow[]} />
               ) : board === "verdicts" ? (
