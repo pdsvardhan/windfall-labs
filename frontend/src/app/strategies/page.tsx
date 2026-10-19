@@ -166,7 +166,8 @@ function ConfigPeek({ c }: { c: any }) {
       {line("Rank", `${c?.rank_by || "—"} ${c?.rank_order === "asc" ? "↑" : "↓"}`)}
       {line("Sizing", `top ${c?.n_holdings} · ${c?.weighting}${c?.max_weight_per_stock ? ` · max ${c.max_weight_per_stock}` : ""}`)}
       {line("Exits", `stop ${c?.stop_loss?.type ?? "none"} · tp ${c?.take_profit?.type ?? "none"}${c?.regime_filter?.enabled ? " · regime on" : ""}`)}
-      {line("Costs", `${c?.costs_bps?.brokerage}+${c?.costs_bps?.stt}+${c?.costs_bps?.slippage} bps`)}
+      {/* costs_bps is inert (adr-020) — show the schedule the engine actually charges */}
+      {line("Costs", "NSE delivery · ~22 bps round-trip + ₹15.93 DP/sell")}
       {line("Window", `${c?.start} → ${c?.end || "today"} · ${c?.rebalance} · vs ${c?.benchmark}`)}
     </div>
   );

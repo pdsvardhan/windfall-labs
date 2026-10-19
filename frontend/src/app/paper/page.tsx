@@ -398,7 +398,7 @@ export default function PaperPage() {
         <StatCard label="Experiment start" value={expStart ? dateShort(expStart) : "—"} sub={expStart ? `${daysBetween(expStart, today)} days live` : ""} />
         <StatCard label="Books" value={String(aggs.length)} sub={`${positions.length} positions`} />
         <StatCard label="Gross P&L" value={money(totalPnl)} sub="before costs" tone={totalPnl >= 0 ? "lime" : "white"} />
-        <StatCard label="Net P&L" value={money(totalNet)} sub="after brokerage/STT/slippage" tone={totalNet >= 0 ? "lime" : "white"} />
+        <StatCard label="Net P&L" value={money(totalNet)} sub="after modelled NSE costs" tone={totalNet >= 0 ? "lime" : "white"} />
         <StatCard label="Nifty500 same period" value={benchSince != null ? pctSigned(benchSince) : "—"} sub="benchmark return" />
       </div>
 
