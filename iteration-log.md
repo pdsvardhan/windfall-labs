@@ -421,3 +421,51 @@ the ADR now names BLEND as an honest exception rather than implying the case is 
 4. **Tidying** — #854, #858, #288, #818, #185, #841/#846.
 5. Pre-existing HARD anti-gaslight: `cockpit-dashboard` and `strategy-editor` at `status=done` with
    no `feature_claims` row. Unchanged since iter-147, still unaddressed.
+
+## Session 2026-10-19/20 — iter-197 (Ottomate iteration 197): website test, paper replay from June
+
+**Stage:** Stage 4 · 14 items locked (12 classified + 2 added at lock) · branch `iter-197-paper-replay`
+
+### What the owner asked, and what testing found
+
+- **Create + run from the website: half-broken.** Backtests ran (~40–60s) and saved, but the Next
+  rewrite proxy cut every `/api` request at its 30s default, so the builder reported "500" for a
+  run that had succeeded; Cost sensitivity and Explore variations hit the same wall. The running
+  overlay also vanished during the run (`save()` cleared `busy`).
+- **Exits silently inert:** take-profit % had no input; stop % and R-multiple showed defaults that
+  were never written into the config; an R target with no stop places no target at all.
+- **Builder:** End defaulted to 2024-12-31 (22 months dropped from every new backtest); the config
+  pane showed inert `costs_bps` contradicting "no slippage". **Delete** left the backtests behind.
+- **Paper returns:** rupee P&L and all 137 marks were right; the net-of-cost % was 0.4–0.7 pts too
+  high on every book (the Rs1L→Rs5L top-up issued net units at the gross price); the headline mixed
+  the Rs1L and Rs5L eras; 1 in 8 equity loads 500'd (one DuckDB connection shared across request
+  threads — a second `execute()` swallowed the first thread's pending result).
+
+### Built (all code-verifier APPROVE; feature verifier — see Ottomate iteration 197)
+
+- 1410 proxyTimeout 15 min + overlay through save+run · 1411 exit defaults written, TP % input,
+  guardrails incl. R-without-stop · 1412 End=null (latest), costs_bps hidden, list shows the real
+  NSE schedule · 1413 Signals hidden (route + engine kept) · 1414/1415 explanatory text removed ·
+  1416 one list · 1417 one naming pattern + one rules template · 1418 net series unitized at net
+  NAV · 1419 headline % = Rs P&L ÷ Rs5L, sorted by it · 1420 per-thread Trendlyne cursor + explicit
+  error/Retry · 1421 Holdings / History tabs · 1422 delete cascades to backtests.
+- **1423 — the replay (adr-048).** Owner: *"all 8 strats to look like they were being orchestrated
+  since June ending."* `paper/replay.py` re-runs the paper process itself from 29 Jun on Rs5L
+  (as-of selection, period cadence incl. weekends, next-open fills, cash guard). Applied 2026-10-19
+  22:32 IST: 403 positions, 52 runs, old rows in `*_archive_20261019_170254`. Matches the live
+  process's last rebalance on all 8 books; 16/16 clipped-data selections identical (no look-ahead).
+
+### Findings carried forward (to-dos)
+
+- **#952 P1** live Bhavcopy tail not split-adjusted — BHAGYANGR 454.55→41.40 on 8 Oct reads as
+  −84.7% in both Momentum books and the Blend; stored entries also never re-base on a split.
+- **#953 P1** Trendlyne factor harvest overdue — factors end 2026-09-04, so October rebalanced on
+  45-day-old scores. **#954** the cron's staleness check ignores that warning. **#955** meta-store
+  proxy has the same fetch-outside-lock shape as 1420 (latent). **#956** paper labels hardcoded.
+- Closed by the replay: #865 (Rs5L idle-cash drag gone except BLEND 5.4%), #866 (weekly/monthly DVM
+  no longer identical).
+
+### Cleanup
+
+Test strategies `ZZ TEST momentum 126` (+ its backtest) and the older `Untitled strategy` deleted
+through the now-cascading DELETE.
