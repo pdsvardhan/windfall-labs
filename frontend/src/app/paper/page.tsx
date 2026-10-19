@@ -24,17 +24,20 @@ const LABELS: Record<string, string> = {
   BLEND_70_30: "Momentum 70 / Low-vol 30 · top 20 each · monthly",
 };
 
-const rule = (n: number, by: string, freq: string, universe: string) =>
-  `Top ${n} by ${by}, equal weight, rebalanced ${freq} · universe: ${universe}`;
+// Every book also sits behind the engine's point-in-time ₹500cr membership floor, so the universe
+// text starts there for all eight; only the extra screens differ.
+const rule = (n: number | string, by: string, freq: string, extra: string) =>
+  `Top ${n} by ${by}, equal weight, rebalanced ${freq} · universe: mcap ≥ ₹500cr, ${extra}`;
+const DVM3 = "Durability + Valuation + Momentum";
 const RULES: Record<string, string> = {
-  DVM_user: rule(10, "avg of Durability, Valuation, Momentum", "monthly", "mcap ≥ ₹500cr, ADTV ≥ ₹5cr, avg DVM ≥ 55"),
+  DVM_user: rule(10, DVM3, "monthly", "ADTV ≥ ₹5cr, avg DVM ≥ 55"),
   DVM_dm_m_20: rule(20, "Durability + Momentum", "monthly", "ADTV ≥ ₹0.5cr"),
   MOM_roc252_m_20: rule(20, "12-month price change", "monthly", "ADTV ≥ ₹0.5cr"),
   MOM_roc252_m_10: rule(10, "12-month price change", "monthly", "ADTV ≥ ₹0.5cr"),
   CMP_valmom_m_20: rule(20, "low PE + 6-month price change", "monthly", "ADTV ≥ ₹0.5cr"),
-  DVM_all_w_10: rule(10, "Durability + Valuation + Momentum", "weekly", "ADTV ≥ ₹0.5cr"),
-  DVM_all_m_10: rule(10, "Durability + Valuation + Momentum", "monthly", "ADTV ≥ ₹0.5cr"),
-  BLEND_70_30: "70% in 12-month Momentum top 20, 30% in Low-volatility top 20, rebalanced monthly · universe: ADTV ≥ ₹0.5cr",
+  DVM_all_w_10: rule(10, DVM3, "weekly", "ADTV ≥ ₹0.5cr"),
+  DVM_all_m_10: rule(10, DVM3, "monthly", "ADTV ≥ ₹0.5cr"),
+  BLEND_70_30: rule("20 + 20", "12-month price change (70%) / low volatility (30%)", "monthly", "ADTV ≥ ₹0.5cr"),
 };
 
 const REASON_LABEL: Record<string, string> = { rebalance: "rebalance", stop: "stop-loss", target: "target hit", resize: "resize" };
@@ -71,7 +74,9 @@ function aggregate(sid: string, ps: PaperPosition[], today: string): Agg {
     }
     if (p.entry == null || p.shares == null) continue;   // void, or an incomplete row
     const cost = p.entry * p.shares;
-    const mark = (p.last_price ?? p.entry) * p.shares;
+    // A stop/target exit books the stop/target level as `exit` while last_price stays that day's
+    // close; the equity curve uses `exit`, so the ₹ line must too or it drifts off the % above it.
+    const mark = ((p.status === "closed" && p.exit != null ? p.exit : p.last_price) ?? p.entry) * p.shares;
     invested += cost; value += mark;
     // `invested` is every rupee ever deployed, so on a book that has recycled capital it exceeds
     // the notional and reads as nonsense next to a cash figure (₹1,54,885 on a ₹1L book).

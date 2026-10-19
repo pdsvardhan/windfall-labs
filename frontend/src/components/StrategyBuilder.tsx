@@ -66,8 +66,14 @@ export function StrategyBuilder({ initial }: { initial?: { id?: string; name: st
     if (cfg.max_hold_days != null && cfg.max_hold_days < 1) e.push("Max hold days must be at least 1.");
     if (cfg.sector_cap != null && cfg.sector_cap < 1) e.push("Sector cap must be at least 1.");
     if (cfg.stop_loss.type === "pct" && cfg.stop_loss.value == null) e.push("Set a stop-loss %.");
+    if ((cfg.stop_loss.type === "atr" || cfg.stop_loss.type === "trailing") && cfg.stop_loss.mult == null)
+      e.push("Set a stop ATR multiple.");
     if (cfg.take_profit.type === "pct" && cfg.take_profit.value == null) e.push("Set a take-profit %.");
     if (cfg.take_profit.type === "r_multiple" && cfg.take_profit.r == null) e.push("Set a take-profit R multiple.");
+    // R is measured from the stop (engine _stop_target: target = entry + r × (entry − stop)), so an
+    // R target with no stop places no target at all.
+    if (cfg.take_profit.type === "r_multiple" && cfg.stop_loss.type === "none")
+      e.push("An R-multiple take profit needs a stop loss — R is measured from the stop.");
     return e;
   }, [name, cfg]);
 
