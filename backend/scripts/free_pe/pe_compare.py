@@ -45,10 +45,11 @@ def main() -> None:
     tl = tl.reindex(idx.union(tl.index)).ffill(limit=10).reindex(idx)
     tl = tl.where(tl > 0)
     dead = {r[0] for r in ts._con().execute("SELECT symbol FROM delistings").fetchall()}
-    fin = {r[0].replace(".NS", "") for r in duckdb.connect(str(DATA / "screener_fundamentals.duckdb"),
-                                                            read_only=True).execute(
-        "SELECT DISTINCT ticker FROM fundamentals_history WHERE confidence='excluded-financial' "
-        "OR is_financial").fetchall()}
+    # Banks/NBFCs by Trendlyne's own sector label. The screener store cannot answer this: financials
+    # were filtered out by sector BEFORE ingest, so it flags only a handful (verifier round 1).
+    fin = {s for s, v in ts.sector_map().items()
+           if "bank" in (v or "").lower() or "financ" in (v or "").lower()}
+    in_store = set(eps.columns[eps.notna().any()])
 
     rows = []
     for d in months:
@@ -63,6 +64,8 @@ def main() -> None:
         q_t = set(t[both].nsmallest(len(both) // 5).index)
         only_t, only_o = set(t.index) - set(o.index), set(o.index) - set(t.index)
         rows.append({"date": d.date(), "universe": len(u), "own": len(o), "tl": len(t),
+                     "own_missing_not_in_store": len(set(u) - in_store),
+                     "own_missing_financial": len((set(u) - set(o.index)) & fin),
                      "both": len(both), "spearman": rho,
                      "cheap_quintile_overlap": len(q_o & q_t) / max(len(q_t), 1),
                      "tl_only": len(only_t), "tl_only_financial": len(only_t & fin),
@@ -80,9 +83,15 @@ def main() -> None:
         print(f"  {y} | {g.universe.mean():.0f} | {g.own.mean():.0f} | {g.tl.mean():.0f} | "
               f"{g.both.mean():.0f} | {g.spearman.mean():.2f} | {g.cheap_quintile_overlap.mean():.0%} | "
               f"{g.tl_only.mean():.0f} ({g.tl_only_financial.mean():.0f}) | "
-              f"{g.own_only.mean():.0f} ({g.own_only_dead.mean():.0f})")
-    print(f"\nall months: rank corr {m.spearman.mean():.2f} (min {m.spearman.min():.2f}), "
-          f"cheapest-fifth overlap {m.cheap_quintile_overlap.mean():.0%}")
+              f"{g.own_only.mean():.0f} ({g.own_only_dead.mean():.0f}) | "
+              f"own missing: not in store {g.own_missing_not_in_store.mean():.0f}, "
+              f"banks/NBFCs {g.own_missing_financial.mean():.0f}")
+    thin = m[m.tl < 100]
+    print(f"\nmonths where tl_pe covers <100 names (rank stats unreliable, excluded below): "
+          f"{[str(x) for x in thin.date]}")
+    ok = m[m.tl >= 100]
+    print(f"all other months: rank corr {ok.spearman.mean():.2f} (min {ok.spearman.min():.2f}), "
+          f"cheapest-fifth overlap {ok.cheap_quintile_overlap.mean():.0%}")
 
 
 if __name__ == "__main__":
