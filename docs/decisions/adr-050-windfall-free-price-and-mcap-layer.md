@@ -49,16 +49,18 @@ Adding the app's own events to NSE's makes it worse (their false positives). The
 under-credited.
 
 How Trendlyne's history changes between harvests: against the 2026-06-12 snapshot, 15 of 1,731
-names had their whole history rescaled by one constant factor — 14 by an NSE split, bonus or rights
-issue in between (GENESYS ×0.682 for a rights issue), one unexplained (VMARCIND ×0.167); against the
-2026-07-08 snapshot, 9 of 1,756, all 9 explained. Since adr-049 the tail adjustment already divides
+names had their whole history rescaled by one constant factor — 14 with an NSE split, bonus or
+rights issue in between (GENESYS ×0.682 for a rights issue), one unexplained (VMARCIND ×0.167);
+against the 2026-07-08 snapshot, 9 of 1,756, all 9 explained. ("Explained" means the name has an NSE
+event between the two harvests; the factors were spot-checked against the ratios — MWL ×0.1 split,
+GOODLUCK ×0.333 bonus 2:1 — not matched one by one.) Since adr-049 the tail adjustment already divides
 every earlier bar, Trendlyne's included, for splits and bonuses; adding rights covers the rest.
-Beyond that, two names per comparison moved by a non-constant amount; nothing else changed, so
-nothing requires re-downloading the history.
+Beyond that, two names per comparison moved by a non-constant amount (TEMBO, SAHANA — also a split
+and a bonus); nothing else changed, so nothing requires re-downloading the history.
 
 **Market cap and the ₹500cr universe (item 1462, `explain_membership.py`).** NSE's daily price
 bundle carries an official market-cap file (issue size × close for every listed security) from
-**2024-02-29**. The current universe was scored against NSE's official set at 30 month-ends
+**2024-02-01** (the bundles for 31 Jan 2024, Dec 2023 and Jun 2023 carry none). The current universe was scored against NSE's official set at 30 month-ends
 (Feb 2024 – Jul 2026). Companies are matched by ISIN (renames like ZOMATO→ETERNAL count once); the
 official side counts a company that day only if it trades in a mainboard series (EQ, BE, BZ) above
 ₹500cr; the current side sits behind the strategies' NSE-only gate (company ever traded in EQ,
@@ -67,11 +69,11 @@ adr-024). Averages per month-end (official ≈1,539):
 | Disagreement | Per month | Cause |
 |---|---|---|
 | admitted, NSE puts it ≤₹500cr | 12.9 | share-count / price error |
-| missed, ours ≤₹500cr | 2.5 | share-count / price error |
+| missed, ours ≤₹500cr | 2.4 | share-count / price error |
 | admitted before the company's first NSE bar | **94.6** | the NSE gate is not point-in-time |
 | admitted, no NSE trade in the prior 90 days | 15.0 | the gate ignores dormant NSE listings |
 | admitted, never in a later file / missing that day | 0.4 / 1.9 | delisted / suspended |
-| official, the company is in no universe row at any date | **48.6** | not in Trendlyne's stock list |
+| official, the company is in no universe row at any date | **48.6** | not in Trendlyne's stock list (a rare few, e.g. VAML, are listed but never got a universe row) |
 | official, rows end shortly before the date | 2.6 | harvest-end window (bridged in the engine by the Bhavcopy fallback, adr-046) |
 | official, rows exist but not within 60 days | 1.9 | interior gap |
 
@@ -86,8 +88,9 @@ adr-024). Averages per month-end (official ≈1,539):
   2024–26 month-end yet never appear in `universe_membership`; 149 are still listed, and **142 of
   them are under ₹500cr today** (median ₹302cr). Trendlyne's stock list evidently reflects today's
   larger companies, so companies that qualified and later shrank are missing from backtests in the
-  months they qualified — an upward bias in every backtest, very likely before 2024 as well, and not
-  fixed by changing where market cap comes from.
+  months they qualified. That should bias backtests upward — inferred from the excluded companies
+  having shrunk, not measured — very likely before 2024 as well, and it is not fixed by changing
+  where market cap comes from.
 - REITs and InvITs sit in `universe_membership` but never reach a strategy (no EQ series); no paper
   position — current or archived, 213 tickers — ever held one.
 - Paper exposure: **4 of 389** paper buys were in names NSE's official figure put under ₹500cr at the
@@ -95,7 +98,7 @@ adr-024). Averages per month-end (official ≈1,539):
   2026, after the adr-048 replay) is when share counts are freshest, so it does not carry over to
   backtests.
 
-Not measured: anything before 2024-02-29 — NSE publishes no daily market-cap file earlier. Share
+Not measured: anything before Feb 2024 — NSE's daily bundle carries no market-cap file earlier. Share
 counts drift (413 of 2,096 names, 19.7%, moved more than 10% in 2.5 years net of splits and
 bonuses — `compare_mcap.py`), and `pit_mcap` holds today's count constant back through history, so its
 pre-2024 accuracy is unknown.
@@ -110,10 +113,10 @@ bonus. No row in the live window is affected (current NSE filings list the two s
    adjustment, fix `parse` for combined subjects.
 2. **Gap detector.** An overnight move that snaps to a canonical split/bonus ratio with no NSE event
    is alerted (the paper crons' webhook), never auto-adjusted — NSE misses a few percent of events.
-3. **Membership from NSE's official market cap from 2024-02-29**, pulled daily with the Bhavcopy
+3. **Membership from NSE's official market cap from 2024-02-01**, pulled daily with the Bhavcopy
    refresh. Requirements: companies mapped to engine symbols by ISIN through Bhavcopy (the MCAP file
    carries no ISIN; renames), `recovered_symbols` honoured, mainboard series counted. Before
-   2024-02-29 keep the existing `pit_mcap` (static; NSE's quarterly shareholding filings are the
+   then keep the existing `pit_mcap` (static; NSE's quarterly shareholding filings are the
    candidate if pre-2024 accuracy is ever measured).
 4. **Make the NSE gate point-in-time**, for all dates: a company enters only from its first NSE bar
    and only while it has traded on NSE within ~90 days. The largest correction measured; needs no
@@ -133,5 +136,7 @@ bonus. No row in the live window is affected (current NSE filings list the two s
 - The ₹500cr gate becomes NSE's own number from Feb 2024 and stops drifting between harvests.
 - New moving parts: a daily MCAP pull, an ISIN mapping, and the gap detector — all NSE-public, all
   alerting on failure the way the corporate-actions refresh does.
-- Known limit of the measurement: ISIN grouping joins a few unrelated tickers (ETF families, one
-  IBULISL group) and does not link an ISIN change at a rename — negligible to the totals.
+- Known limits of the measurement, negligible to the totals: ISIN grouping joins a few unrelated
+  tickers (ETF families, one IBULISL group) and does not link an ISIN change at a rename; the official
+  side is not EQ-gated like ours (~1 company-month per month — rights-entitlement tickers, SWANDEF,
+  VHLTD).

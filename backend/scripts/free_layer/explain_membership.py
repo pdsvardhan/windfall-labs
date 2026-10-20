@@ -1,7 +1,7 @@
 """iter-200 (item 1462): the current Rs500cr universe scored against NSE's OFFICIAL market cap, each
 disagreement attributed to a cause.
 
-From 2024-02-29 NSE's daily MCAP file gives every listed security's official market cap. At each
+From 2024-02-01 NSE's daily MCAP file gives every listed security's official market cap. At each
 month-end (Feb 2024 - Jul 2026, inside Trendlyne's coverage) this compares:
   official  every company trading in a MAINBOARD series that day (EQ, BE, BZ — read point-in-time
             from that day's file, so an SME name that later moved to EQ is not counted early)
