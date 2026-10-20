@@ -619,6 +619,21 @@ def dvm_panel(score: str, symbols) -> pd.DataFrame:
     return _pk_panel("dvm_history", "score", _DVM[score], symbols)
 
 
+def factor_last_dates() -> dict:
+    """{family: newest date published} for the Trendlyne factor tables a strategy can rank on —
+    `dvm` (dvm_history: tl_durability / tl_valuation / tl_momentum) and `valuation`
+    (valuation_ratios: tl_pe / tl_peg / tl_pbv). What the paper rebalance's stale-factor guard
+    measures a book against (iter-202, #954)."""
+    out = {}
+    for fam, table in (("dvm", "dvm_history"), ("valuation", "valuation_ratios")):
+        try:
+            r = _con().execute(f"SELECT max(date) FROM {table}").fetchone()
+            out[fam] = r[0] if r else None
+        except duckdb.Error:
+            out[fam] = None
+    return out
+
+
 def valuation_panel(metric: str, symbols) -> pd.DataFrame:
     """Trendlyne daily valuation multiple: PE_TTM / PEG_TTM / PBV_A. Published daily -> point-in-time.
 

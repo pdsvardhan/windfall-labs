@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
-import type { PaperEquity, PaperEquityBook, PaperPosition, ScoreRow } from "@/lib/types";
+import type { PaperBookStaleness, PaperDataHealth, PaperEquity, PaperEquityBook, PaperPosition, ScoreRow } from "@/lib/types";
 import { dateShort, money, num, pct, pctSigned, signClass } from "@/lib/format";
 import { Card, Pill, StatCard } from "@/components/ui";
 import { EquityChart } from "@/components/charts";
@@ -115,8 +115,8 @@ function holdingValue(p: PaperPosition): number | null {
   return p.entry != null && p.shares != null ? (p.last_price ?? p.entry) * p.shares : null;
 }
 
-function BookCard({ a, i, score, equity, isOpen, onToggle }: {
-  a: Agg; i: number; score?: ScoreRow;
+function BookCard({ a, i, score, equity, stale, isOpen, onToggle }: {
+  a: Agg; i: number; score?: ScoreRow; stale?: PaperBookStaleness | null;
   equity?: PaperEquityBook;
   isOpen: boolean; onToggle: () => void;
 }) {
@@ -172,6 +172,12 @@ function BookCard({ a, i, score, equity, isOpen, onToggle }: {
           <div className="font-extrabold text-[15px]">{title}</div>
           <div className="text-[11.5px] text-faint truncate">
             since <b>{dateShort(a.start)}</b> · {a.days} days
+            {/* Held by the stale-factor guard (iter-202): it will not rebalance on old scores. */}
+            {stale?.factor_stale && (
+              <span className="font-bold" style={{ color: "#9a6c12" }}>
+                {" "}· holding — {stale.factor_age_days == null ? "data date unknown" : `Trendlyne data ${stale.factor_age_days}d old`}
+              </span>
+            )}
           </div>
         </div>
         <div className="text-right w-[92px]">
@@ -343,6 +349,7 @@ export default function PaperPage() {
   const [scoreRows, setScoreRows] = useState<ScoreRow[]>([]);
   const [equity, setEquity] = useState<PaperEquity | null>(null);
   const [eqErr, setEqErr] = useState<string | null>(null);
+  const [health, setHealth] = useState<PaperDataHealth | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [markMsg, setMarkMsg] = useState<string | null>(null);
@@ -356,6 +363,7 @@ export default function PaperPage() {
     // void rows are never shown anywhere
     api.paperPositions().then((ps) => setPositions(ps.filter((p) => p.status !== "void"))).catch((e) => setErr(e.message));
     api.scoreboard().then(setScoreRows).catch(() => {});
+    api.paperDataHealth().then(setHealth).catch(() => setHealth(null));
     loadEquity();
   }
   useEffect(load, []);
@@ -397,6 +405,11 @@ export default function PaperPage() {
     return b?.length ? b[b.length - 1][1] : null;
   }, [equity, first]);
 
+  const heldBooks = Object.entries(health?.books ?? {}).filter(([, b]) => b?.factor_stale);
+  const heldAsOf = heldBooks.map(([, b]) => b?.factor_as_of).filter(Boolean).sort()[0] ?? null;
+  const heldAges = heldBooks.map(([, b]) => b?.factor_age_days ?? null);
+  const heldAge = heldAges.some((x) => x == null) ? null : Math.max(0, ...(heldAges as number[]));
+
   return (
     <div>
       <div className="flex items-end justify-between mt-6 mb-4 animate-rise">
@@ -417,6 +430,17 @@ export default function PaperPage() {
         </Card>
       )}
 
+      {heldBooks.length > 0 && (
+        <Card className="px-4 py-3 mb-4" style={{ background: "#fff3da" }}>
+          <span className="text-[13px]" style={{ color: "#9a6c12" }}>
+            {heldAge == null
+              ? "Trendlyne factor data could not be dated"
+              : <>Trendlyne factor data (scores, P/E) last published {heldAsOf ? dateShort(heldAsOf) : "—"} ({heldAge} days ago)</>} — {heldBooks.length}
+            book{heldBooks.length === 1 ? " that ranks on it is" : "s that rank on it are"} holding until fresh data arrives (limit {health?.threshold_days ?? 7} days).
+          </span>
+        </Card>
+      )}
+
       {/* the basics, up front */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-2.5 mb-4">
         <StatCard label="Experiment start" value={expStart ? dateShort(expStart) : "—"} sub={expStart ? `${daysBetween(expStart, today)} days live` : ""} />
@@ -433,6 +457,7 @@ export default function PaperPage() {
           {aggs.map((a, i) => (
             <BookCard
               key={a.sid} a={a} i={i} score={scoreBy[a.sid]} equity={equity?.books[a.sid]}
+              stale={health?.books?.[a.sid] ?? null}
               isOpen={open === a.sid} onToggle={() => setOpen(open === a.sid ? null : a.sid)}
             />
           ))}

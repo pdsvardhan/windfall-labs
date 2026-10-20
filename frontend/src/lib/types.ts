@@ -165,6 +165,20 @@ export interface PaperEquityBook {
   stats?: PaperBookStats;
 }
 
+/** Age of the Trendlyne factor data each tracked book ranks on (iter-202, #954). */
+export interface PaperBookStaleness {
+  factor_families: string[];
+  factor_as_of: string | null;
+  factor_age_days: number | null;
+  factor_stale: boolean;
+}
+export interface PaperDataHealth {
+  threshold_days: number;
+  factors: Record<string, { as_of: string | null; age_days: number | null }>;
+  /** null for a book that ranks on prices only */
+  books: Record<string, PaperBookStaleness | null>;
+}
+
 export interface PaperEquity {
   benchmark: string;
   books: Record<string, PaperEquityBook>;
