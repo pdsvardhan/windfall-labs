@@ -132,7 +132,7 @@ are in `FUNDAMENTALS-EXPORT-COLUMNS.md`. Roughly quarterly; a cron nags past 35 
 - **A harvester reporting `NO PK` for a name** — say which one, don't assume it's absent. Names
   the symbol search can't resolve (e.g. "BSE", pk 52884) must be addressed as `{sym, pk}`.
 - **The megacap `SYMBOLS` list is hardcoded and drifts.** Jul 2026 it was missing
-  CIPLA/ZYDUSLIFE/LUPIN/LODHA; Sep 2026 it was missing MARICO/SBICARD. When the ingest dry-run
+  CIPLA/ZYDUSLIFE/LUPIN/LODHA; Sep 2026 it was missing MARICO/SBICARD; Oct 2026 PAYTM/INDHOTEL/LAURUSLABS/MEESHO (added 2026-10-20). When the ingest dry-run
   shows a big live name under "preserved" or "shrinking", that's this.
 
 ---
