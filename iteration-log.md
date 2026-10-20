@@ -571,3 +571,70 @@ wording fixed in 23f7ab4, including NSE's MCAP start (2024-02-01, not 02-29 — 
 - Parallel sessions: production runs iter-202's images, so iter-200 (scripts + docs) needed no rebuild;
   DB reads finished before the Trendlyne ingest window. Merged into master without switching the shared
   checkout's branch.
+
+## Session 2026-10-20 (cont.) — iteration 202: stale-factor guard + Trendlyne refresh (#953, #954)
+
+**Stage:** Stage 4 · 2 items locked · branch `iter-202-stale-guard` · adr-051
+
+### Why
+
+Owner, on the replay's numbers: "so our paper trades are just completely wrong then?" The books
+were running the strategies as designed, but on Trendlyne factors last published 2026-09-04 (46
+days by today), and nothing stopped them: the 21:30 cron printed "signals current" on 19 Oct while
+the weekly DVM book re-ranked on 46-day-old scores. Owner chose: fix data staleness first.
+
+### The guard (item 1470, adr-051 — owner: HOLD + ALERT at 7 days)
+
+- A due book that ranks or filters on Trendlyne factors (D/V/M → `dvm_history`; P/E, PEG, P/B and
+  the peer-P/E features → `valuation_ratios`) is HELD when that data is more than 7 days older than
+  the rebalance day: no signals, no orders, no run recorded (stays due). Price-only books untouched.
+  An undatable table holds too and reads as "date unknown". `allow_stale=true` is the only override.
+- `data_health` names held books; `GET /api/paper/data-health`; the paper page shows one warning
+  line and a "holding — Trendlyne data Nd old" tag; the 21:30 cron counts held books and alerts.
+- Live before the refresh: 5 of 8 books held at 46 days (4 DVM + Value + Momentum); 3 price-only not.
+
+### The refresh (item 1469) — run in the owner's Chrome via Claude in Chrome
+
+- DVM 1,931 stocks / 9.16M rows / no fetch failures; megacap 99 of 100 (BSE never resolves by
+  symbol); valuation ratios 1,931 stocks / 9.82M rows; OHLCV 1,931 stocks / 5.14M rows. ~1h15m,
+  zero 429s. Chained in one tab (DVM → megacap → leg1-lite → OHLCV → gap-fill); each injected script
+  was hash-checked against the repo copy before it ran.
+- The dry-run's "preserved" list exposed drift: PAYTM, INDHOTEL, LAURUSLABS, MEESHO (~Rs1L cr each)
+  were in neither the base screener nor the megacap list, and CIPLA, ZYDUSLIFE, BSE, LENSKART,
+  JBCHEPHARM, INDOTHAI had been frozen at 2026-07-16 (missed by the September refresh too). A 12-name
+  by-pk gap-fill — which now also pulls P/E, PEG, P/B — brought 10 current; JBCHEPHARM (to 07-16) and
+  GSPL (to 05-11) end where Trendlyne ends (merged/delisted). Seven names added to the megacap list.
+- Applied 15:15 IST (backup `trendlyne.duckdb.pre-refresh-2026-10-20-bak`): dvm_history 10.07M →
+  10.21M rows (to 10-19), valuation_ratios 10.81M → 10.96M (to 10-16), ohlcv to 10-12, stocks 2,077 →
+  2,133; 99 sub-floor/delisted names preserved (largest ~Rs3.9k cr). pit_mcap + universe_membership
+  rebuilt (6.05M rows, 2,249 symbols). data-health after: DVM 1 day old, valuation 4 — no book held.
+
+### Replay re-applied (owner decision 2026-10-20)
+
+Archive `20261020_095632`, 0 problems. Every pick since 4 Sep re-made on the scores published that
+day (gross, start → today): DVM (your screen) 13.3% → 14.6%, Value + Momentum 20.5% → 16.6%,
+Durability + Momentum 9.6% → 7.4%, DVM monthly 7.3% → 9.6%, DVM weekly 11.1% → 9.5%. The three
+price-only books keep identical holdings; they move −0.2 to +1.0 points, traced position by
+position to fills now priced on Trendlyne's refreshed history (e.g. FREDUN's 2-Sep entry 1,497.80 →
+1,525.75) and two first-week fills moving a day.
+
+### Verification
+
+- Code verifier: APPROVE, 9/9 criteria; round-1 LOWs fixed (undatable dates read as unknown, peer
+  P/E counted, dates read once, tests for force / entry_filters / early-return / normalisation).
+- Feature verifier: Phase A (stale, live page) APPROVE 4/4; Phase B (fresh) APPROVE 3/3; refresh
+  evidence for 1469 APPROVE (reports 1192 / 1193; claims 316 / 317 reconciled).
+- Tests: guard 12/12; paper + replay + corporate-action suites green (one pre-existing env-only
+  failure in a worktree without data files).
+
+### Ops
+
+- `/opt/homeserver/scripts/windfall-paper-rebalance.sh` reports HELD books and alerts on them
+  (backup `.bak-20261020`).
+- The quarterly fundamentals snapshot (Data Downloader `.xlsx`, runbook phase 4) is not part of this
+  refresh and is 43 days old against its 35-day reminder — owner step, in the browser.
+- No push channel exists on this server for any project (`.windfall-alert.env` absent) — alerts
+  reach the log and the cockpit only. Owner question.
+- Deployed from the iter-202 worktree (`docker build` there, `compose up --no-build` from the main
+  checkout) while the main checkout was on iter-200's branch; coordinated with that session, which
+  ships iteration 204 (adr-050) on top of this merge.

@@ -706,14 +706,30 @@ def paper_sim():
 
 
 @app.post("/api/paper/rebalance")
-def paper_rebalance(force: bool = False):
+def paper_rebalance(force: bool = False, allow_stale: bool = False):
     """Rebalance every tracked paper book that is DUE on its own cadence (iter-171, item 1231).
 
     Safe to call daily — a book already rebalanced inside its current period is skipped, and one
     whose run was missed (holiday, failed cron) is caught up. `force=true` overrides the cadence
-    check for a manual run.
+    check for a manual run. A book ranking on Trendlyne factors older than 7 days is held (iter-202,
+    #954) unless `allow_stale=true` — a deliberate operator override, never the cron's.
     """
-    return clean(rebalance_paper(force=force))
+    return clean(rebalance_paper(force=force, allow_stale=allow_stale))
+
+
+@app.get("/api/paper/data-health")
+def paper_data_health():
+    """How fresh the factor data each tracked book ranks on is, against the 7-day hold limit."""
+    import datetime as _dt
+    from windfall.paper import rebalance as _rb
+    today = _dt.date.today()
+    last = _rb.factor_dates()
+    books = {e["sid"]: _rb.factor_staleness(e, today, last) for e in _rb.ROSTER}
+    return clean({"threshold_days": _rb.STALE_HOLD_DAYS,
+                  "factors": {f: {"as_of": str(d) if d else None,
+                                  "age_days": (today - d).days if d else None}
+                              for f, d in last.items()},
+                  "books": books})
 
 
 class ResizeIn(BaseModel):
