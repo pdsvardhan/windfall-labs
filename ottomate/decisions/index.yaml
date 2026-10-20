@@ -466,3 +466,13 @@ decisions:
       - curated
       - cat:product
     body_path: docs/decisions/adr-048-windfall-paper-replay-from-june.md
+  - id: adr-049-windfall-corporate-actions-tail
+    project_slug: windfall-labs
+    title: Corporate actions come from NSE; splits and bonuses in the live price
+      tail are back-adjusted, demergers are not
+    status: accepted
+    date: 2026-10-20T00:00:00.000Z
+    tags:
+      - curated
+      - cat:reliability
+    body_path: docs/decisions/adr-049-windfall-corporate-actions-tail.md
