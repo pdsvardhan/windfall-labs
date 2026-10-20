@@ -137,12 +137,16 @@ Built as proposed, steps 1–5, with these choices made in the build:
 - **Corporate actions** (`corp_actions.py`): NSE's list backfilled from 2010 (`/api/corporate-actions/backfill`);
   combined subjects multiply (#958); rights issues are typed and priced at P/TERP when the list is
   refreshed, from the last close before the ex-date — only issues stating a price (premium or par),
-  fully paid and in equity; one event filed twice (same day, same ratio) counts once. A share COUNT
+  fully paid and in equity; one event filed twice (same day, kind and ratio) counts once, while a
+  bonus and a split on one day are two events even when their ratios match (seven such pairs since
+  2021). The cum-rights price is looked up across every ticker the company has used. A share COUNT
   is scaled by splits/bonuses only (`share_events`), never by a rights P/TERP.
 - **Prices** (`trendlyne_store.adjusted_close_panel`): Trendlyne `ohlcv` frozen; names with no
   Trendlyne bars (listings after the freeze, the companies Trendlyne never listed) priced from
-  Bhavcopy back-adjusted with NSE's events (`_bhavcopy_adjusted`). Rights reach the live tail and
-  the paper re-base through `ratio_events`, the same convention as the backtests.
+  Bhavcopy back-adjusted with NSE's events (`_bhavcopy_adjusted`). Trendlyne-priced names extend
+  from Bhavcopy whenever a window runs past their last bar — a live run, or a backtest whose explicit
+  end is after the freeze (otherwise every walk-forward OOS window would lose them). Rights reach the
+  live tail and the paper re-base through `ratio_events`, the same convention as the backtests.
 - **Harvest**: the OHLCV harvester is retired and `ingest_refresh.py` ignores `tl_ohlcv_*.csv`
   unless `--include-ohlcv`. The megacap harvester stays — it carries the DVM and valuation rows of
   the ~100 index names the base screener omits. `rebuild_pit_mcap_ca.py` / `build_membership.py`
@@ -157,11 +161,19 @@ Built as proposed, steps 1–5, with these choices made in the build:
   Trendlyne has one, else its latest NSE ticker. From 2024-02-01 membership, the `mcap` feature and
   the universe candidates read it; the adr-046 Bhavcopy fallback only engages when the pull is behind.
 - **NSE gate** (`nse_gate_panel` / `nse_gate_at`): first EQ bar on or before the date AND a mainboard
-  (EQ/BE/BZ) trade within 90 days, by company. adr-024 amended.
-- **Survivorship** (`survivors()`): a company NSE put above the floor on any day from 2024-02-01 with
-  no `universe_membership` row. Before 2024 its market cap is its adjusted close × the share count
-  implied by its first MCAP reading (pit_mcap's own method). No Trendlyne scores, so only price-based
-  rules can pick it. Out of scope: companies that delisted before 2024-02-01 without a Trendlyne row.
+  (EQ/BE/BZ) trade within 90 days, by company. Bhavcopy starts 2010-01-04, so before it a company
+  counts if it was already listed when coverage began (warned). adr-024 amended.
+- **Survivorship** (`survivors()`): a company NSE put above the floor on any day from 2024-02-01 whose
+  ISIN group has no `universe_membership` row. Before 2024 its market cap is its adjusted close × the
+  share count implied by its first MCAP reading (pit_mcap's own method). It has no Trendlyne factor,
+  so a rank_blend that uses one leaves it out (`resolve._mask_uncovered`) rather than scoring it on
+  the blend's price factors alone; price-only rules can pick it. A company renamed after the frozen
+  membership build keeps its rows under the old symbol; `companies.membership_symbol` reads them under
+  the new one, so it is never counted twice. Out of scope: companies that delisted before 2024-02-01
+  without a Trendlyne row (survivor selection uses post-2024 data, so some pre-2024 bias remains).
+- **Known break at the cutover:** the `mcap` feature switches from Trendlyne's pit_mcap to NSE's own
+  number on 2024-02-01 and steps where pit_mcap's share count was wrong (IDEA 155,586 → 68,882 cr;
+  UJJIVAN 110,608 → 6,667 cr) — a size-ranked rule sees that step.
 
 ## Consequences
 

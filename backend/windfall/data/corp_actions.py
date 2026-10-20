@@ -304,13 +304,17 @@ def _events(symbols, include_rights: bool) -> dict[str, list[tuple[dt.date, floa
     if not include_rights:
         where += " AND kind <> 'rights'"
     out: dict[str, list] = {}
-    for sym, exd, ratio, _kind, _subj in _rows(symbols, where):
-        ev = (exd, float(ratio))
-        # NSE sometimes files one event twice under two wordings; the same ratio on the same day is
-        # one event (iter-200 measured against Trendlyne's steps with exactly this rule). A split
-        # and a bonus on one day carry different ratios and are both applied.
-        if ev not in out.setdefault(sym, []):
-            out[sym].append(ev)
+    seen: set = set()
+    for sym, exd, ratio, kind, _subj in _rows(symbols, where):
+        # One event filed twice under two wordings is the same symbol, day, KIND and ratio. A bonus
+        # 1:1 and a split 10->5 on one day are two events that happen to share the ratio 2 — both
+        # apply (x4). Seven such pairs since 2021 (GPIL, 360ONE, MAANALU, CGCL, LINC, NAZARA,
+        # BHARATRAS; iter-204 verifier B1); deduping on (day, ratio) alone left a phantom 50% crash.
+        key = (sym, exd, float(ratio), kind)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.setdefault(sym, []).append((exd, float(ratio)))
     return out
 
 

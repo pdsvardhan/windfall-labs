@@ -133,13 +133,13 @@ def _store(tmp=None):
             in_trendlyne BOOLEAN);
         CREATE TABLE nl.companies (engine_symbol VARCHAR, isin_group VARCHAR, in_trendlyne BOOLEAN,
             has_membership BOOLEAN, first_mcap_date DATE, first_mcap_cr DOUBLE, max_mcap_cr DOUBLE,
-            survivor BOOLEAN);
+            survivor BOOLEAN, membership_symbol VARCHAR);
     """)
     return con
 
 
 _CACHED = ("symbol_pk_map", "_nse_symbols", "_ticker_aliases", "_first_eq_by_ticker", "survivors",
-           "_survivor_pre_mcap", "_ohlcv_pks", "ca_uncertain_symbols")
+           "_survivor_pre_mcap", "_ohlcv_pks", "ca_uncertain_symbols", "_frozen_alias", "_bhav_start")
 
 
 @pytest.fixture
@@ -202,7 +202,7 @@ def test_a_company_trendlyne_never_listed_enters_with_prices_and_membership(fake
     fake.execute("INSERT INTO nl.mcap_daily SELECT d, 'GONECO', 'EQ', 10, 1, 50, 800.0 FROM "
                  "unnest(generate_series(DATE '2024-02-01', DATE '2024-03-29', INTERVAL 1 DAY)) t(d)")
     fake.execute("INSERT INTO nl.companies VALUES ('GONECO', 'g2', false, false, DATE '2024-02-01', "
-                 "800.0, 800.0, true)")
+                 "800.0, 800.0, true, NULL)")
     assert "GONECO" in ts.survivors()
     px = ts.adjusted_close_panel(["GONECO"], "2023-10-01", "2024-03-29")
     assert px["GONECO"].dropna().iloc[0] == 50.0, "priced from Bhavcopy — no Trendlyne pk needed"
@@ -293,3 +293,120 @@ def test_build_map_names_companies_by_their_trendlyne_symbol_and_flags_survivors
     surv = {r[0]: r[1] for r in con.execute("SELECT engine_symbol, survivor FROM companies").fetchall()}
     assert surv == {"ETERNAL": False, "SHRUNK": True}
     assert out["trendlyne_unplaced"] == []
+
+
+# ── iter-204 verifier round 1 regressions ────────────────────────────────────
+
+def test_same_day_bonus_and_split_with_one_ratio_are_two_events():
+    """B1: a bonus 1:1 and a split 10->5 on one day both multiply by 2 — x4, not x2."""
+    win = (D(2033, 1, 1), D(2033, 12, 31))
+    base = {"symbol": "T204BS", "ex_date": D(2033, 3, 1), "record_date": None, "face_value": 10.0}
+    try:
+        corp_actions.ingest([
+            {**base, "subject": "Bonus 1:1", "kind": "bonus", "ratio": 2.0},
+            {**base, "subject": "Face Value Split From Rs 10/- To Rs 5/-", "kind": "split", "ratio": 2.0},
+            {**base, "subject": "Bonus 1:1 (revised)", "kind": "bonus", "ratio": 2.0},   # a re-filing
+        ], win)
+        assert corp_actions.ratio_events(["T204BS"]) == {"T204BS": [(D(2033, 3, 1), 2.0)] * 2}
+    finally:
+        _init().execute("DELETE FROM nse_corporate_actions WHERE symbol='T204BS'")
+
+
+def test_an_explicit_end_after_the_freeze_still_extends_trendlyne_names(fake):
+    """B2: a backtest ending after the last Trendlyne bar keeps pricing from Bhavcopy, up to `end`."""
+    days = pd.bdate_range("2026-10-01", "2026-10-30")
+    fake.execute("INSERT INTO stocks VALUES (5, 'FROZEN', 'Frozen Co', 1, 1, 1, 1)")
+    for d in days[:8]:
+        fake.execute("INSERT INTO ohlcv VALUES (5, ?, 50, 50, 50, 50, 1)", [d])
+    _bars(fake, "FROZEN", "INE000G01011", "EQ", days, close=50.0)
+    px = ts.adjusted_close_panel(["FROZEN"], "2026-10-01", "2026-10-20")
+    assert px["FROZEN"].dropna().index.max() == pd.Timestamp("2026-10-20")
+    early = ts.adjusted_close_panel(["FROZEN"], "2026-10-01", "2026-10-07")
+    assert early["FROZEN"].dropna().index.max() == pd.Timestamp("2026-10-07")
+
+
+def test_duplicate_trendlyne_rows_average_as_before_without_the_nse_layer(fake, monkeypatch):
+    """B3: universe_membership's live+dead twins (SHALPAINTS, MAZDA) are averaged, as on master."""
+    monkeypatch.setattr(ts, "_has_nl", lambda: False)
+    days = pd.bdate_range("2019-04-01", "2019-04-05")
+    for d in days:
+        fake.execute("INSERT INTO universe_membership VALUES ('TWIN', ?, 900.0), ('TWIN', ?, 155.0)", [d, d])
+    m = ts.mcap_panel(["TWIN"], days)
+    assert m["TWIN"].tolist() == [527.5] * len(days)
+
+
+def test_a_company_renamed_after_the_freeze_is_one_company(fake):
+    """B5: frozen rows under OLD are read as NEW; OLD is not a second member before the cutover."""
+    days = pd.bdate_range("2023-07-03", "2023-12-29")
+    _bars(fake, "OLD", "INE000H01011", "EQ", pd.bdate_range("2023-01-02", "2023-12-29"))
+    _bars(fake, "NEW", "INE000H01011", "EQ", pd.bdate_range("2024-01-01", "2024-01-05"))
+    fake.execute("INSERT INTO stocks VALUES (9, 'NEW', 'Renamed Co', 1, 1, 1, 1)")
+    fake.execute("INSERT INTO universe_membership SELECT 'OLD', d, 900.0 FROM "
+                 "unnest(generate_series(DATE '2023-06-01', DATE '2023-12-31', INTERVAL 1 DAY)) t(d)")
+    fake.execute("INSERT INTO nl.ticker_map VALUES ('OLD', 'NEW', 'g9', true), ('NEW', 'NEW', 'g9', true)")
+    fake.execute("INSERT INTO nl.companies VALUES ('NEW', 'g9', true, true, DATE '2024-02-01', 900, 900, "
+                 "false, 'OLD')")
+    m = ts.membership_panel(["OLD", "NEW"], days)
+    assert m["NEW"].all() and not m["OLD"].any()
+    assert ts.pit_universe("2023-10-02") == ["NEW"]
+    assert ts.universe_over_window("2023-07-01", "2023-12-31") == ["NEW"]
+
+
+def test_the_gate_before_bhavcopy_starts_counts_companies_listed_when_coverage_began(fake):
+    """Verifier 1488 note: Bhavcopy starts 2010-01-04, Trendlyne in 2006 — no empty pre-2010 universe."""
+    _bars(fake, "ATSTART", "INE000J01011", "EQ", pd.bdate_range("2010-01-04", "2010-03-31"))
+    _bars(fake, "LATER", "INE000K01011", "EQ", pd.bdate_range("2012-01-02", "2012-03-30"))
+    early = pd.bdate_range("2008-06-02", "2008-06-30")
+    g = ts.nse_gate_panel(["ATSTART", "LATER"], early)
+    assert g["ATSTART"].all() and not g["LATER"].any()
+    assert ts.nse_gate_at(["ATSTART", "LATER"], "2008-06-16") == {"ATSTART"}
+
+
+def test_gate_at_and_gate_panel_agree_at_exactly_the_window_edge(fake):
+    days = pd.bdate_range("2023-01-02", "2023-01-31")
+    _bars(fake, "EDGE", "INE000L01011", "EQ", days)
+    d = pd.Timestamp("2023-01-31") + pd.Timedelta(days=ts.GATE_RECENT_DAYS)
+    assert bool(ts.nse_gate_panel(["EDGE"], [d])["EDGE"].iloc[0])
+    assert ts.nse_gate_at(["EDGE"], d) == {"EDGE"}
+
+
+def test_a_trendlyne_factor_blend_leaves_out_names_trendlyne_does_not_cover():
+    """B4: a survivor has no P/E at all, so a tl_pe + momentum blend must not rank it on momentum alone."""
+    import importlib
+    rv = importlib.import_module("windfall.strategy.resolve")   # the package re-exports a resolve() function
+    idx = pd.bdate_range("2025-01-01", periods=3)
+    rank = pd.DataFrame({"COVERED": [0.4, 0.5, 0.6], "SURVIVOR": [0.9, 0.9, 0.9],
+                         "DELISTED": [0.7, 0.7, 0.7]}, index=idx)
+    warns: list[str] = []
+    out = rv._mask_uncovered(rank, ["tl_pe", "roc126"], {"SURVIVOR"}, warns)
+    assert out["SURVIVOR"].isna().all() and out["COVERED"].tolist() == [0.4, 0.5, 0.6]
+    assert out["DELISTED"].tolist() == [0.7] * 3, "the adr-030 dead set keeps ranking as before"
+    assert warns and "tl_pe" in warns[0]
+    same = rv._mask_uncovered(rank, ["roc126", "mcap"], {"SURVIVOR"}, [])   # price-only: untouched
+    pd.testing.assert_frame_equal(same, rank)
+
+
+def test_build_map_keeps_a_renamed_company_off_the_survivor_list(tmp_path, monkeypatch):
+    import scripts.nse_mcap_ingest as ing
+    bc, tl = tmp_path / "bc.duckdb", tmp_path / "tl.duckdb"
+    b = duckdb.connect(str(bc))
+    b.execute("CREATE TABLE bhavcopy_prices (date DATE, ticker VARCHAR, isin VARCHAR, series VARCHAR)")
+    b.execute("INSERT INTO bhavcopy_prices VALUES ('2025-01-02', 'OLD.NS', 'INE333C01011', 'EQ'), "
+              "('2027-01-04', 'NEW.NS', 'INE333C01011', 'EQ')")
+    b.close()
+    t = duckdb.connect(str(tl))
+    t.execute("CREATE TABLE stocks (pk INTEGER, nsecode VARCHAR)")
+    t.execute("INSERT INTO stocks VALUES (1, 'NEW')")
+    t.execute("CREATE TABLE recovered_symbols (pk INTEGER, nse_symbol VARCHAR)")
+    t.execute("CREATE TABLE universe_membership (symbol VARCHAR, date DATE, mcap_cr DOUBLE)")
+    t.execute("INSERT INTO universe_membership VALUES ('OLD', '2026-10-12', 900)")
+    t.execute("CREATE TABLE delistings (symbol VARCHAR)")
+    t.close()
+    monkeypatch.setattr(ing, "BC", bc)
+    monkeypatch.setattr(ing, "TL", tl)
+    con = duckdb.connect(str(tmp_path / "nl.duckdb"))
+    con.execute(ing.SCHEMA)
+    con.execute("INSERT INTO mcap_daily VALUES ('2024-02-01', 'OLD', 'EQ', 1, 1, 1, 900)")
+    ing.build_map(con)
+    rows = con.execute("SELECT engine_symbol, has_membership, survivor, membership_symbol FROM companies").fetchall()
+    assert rows == [("NEW", True, False, "OLD")]

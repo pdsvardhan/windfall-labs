@@ -66,8 +66,11 @@ def scan(symbols, sessions: int = 5, today: dt.date | None = None) -> list[dict]
                 continue
             pos = cal.get_loc(day)
             lo = cal[max(0, pos - NEAR_SESSIONS)]
-            hi = cal[min(len(cal) - 1, pos + NEAR_SESSIONS)]
-            if any(lo <= e <= hi + pd.Timedelta(days=NEAR_SESSIONS * 2) for e in events.get(sym, [])):
+            # Within NEAR_SESSIONS sessions either side. Near the end of the tape the later sessions
+            # have not happened yet, so an event up to that many sessions (~a week) ahead still counts.
+            hi = (cal[pos + NEAR_SESSIONS] if pos + NEAR_SESSIONS < len(cal)
+                  else cal[-1] + pd.Timedelta(days=(pos + NEAR_SESSIONS - len(cal) + 1) * 7 // 5 + 2))
+            if any(lo <= e <= hi for e in events.get(sym, [])):
                 continue
             out.append({"symbol": sym, "date": str(day.date()),
                         "prev_close": float(s.shift(1)[day]), "close": float(s[day]),

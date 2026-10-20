@@ -24,11 +24,15 @@ IDX = pd.bdate_range("2026-06-01", "2026-09-04")
 
 
 def _live_symbols(n=40):
-    """Symbols whose Trendlyne membership is stale but which Bhavcopy still prices."""
+    """Symbols whose Trendlyne membership is stale but which Bhavcopy still prices — required to
+    have traded since September, and ordered, so a membership rebuild that adds delisted names
+    cannot turn the sample into companies that no longer trade (it did on 2026-10-20)."""
     rows = ts._con().execute("""
         SELECT symbol FROM universe_membership
         GROUP BY 1 HAVING MAX(date) < DATE '2026-08-01' AND MAX(mcap_cr) > 1000
-        LIMIT ?""", [n]).fetchall()
+           AND symbol IN (SELECT DISTINCT upper(regexp_replace(ticker, '\\.NS$', ''))
+                          FROM bc.bhavcopy_prices WHERE date >= DATE '2026-09-01')
+        ORDER BY symbol LIMIT ?""", [n]).fetchall()
     return [r[0] for r in rows]
 
 

@@ -261,8 +261,10 @@ def _feasibility(cov: dict, fcov: dict | None = None, tl: dict | None = None) ->
         return [
             {"need": "Daily adjusted OHLCV (20yr)", "source": "Trendlyne (frozen) + NSE Bhavcopy",
              "status": "available",
-             "detail": (f"{tl.get('price_tickers')} names {tl.get('date_min')}..{tl.get('date_max')}: "
-                        f"Trendlyne's adjusted history to its last harvest, then NSE Bhavcopy adjusted "
+             "detail": (f"{tl.get('price_tickers')} names {tl.get('date_min')}.."
+                        f"{tl.get('prices_to') or tl.get('date_max')}: "
+                        f"Trendlyne's adjusted history to its last harvest ({tl.get('date_max')}), then "
+                        f"NSE Bhavcopy adjusted "
                         f"with NSE's splits, bonuses and rights — and Bhavcopy alone for names Trendlyne "
                         f"never priced (adr-050); legacy yfinance store retained: "
                         f"{cov.get('n_tickers', 0)} tickers to {cov.get('date_max')}")},

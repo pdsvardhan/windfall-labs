@@ -151,6 +151,35 @@ def _relative_return(close, window: int, bench=None, groups=None) -> pd.DataFram
     return (ret - peer) * 100.0
 
 
+def _mask_uncovered(rank: pd.DataFrame, blend_exprs, uncovered, warnings: list) -> pd.DataFrame:
+    """A blend that uses a Trendlyne factor does not rank the companies adr-050 added (survivors).
+
+    _percentile_blend renormalises the weights per cell, so a name with no value for a factor is
+    ranked on the others. A company Trendlyne never listed — added from NSE data by adr-050 step 5
+    — has no Trendlyne factor at all, so it would compete on the blend's price factors alone as if
+    it had passed the fundamental ones: in the re-baseline 84 of the 86 names Value + Momentum newly
+    traded were such companies (iter-204 verifier B4). Their cells are blanked here.
+
+    Delisted names are deliberately NOT blanked, though they carry no Trendlyne factors either: they
+    are the survivorship-free set every backtest has run on since adr-030, scored on the factors
+    they have; dropping them from blends would reintroduce survivorship bias by another door.
+    """
+    tl_used = sorted({t for e in blend_exprs for t in feature_names(e) if t in _TL_FEATURES - _TL_MCAP})
+    if not tl_used:
+        return rank
+    out = [c for c in rank.columns if c in uncovered]
+    live = [c for c in out if rank[c].notna().any()]
+    if out:
+        rank = rank.copy()
+        rank[out] = np.nan
+    if live:
+        warnings.append(
+            f"rank_blend uses Trendlyne factor(s) {tl_used}: {len(live)} name(s) Trendlyne does not "
+            f"cover (companies added from NSE data, adr-050) are left out of the ranking rather than "
+            f"scored on the price factors alone.")
+    return rank
+
+
 def _percentile_blend(factors, mask, eval_expr, idx, cols, warnings) -> pd.DataFrame | None:
     """Cross-sectional percentile blend over the eligible set, per rebalance date.
 
@@ -496,6 +525,8 @@ def resolve(cfg: StrategyConfig) -> ResolvedStrategy:
         if rank is None:
             warnings.append("rank_blend produced no usable factors — defaulting to roc21")
             rank = feat("roc21").reindex(index=close.index, columns=close.columns)
+        elif use_tl:
+            rank = _mask_uncovered(rank, blend_exprs, set(ts.survivors()), warnings)
     else:
         rank = eval_expr(cfg.rank_by)
         if rank is None:

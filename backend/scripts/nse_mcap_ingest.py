@@ -54,7 +54,13 @@ FIRST_DAY = dt.date(2024, 2, 1)
 FLOOR = 500.0
 MAINBOARD = ("EQ", "BE", "BZ")
 
-SCHEMA = """
+COMPANIES_DDL = """
+CREATE TABLE IF NOT EXISTS companies (
+    engine_symbol VARCHAR PRIMARY KEY, isin_group VARCHAR, in_trendlyne BOOLEAN,
+    has_membership BOOLEAN, first_mcap_date DATE, first_mcap_cr DOUBLE, max_mcap_cr DOUBLE,
+    survivor BOOLEAN, membership_symbol VARCHAR)"""
+
+SCHEMA = COMPANIES_DDL + ";" + """
 CREATE TABLE IF NOT EXISTS mcap_daily (
     date DATE NOT NULL, symbol VARCHAR NOT NULL, series VARCHAR NOT NULL,
     face_value DOUBLE, issue_size DOUBLE, close DOUBLE, mcap_cr DOUBLE,
@@ -63,10 +69,6 @@ CREATE TABLE IF NOT EXISTS mcap_days (
     date DATE PRIMARY KEY, status VARCHAR, n_rows INTEGER, fetched_at TIMESTAMP);
 CREATE TABLE IF NOT EXISTS ticker_map (
     ticker VARCHAR PRIMARY KEY, engine_symbol VARCHAR, isin_group VARCHAR, in_trendlyne BOOLEAN);
-CREATE TABLE IF NOT EXISTS companies (
-    engine_symbol VARCHAR PRIMARY KEY, isin_group VARCHAR, in_trendlyne BOOLEAN,
-    has_membership BOOLEAN, first_mcap_date DATE, first_mcap_cr DOUBLE, max_mcap_cr DOUBLE,
-    survivor BOOLEAN);
 CREATE TABLE IF NOT EXISTS build_log (
     run_at TIMESTAMP, mode VARCHAR, days_ok INTEGER, days_missing INTEGER, days_failed INTEGER,
     mcap_rows BIGINT, tickers INTEGER, companies INTEGER, survivors INTEGER,
@@ -214,23 +216,32 @@ def build_map(con) -> dict:
             in_tl = True
         else:
             engine, in_tl = latest, False
-        comp_tl[engine] = (g, in_tl)
+        # Membership is a COMPANY fact: any of its tickers carrying universe_membership rows counts.
+        # universe_membership is frozen with the price history (adr-050) while stocks.nsecode follows
+        # every rename, so after a rename the rows sit under the OLD symbol and the engine symbol is
+        # the NEW one. Testing only the engine symbol made such a company a "survivor" and counted
+        # it twice before the cutover (iter-204 verifier B5); membership_symbol records where its
+        # frozen rows live so the engine reads them under the new name.
+        with_rows = [t for t in ts if t in um_last]
+        msym = (engine if engine in um_last else
+                max(with_rows, key=lambda t: um_last[t]) if with_rows else None)
+        comp_tl[engine] = (g, in_tl, bool(with_rows), msym)
         tmap += [(t, engine, g, in_tl) for t in ts]
 
     con.execute("BEGIN TRANSACTION")
     try:
         con.execute("DELETE FROM ticker_map")
         con.executemany("INSERT INTO ticker_map VALUES (?, ?, ?, ?)", tmap)
-        con.execute("DELETE FROM companies")
+        con.execute("DROP TABLE IF EXISTS companies")      # recreated: the shape grew in iter-204
+        con.execute(COMPANIES_DDL)
         stats = con.execute("""
             SELECT t.engine_symbol, min(m.date) AS d0, arg_min(m.mcap_cr, m.date) AS m0, max(m.mcap_cr) AS mx
             FROM mcap_daily m JOIN ticker_map t ON t.ticker = m.symbol GROUP BY 1""").fetchall()
         comps = []
         for eng, d0, m0, mx in stats:
-            g, in_tl = comp_tl[eng]
-            has_m = eng in um_last
-            comps.append((eng, g, in_tl, has_m, d0, m0, mx, (not has_m) and mx > FLOOR))
-        con.executemany("INSERT INTO companies VALUES (?, ?, ?, ?, ?, ?, ?, ?)", comps)
+            g, in_tl, has_m, msym = comp_tl[eng]
+            comps.append((eng, g, in_tl, has_m, d0, m0, mx, (not has_m) and mx > FLOOR, msym))
+        con.executemany("INSERT INTO companies VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", comps)
         con.execute("COMMIT")
     except Exception:
         con.execute("ROLLBACK")
@@ -245,7 +256,7 @@ def build_map(con) -> dict:
     placed = {t for t, _e, _g, _i in tmap}
     unplaced = sorted(s for s in active_tl if s not in placed)
     first_day = con.execute("SELECT min(date) FROM mcap_daily").fetchone()[0]
-    surv = [c for c in comps if c[-1]]
+    surv = [c for c in comps if c[7]]
     n_listed = sum(1 for c in surv if c[4] == first_day)
     return {"tickers": len(tmap), "companies": len(comps), "survivors": len(surv),
             "survivors_listed_at_cutover": n_listed, "unmapped_over_floor": int(unmapped),

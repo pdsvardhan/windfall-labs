@@ -113,11 +113,18 @@ def test_real_tail_buildpro_split_is_continuous_and_tembo_is_not_doubled():
                  for s in ("BUILDPRO", "TEMBO")}
     finally:
         _init().execute("DELETE FROM nse_corporate_actions WHERE subject = 't199 split'")
-    b_before = before["BUILDPRO"]["BUILDPRO"]
-    assert b_before.pct_change().min() < -0.6               # the phantom crash, unadjusted
-    assert after["BUILDPRO"].pct_change().min() > -0.3      # gone
-    assert after["BUILDPRO"].iloc[-1] == b_before.iloc[-1]  # latest stays the raw price
-    pd.testing.assert_series_equal(after["TEMBO"], before["TEMBO"]["TEMBO"])   # not doubled
+    # Which property this snapshot can show depends on where each ex-date falls against the name's
+    # last Trendlyne bar: in the raw tail it must be adjusted, inside Trendlyne's history it must
+    # not be applied twice. (The 2026-10-20 harvest moved BUILDPRO's 8 Oct split inside history.)
+    last = ts._last_tl_dates({s: ts.symbol_pk_map()[s] for s in ("BUILDPRO", "TEMBO")})
+    for sym, ex in (("BUILDPRO", D(2026, 10, 8)), ("TEMBO", D(2026, 8, 5))):
+        raw = before[sym][sym]
+        if pd.Timestamp(ex) <= last[sym]:
+            pd.testing.assert_series_equal(after[sym], raw)          # inside history: not doubled
+        else:
+            assert raw.pct_change().min() < -0.6                     # the phantom crash, unadjusted
+            assert after[sym].pct_change().min() > -0.3              # gone
+            assert after[sym].iloc[-1] == raw.iloc[-1]               # latest stays the raw price
 
 
 # ── the paper re-base ────────────────────────────────────────────────────────
