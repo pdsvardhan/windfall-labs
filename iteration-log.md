@@ -707,3 +707,34 @@ to-do #967; the comparison's "new" arm mixes runs (six strategies 15:22 on 5b1a2
 - `windfall.strategy` re-exports a `resolve()` function that shadows the module — use
   `importlib.import_module("windfall.strategy.resolve")` in tests.
 - `trendlyne_store.py` and `resolve.py` are CRLF in master; re-apply CRLF after editing on Windows.
+
+## Session 2026-10-20 (cont.) — iteration 201: can Value + Momentum run on a free P/E?
+
+**Stage:** Stage 4 · 5 items locked (measurement only) · branch `iter-201-free-pe` · write-up
+`docs/validation/free-pe-2026-10-20.md`
+
+Paused while the data was fixed (iterations 202, 204), then run on master 7b47b40. Nothing in the
+engine or the paper books changed.
+
+- **Agreement (1464):** where both exist, the free annual P/E and Trendlyne's TTM P/E rank alike
+  (correlation 0.82, three-quarters of the cheapest fifth in common), but the free one sees half the
+  universe: 760 names are not in the screener.in store and banks/NBFCs are excluded by design.
+- **Backtests (1465):** the first run was wrong — the blend ranks a name with no P/E on momentum
+  alone, so the "free P/E" book was 93% momentum. The verifier caught it (round 1 BLOCK). With a
+  P/E required on both sides, the free P/E beat Trendlyne's in every window (+5.1 / +2.7 / +6.0 CAGR
+  pts, 10y / post-COVID / pre-COVID); universe and restatement biases are unmeasured.
+- **Live book finding:** `CMP_valmom_m_20` as configured buys no-P/E names (loss-makers, later-
+  delisted names) on momentum alone. Requiring a P/E helps since COVID and hurts over 10 years —
+  owner decision, to-do #968.
+- **TTM (1466):** NSE's legacy XBRL (2017–2024) + integrated-filing iXBRL (2025 →) carry quarterly
+  profit/EPS with broadcast times — feasible, ~60k fetches; not built (#970).
+- **Screener refresh (1467):** 2.6 s/name, no failures; refreshes rewrite restated history, so
+  snapshot each run (#971).
+- **Recommendation (1468):** no switch; re-test on equal terms first (#969).
+
+Verification: three rounds. Round 1 BLOCK on 1465 and fixes on 1464/1466; round 2 approved 1464–1467
+and sent the write-up back with 7 corrections; round 3 approved it (reports 1198–1202, claim 318).
+
+Ops: the scripts read the meta DB only through a copy (the price layer's corporate-action lookup
+otherwise tries to open windfall.duckdb, which the api holds — the lock refused it harmlessly);
+the screener refresh ran against a scratch copy of its store.
