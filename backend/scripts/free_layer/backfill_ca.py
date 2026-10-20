@@ -20,6 +20,8 @@ import requests
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from windfall.data.corp_actions import LANDING, API, parse  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _parse import kinds_all, parse_all  # noqa: E402
 from windfall.data.surveillance import _HEADERS  # noqa: E402
 
 DATA = Path(__file__).resolve().parents[2] / "data"
@@ -76,18 +78,32 @@ def backfill(con, refetch: bool) -> None:
             con.execute("INSERT INTO nse_ca SELECT symbol, ex_date, subject, kind, ratio, face_value, "
                         "isin, series, fetched_year FROM df")
             con.unregister("df")
-        print(f"{year}: {len(rows)} split/bonus/consolidation/demerger/scheme rows")
+        print(f"{year}: {len(rows)} corporate-action rows (split, bonus, consolidation, demerger, scheme, rights)")
         time.sleep(1.5)
     # One row per (symbol, ex_date). NSE repeats an event under revised subjects ("Bonus 1:10
     # (Record Date Revised)"), so distinct (kind, ratio) pairs first; then a split AND a bonus on the
     # same ex-date (TITAN 2011: 10:1 split + 1:1 bonus = 20) multiply — the price step is their product.
-    con.execute("""CREATE OR REPLACE TABLE ca_events_nse AS
-        WITH d AS (SELECT DISTINCT symbol, ex_date, kind, ratio FROM nse_ca WHERE kind <> 'rights')
-        SELECT symbol, ex_date,
-               string_agg(kind, '+' ORDER BY kind) AS kind,
-               CASE WHEN count(ratio) = 0 THEN NULL ELSE exp(sum(ln(ratio))) END AS ratio,
-               count(*) AS n_events
-        FROM d GROUP BY symbol, ex_date""")
+    build_events(con)
+
+
+def build_events(con) -> None:
+    """ca_events_nse: one row per (symbol, ex_date). Every subject is parsed in full (combined pre-2018
+    subjects like "Bonus 1:1 / Face Value Split ..." multiply — _parse.parse_all); revised duplicates
+    of one event collapse on (kind, ratio); a split and a bonus filed separately on the same ex-date
+    multiply, since the price step is their product."""
+    raw = con.execute("SELECT DISTINCT symbol, ex_date, subject FROM nse_ca WHERE kind <> 'rights'").fetchdf()
+    raw["ratio"] = raw["subject"].map(parse_all)
+    raw["kind"] = raw["subject"].map(kinds_all)
+    d = raw.dropna(subset=["kind"]).drop_duplicates(["symbol", "ex_date", "kind", "ratio"])
+    g = d.groupby(["symbol", "ex_date"])
+    ev = pd.DataFrame({
+        "kind": g["kind"].agg(lambda k: "+".join(sorted(set("+".join(k).split("+"))))),
+        "ratio": g["ratio"].agg(lambda r: float(r.dropna().prod()) if r.notna().any() else None),
+        "n_events": g.size()}).reset_index()
+    con.register("ev", ev)
+    con.execute("CREATE OR REPLACE TABLE ca_events_nse AS SELECT symbol, CAST(ex_date AS DATE) AS ex_date, "
+                "kind, ratio, n_events FROM ev")
+    con.unregister("ev")
 
 
 def validate(con) -> None:
@@ -157,10 +173,14 @@ def validate(con) -> None:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--refetch", action="store_true")
+    ap.add_argument("--rebuild-only", action="store_true", help="re-derive ca_events_nse, no NSE fetch")
     a = ap.parse_args()
     con = duckdb.connect(str(FREE))
     try:
-        backfill(con, a.refetch)
+        if a.rebuild_only:
+            build_events(con)
+        else:
+            backfill(con, a.refetch)
         validate(con)
     finally:
         con.close()

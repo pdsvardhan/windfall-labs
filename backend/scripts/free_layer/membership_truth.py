@@ -1,5 +1,8 @@
 """iter-200 (item 1462, part 2): score both Rs500cr universes against NSE's OFFICIAL market cap.
 
+SUPERSEDED by explain_membership.py: this first scoring counted renames, SME names and REITs/InvITs as
+"wrongly in" for the current universe (its 18.4% headline is not a fair figure). Kept for the record.
+
 From 2024-02-29 the NSE MCAP file gives each listed security's official market cap on that day,
 so at every month-end since then there is a ground truth: the set of NSE names with mcap > Rs500cr.
 Scored against it:

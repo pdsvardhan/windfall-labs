@@ -27,27 +27,13 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from windfall.data.corp_actions import parse  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _parse import parse_all  # noqa: E402
 
 DATA = Path(__file__).resolve().parents[2] / "data"
 FREE, TL, BC = DATA / "free_layer.duckdb", DATA / "trendlyne.duckdb", DATA / "bhavcopy.duckdb"
 TOL = 0.01          # a day agrees when the two factors are within 1%
 CLEAN = 0.99        # a name is clean when >= 99% of its days agree
-
-# "/" joins two events ("Bonus 1:1 / Face Value Split ...") but also appears inside "Rs 10/- Per
-# Share" — only a slash NOT followed by "-" is a separator.
-_SEP = re.compile(r"\s*(?:/(?!-)|\band\b|&)\s*", re.I)
-
-
-def parse_all(subject: str) -> float | None:
-    """Price ratio of a whole NSE subject, combined events multiplied (None if none parse)."""
-    ratios = []
-    for part in _SEP.split(subject or ""):
-        kind, r = parse(part)
-        if r:
-            ratios.append(r)
-    return float(np.prod(ratios)) if ratios else None
-
 
 _RIGHTS = re.compile(r"Rights\s+(\d+)\s*:\s*(\d+)\s*@\s*Premium\s+(?:Rs|Re)\.?\s*([\d.]+)", re.I)
 
@@ -141,7 +127,6 @@ def compare(fac: pd.DataFrame, ev: pd.DataFrame, label: str) -> pd.DataFrame:
     day_agree = (out["agree"] * out["days"]).sum() / out["days"].sum()
     print(f"\n[{label}] names {len(out)}: clean (>=99% of days agree) {clean:.1%}; "
           f"all name-days agreeing {day_agree:.2%}")
-    since16 = fac[pd.to_datetime(fac["date"]) >= "2016-01-01"]
     return out
 
 
@@ -158,7 +143,7 @@ def main() -> None:
     best = results["nse+rights"].sort_values("agree")
     con.register("best", best)
     con.execute("CREATE OR REPLACE TABLE price_compare AS SELECT * FROM best")
-    print("\nworst 25 names under nse+app (agree share, first/last disagreeing day, worst gap):")
+    print("\nworst 25 names under nse+rights (agree share, first/last disagreeing day, worst gap):")
     for r in best.head(25).itertuples():
         print(f"  {r.symbol:12s} {r.agree:6.1%} of {r.days} days  {r.first_bad} .. {r.last_bad}  "
               f"max gap {r.worst:.1%}")

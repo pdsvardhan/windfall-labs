@@ -1,5 +1,9 @@
 """iter-200 (free layer, item 1462): free market cap and the Rs500cr universe vs today's.
 
+SUPERSEDED for the membership comparison (step 4 below): it keys by ticker (renames count as errors),
+skips tl.recovered_symbols, and multiplies a split-adjusted close by a same-day (pre-split) share count.
+Use explain_membership.py for membership. Steps 1-3 (MCAP download, share-count check, drift) stand.
+
 NSE's daily PR bundle carries `mcapDDMMYYYY.csv` (issue size + market cap per security, official)
 from some date in 2023-24 onward. This:
   1. downloads one MCAP file per month-end from its first appearance (polite rate) into the
