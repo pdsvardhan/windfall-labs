@@ -179,7 +179,6 @@ def commit_signal(strategy_id: str | None, signal: dict, capital_per_position: f
 
 
 REBASE_TOL = 0.03   # stored entry vs the adjusted panel must agree with the CA ratio within 3%
-EXIT_SANITY = 0.35  # a re-based exit further than this from the adjusted close that day is not trusted
 
 
 def _panel_price(ticker: str, day: dt.date):
@@ -221,9 +220,12 @@ def rebase_corporate_actions(today: dt.date | None = None) -> dict:
     and safe for rows written under either basis — including the iter-197 replay, whose fills were
     already taken from an adjusted panel.
 
-    A re-based exit that still lands far from the adjusted close of its own day is not trusted
-    (finding 2): that is a stop fired on a phantom post-split crash before the event was known. It
-    is reported as unresolved rather than turned into a phantom gain.
+    A stop or target exit dated on/after an event the row still lacks is never re-based (finding
+    2): the re-base runs before the stop check at every mark, so such an exit can only have fired
+    while that event was unknown — the stop was compared in the wrong units (a phantom stop-out
+    on a split's or bonus's overnight "crash", whatever the ratio). Re-basing it would book a
+    phantom gain; it is reported as unresolved instead. A rebalance exit on/after the event is a
+    real close and is kept.
     """
     from ..data.corp_actions import ratio_events
 
@@ -232,12 +234,12 @@ def rebase_corporate_actions(today: dt.date | None = None) -> dict:
     try:
         rows = con.execute(
             "SELECT id,ticker,status,entry_date,entry,stop,target,shares,exit,exit_date,last_price,"
-            "last_date FROM paper_positions WHERE status IN ('open','closed') AND entry IS NOT NULL "
-            "AND entry_date IS NOT NULL AND shares IS NOT NULL").fetchall()
+            "last_date,reason FROM paper_positions WHERE status IN ('open','closed') "
+            "AND entry IS NOT NULL AND entry_date IS NOT NULL AND shares IS NOT NULL").fetchall()
         events = ratio_events({r[1] for r in rows})
         rebased, unresolved = [], []
         for (pid, ticker, status, entry_date, entry, stop, target, shares, exit_, exit_date, last,
-             last_date) in rows:
+             last_date, reason) in rows:
             evs = sorted((ex, r) for ex, r in events.get(ticker.upper(), [])
                          if entry_date < ex <= today)
             if not evs:
@@ -263,17 +265,16 @@ def rebase_corporate_actions(today: dt.date | None = None) -> dict:
                 """Product of the missing events later than `day` — what a price taken that day lacks."""
                 return math.prod(r for ex, r in missing if day is None or ex > day)
 
+            if (reason in ("stop", "target") and exit_date is not None
+                    and any(ex <= exit_date for ex, _ in missing)):
+                unresolved.append(ticker)
+                _log.warning("paper re-base: %s %s %s exit on %s came after an event the row had "
+                             "not been re-based for (%s) — fired off-basis; left unchanged",
+                             pid, ticker, reason, exit_date, missing)
+                continue
             new_entry = entry / factor
             new_exit = exit_ / after(exit_date) if exit_ is not None else None
             new_last = last / after(last_date) if last is not None else None
-            if new_exit is not None and exit_date is not None:
-                close_then = _panel_price(ticker, exit_date)[1]
-                if close_then and abs(new_exit / close_then - 1.0) > EXIT_SANITY:
-                    unresolved.append(ticker)
-                    _log.warning("paper re-base: %s %s exit %.2f on %s is %.2fx the adjusted close "
-                                 "%.2f — a stop/target fired off-basis? left unchanged",
-                                 pid, ticker, new_exit, exit_date, new_exit / close_then, close_then)
-                    continue
             new_stop = stop / factor if stop is not None else None
             mark = new_exit if new_exit is not None else new_last
             con.execute(

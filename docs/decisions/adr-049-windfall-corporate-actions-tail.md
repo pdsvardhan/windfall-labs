@@ -60,5 +60,18 @@ day, the exchange did not adjust `prev_close`, and NSE lists the event as a **de
 - Backtests that end before a name's last Trendlyne bar are unaffected. Live signals and paper are
   the consumers that change.
 - BHAGYANGR's −84.7% in the two 12-month Momentum books and the Blend stands, now explained.
-- The feed depends on NSE's public API. A failed refresh leaves yesterday's list in place (logged);
-  a stale list can only miss an adjustment, never invent one.
+- The feed depends on NSE's public API. A failed refresh leaves yesterday's list in place (logged
+  in `/opt/homeserver/logs/windfall-surveillance.log`); a stale list can only miss an adjustment,
+  never invent one. If it misses one while a stop is live, the phantom stop-out is reported as an
+  unresolved re-base rather than silently converted into a gain.
+- The refresh line lives in `/opt/homeserver/scripts/windfall-surveillance-refresh.sh` on the host
+  (backup `.bak-20261020`), like every other windfall cron — outside version control; to-do #288
+  (fold the crons into one dispatcher) is where that gets fixed.
+- Re-base rules settled by verification: every ratio event after a fill counts, open or closed (a
+  position sold before a split is rescaled whole); the events a row still lacks are the trailing
+  run its entry evidence implies (a second split never strands a row); prices taken before an
+  event are rescaled with the entry, prices taken after it are not; a stop or target exit dated
+  on/after an event the row still lacked is never re-based — the re-base runs before every stop
+  check, so such an exit fired in the wrong units — and is reported instead, whatever the ratio.
+- A refresh replaces its window only when NSE returns at least 80% of what the window already
+  holds; an empty or truncated answer is refused and the stored list kept.

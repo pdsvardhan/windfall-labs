@@ -116,7 +116,8 @@ def test_real_tail_buildpro_split_is_continuous_and_tembo_is_not_doubled():
 
 # ── the paper re-base ────────────────────────────────────────────────────────
 
-def _seed(pid, entry_date, entry, shares, stop=None, status="open", exit_=None, exit_date=None):
+def _seed(pid, entry_date, entry, shares, stop=None, status="open", exit_=None, exit_date=None,
+          reason=None):
     con = _init()
     con.execute("DELETE FROM paper_positions WHERE id=?", [pid])
     con.execute(
@@ -124,7 +125,7 @@ def _seed(pid, entry_date, entry, shares, stop=None, status="open", exit_=None, 
         "weight,shares,last_price,last_date,exit_date,exit,return_pct,r_multiple,reason,created_at,"
         "planned_capital,origin) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         [pid, "T199", "SPLITCO", status, entry_date, entry, stop, None, 0.1, shares, entry,
-         entry_date, exit_date, exit_, 0.0, None, None, dt.datetime.now(), entry * shares, "live"])
+         entry_date, exit_date, exit_, 0.0, None, reason, dt.datetime.now(), entry * shares, "live"])
 
 
 def _row(pid):
@@ -197,10 +198,62 @@ def test_a_stop_fired_on_a_phantom_crash_is_reported_not_turned_into_a_gain(spli
     split_world.setattr(book, "_panel_price", _prices({D(2026, 10, 1): [330.3, 331.0],
                                                        D(2026, 10, 9): [329.0, 330.0]}))
     _seed("t199e", D(2026, 10, 1), 660.6, 40.0, stop=561.51, status="closed", exit_=561.51,
-          exit_date=D(2026, 10, 9))
+          exit_date=D(2026, 10, 9), reason="stop")
     out = book.rebase_corporate_actions(today=D(2026, 10, 19))
     assert out["ca_rebased"] == 0 and out["ca_unresolved"] == 1
     assert _full("t199e")[:3] == pytest.approx((660.6, 40.0, 561.51))
+
+
+def test_a_phantom_stop_on_a_small_ratio_bonus_is_also_reported(split_world):
+    """Round-2 finding: a 1:2 bonus (ratio 1.5) with a 15% stop. The stop fired at 85 in the old
+    units; a distance threshold would re-base it into +27.5%. The rule is structural instead."""
+    split_world.setattr(corp_actions, "ratio_events",
+                        lambda syms: {"SPLITCO": [(D(2026, 10, 8), 1.5)]})
+    split_world.setattr(book, "_panel_price", _prices({D(2026, 10, 1): [66.67, 66.8]}))
+    _seed("t199h", D(2026, 10, 1), 100.0, 100.0, stop=85.0, status="closed", exit_=85.0,
+          exit_date=D(2026, 10, 8), reason="stop")
+    out = book.rebase_corporate_actions(today=D(2026, 10, 19))
+    assert out["ca_rebased"] == 0 and out["ca_unresolved"] == 1
+    assert _full("t199h")[:3] == pytest.approx((100.0, 100.0, 85.0))
+
+
+def test_a_rebalance_exit_after_the_split_is_a_real_close_and_kept(split_world):
+    split_world.setattr(book, "_panel_price", _prices({D(2026, 10, 1): [20.0, 20.4]}))
+    _seed("t199i", D(2026, 10, 1), 100.0, 100.0, status="closed", exit_=21.0,
+          exit_date=D(2026, 10, 12), reason="rebalance")
+    assert book.rebase_corporate_actions(today=D(2026, 10, 19))["ca_rebased"] == 1
+    entry, shares, exit_, _last, ret = _full("t199i")
+    assert (entry, shares, exit_) == pytest.approx((20.0, 500.0, 21.0))
+    assert ret == pytest.approx(0.05)
+
+
+def test_a_real_gap_through_stop_before_the_split_is_still_rebased(split_world):
+    """Round-2 N2: a stop that gapped far below its level BEFORE the event is a real exit."""
+    split_world.setattr(book, "_panel_price", _prices({D(2026, 9, 1): [20.0, 20.0]}))
+    _seed("t199j", D(2026, 9, 1), 100.0, 100.0, stop=90.0, status="closed", exit_=90.0,
+          exit_date=D(2026, 9, 20), reason="stop")
+    assert book.rebase_corporate_actions(today=D(2026, 10, 19))["ca_rebased"] == 1
+    assert _full("t199j")[:3] == pytest.approx((20.0, 500.0, 18.0))
+
+
+def test_a_short_or_empty_fetch_never_wipes_the_stored_list():
+    """Round-2 N1: an HTTP 200 with [] (or a truncated list) must not delete the events."""
+    win = (D(2032, 1, 1), D(2032, 1, 31))
+    rows = [{"symbol": f"T199N{i}", "ex_date": D(2032, 1, 10 + i), "subject": "Bonus 1:1",
+             "kind": "bonus", "ratio": 2.0, "record_date": None} for i in range(6)]
+    held = lambda: _init().execute(                                   # noqa: E731
+        "SELECT count(*) FROM nse_corporate_actions WHERE symbol LIKE 'T199N%'").fetchone()[0]
+    try:
+        corp_actions.ingest(rows, win)
+        with pytest.raises(ValueError):
+            corp_actions.ingest([], win)
+        with pytest.raises(ValueError):
+            corp_actions.ingest(rows[:3], win)
+        assert held() == 6
+        corp_actions.ingest(rows[:5] + [{**rows[5], "subject": "Bonus 1:1 (revised)"}], win)
+        assert held() == 6
+    finally:
+        _init().execute("DELETE FROM nse_corporate_actions WHERE symbol LIKE 'T199N%'")
 
 
 def test_a_second_split_after_a_rebase_is_applied_alone(split_world):

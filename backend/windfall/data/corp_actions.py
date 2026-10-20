@@ -103,14 +103,29 @@ def fetch(from_date: dt.date, to_date: dt.date) -> list[dict]:
     return out
 
 
+MIN_KEEP = 0.8   # a window fetch returning under 80% of what the window already holds is refused
+
+
 def ingest(rows: list[dict], window: tuple[dt.date, dt.date] | None = None) -> dict:
     """Upsert rows. With `window`, the fetch is authoritative for that ex-date range: everything
     stored inside it is replaced, so an event NSE revised (subject or ex-date) leaves no stale twin
-    to be applied twice. The swap is one transaction under the store lock."""
+    to be applied twice. The swap is one transaction under the store lock.
+
+    Replacing on a bad fetch would be worse than not refreshing: an HTTP 200 carrying [] or a
+    truncated list would delete the events and bring every phantom crash back (verifier finding
+    N1). Events only enter a rolling window, they do not vanish from it, so a fetch that comes back
+    materially SHORTER than what the window holds is refused and the stored list kept.
+    """
     from .store import _LOCK
 
     con = connect()
     con.execute(SCHEMA)
+    if window:
+        held = con.execute("SELECT count(*) FROM nse_corporate_actions WHERE ex_date BETWEEN ? AND ?",
+                           list(window)).fetchone()[0]
+        if held and len(rows) < MIN_KEEP * held:
+            raise ValueError(f"refusing to replace {held} stored corporate actions in "
+                             f"{window[0]}..{window[1]} with a fetch of {len(rows)} — kept the stored list")
     now = dt.datetime.now()
     with _LOCK:
         con.execute("BEGIN TRANSACTION")
