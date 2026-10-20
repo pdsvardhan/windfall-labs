@@ -203,6 +203,33 @@ def corporate_actions_refresh(days_back: int = 150, days_forward: int = 60):
         raise HTTPException(502, f"NSE corporate-actions fetch failed: {exc}")
 
 
+@app.post("/api/corporate-actions/backfill")
+def corporate_actions_backfill(from_year: int = 2010, to_year: int | None = None):
+    """NSE's corporate actions for whole years (adr-050): every name priced from Bhavcopy for its
+    whole life — the companies Trendlyne never listed, listings after its frozen harvest — needs
+    every event, not just the daily refresh's rolling window. In-process, ONE DOOR; one-off."""
+    try:
+        return corp_actions.backfill(from_year=from_year, to_year=to_year)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(502, f"NSE corporate-actions backfill failed: {exc}")
+
+
+@app.get("/api/data/gap-check")
+def data_gap_check(sessions: int = 5):
+    """Split-like overnight moves with no NSE event near them, in held and universe names
+    (adr-050 step 2). Alert-only: the 20:40 mark cron posts any to the webhook; nothing is
+    adjusted. `checked` says how many names were looked at, so an empty list is evidence."""
+    from windfall.data import gap_check
+
+    con = store_meta._init()
+    held = {r[0].upper() for r in con.execute(
+        "SELECT DISTINCT ticker FROM paper_positions WHERE status IN ('open', 'pending')").fetchall()}
+    last = ts._con().execute("SELECT max(date) FROM bc.bhavcopy_prices").fetchone()[0]
+    names = held | set(ts.pit_universe(last))
+    return clean({"as_of": str(last), "checked": len(names), "sessions": sessions,
+                  "suspects": gap_check.scan(names, sessions=sessions)})
+
+
 @app.get("/api/corporate-actions")
 def corporate_actions_list(symbol: str | None = None):
     syms = [symbol] if symbol else None
@@ -232,30 +259,36 @@ def _feasibility(cov: dict, fcov: dict | None = None, tl: dict | None = None) ->
     if tl and tl.get("available"):
         floor = int(tl.get("floor_cr") or 500)
         return [
-            {"need": "Daily adjusted OHLCV (20yr)", "source": "Trendlyne + NSE Bhavcopy",
+            {"need": "Daily adjusted OHLCV (20yr)", "source": "Trendlyne (frozen) + NSE Bhavcopy",
              "status": "available",
-             "detail": (f"{tl.get('price_tickers')} names {tl.get('date_min')}..{tl.get('date_max')}, "
-                        f"split/bonus-adjusted, spliced to the latest Bhavcopy EOD for live signals "
-                        f"(adr-022); legacy yfinance store retained: {cov.get('n_tickers', 0)} tickers "
-                        f"to {cov.get('date_max')}")},
+             "detail": (f"{tl.get('price_tickers')} names {tl.get('date_min')}..{tl.get('date_max')}: "
+                        f"Trendlyne's adjusted history to its last harvest, then NSE Bhavcopy adjusted "
+                        f"with NSE's splits, bonuses and rights — and Bhavcopy alone for names Trendlyne "
+                        f"never priced (adr-050); legacy yfinance store retained: "
+                        f"{cov.get('n_tickers', 0)} tickers to {cov.get('date_max')}")},
             {"need": "Fundamentals + DVM scores (point-in-time)", "source": "Trendlyne Pro",
              "status": "available",
              "detail": (f"daily D/V/M + raw fundamentals history {tl.get('date_min')}.."
                         f"{tl.get('date_max')}, result-lag gated so nothing is visible before it was "
                         f"published (adr-016/adr-028); live snapshot: {n_fund} stocks, "
                         f"latest {fcov.get('latest')}")},
-            {"need": "Survivorship-free (delisted) history", "source": "Trendlyne + CA master",
+            {"need": "Survivorship-free (delisted) history", "source": "Trendlyne + NSE",
              "status": "available",
-             "detail": (f"{tl.get('universe_ever')} names ever >Rs{floor}cr in-window incl "
-                        f"{tl.get('delisted')} delisted — dead names ride peak to delisting "
-                        f"(adr-018/adr-030); data refreshes merge, never replace")},
-            {"need": "Corporate actions", "source": "CA master (iter-28)", "status": "available",
-             "detail": ("per-name split/bonus adjustment factors incl. delisted names; unconfirmed "
-                        "cases are flagged (ca_uncertain) in resolve warnings, never silently used")},
-            {"need": "Point-in-time universe membership", "source": "pit_mcap (adr-015)",
+             "detail": (f"{tl.get('universe_ever')} names ever >Rs{floor}cr incl "
+                        f"{tl.get('delisted')} delisted and {tl.get('survivors_added', 0)} companies "
+                        f"Trendlyne's stock list had dropped (adr-050) — dead names ride peak to "
+                        f"delisting (adr-018/adr-030); data refreshes merge, never replace")},
+            {"need": "Corporate actions", "source": "NSE corporate actions + CA master (iter-28)",
              "status": "available",
-             "detail": (f"Rs{floor}cr market-cap-floor membership panel, point-in-time per date; "
-                        f"live signals gate eligibility on a 14-day lookback")},
+             "detail": ("NSE's list from 2010 (splits, bonuses, combined subjects, rights at P/TERP) "
+                        "for live and Bhavcopy-priced names; derived factors for delisted names, "
+                        "unconfirmed cases flagged (ca_uncertain); a split-shaped move NSE never "
+                        "announced is alerted, never auto-adjusted (/api/data/gap-check)")},
+            {"need": "Point-in-time universe membership", "source": "NSE official market cap + pit_mcap",
+             "status": "available",
+             "detail": (f"Rs{floor}cr floor: NSE's official market cap from 2024-02-01, Trendlyne's "
+                        f"pit_mcap before; a company counts only after its NSE listing and while it "
+                        f"trades on NSE (adr-050); live signals gate on a 14-day lookback")},
         ]
     return [
         {"need": "Daily adjusted OHLCV (~12yr)", "source": "yfinance",

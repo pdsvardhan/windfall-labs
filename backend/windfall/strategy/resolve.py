@@ -227,10 +227,15 @@ def resolve(cfg: StrategyConfig) -> ResolvedStrategy:
                 f"window (source a longer index history to extend it).")
         membership_mask = ts.membership_panel(tickers, close.index, warnings=warnings)
         n_uncertain = len(set(tickers) & ts.ca_uncertain_symbols())
+        n_sv = len(set(tickers) & set(ts.survivors()))
         warnings.append(
-            f"survivorship-free Trendlyne layer: {len(tickers)} names ever >Rs{int(ts.MCAP_FLOOR_CR)}cr "
-            f"in-window (live + delisted, blow-ups included); membership is point-in-time; prices are "
-            f"split/bonus-adjusted (delisted via the iter-28 CA master).")
+            f"survivorship-free layer: {len(tickers)} names ever >Rs{int(ts.MCAP_FLOOR_CR)}cr "
+            f"in-window (live + delisted, blow-ups included"
+            + (f", {n_sv} companies Trendlyne's stock list had dropped" if n_sv else "")
+            + "); membership is point-in-time — NSE's official market cap from 2024-02-01 and only "
+              "while a company is listed and trading on NSE (adr-050); prices are split/bonus/rights-"
+              "adjusted (Trendlyne's frozen history + NSE Bhavcopy with NSE corporate actions; "
+              "delisted via the iter-28 CA master).")
         if n_uncertain:
             warnings.append(
                 f"data-quality: {n_uncertain} delisted name(s) in the universe have an unconfirmed "

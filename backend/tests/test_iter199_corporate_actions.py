@@ -41,10 +41,16 @@ def test_parse_reads_the_price_ratio(subject, kind, ratio):
 
 
 @pytest.mark.parametrize("subject", [
-    "Dividend - Rs 5 Per Share", "Rights 3:5 @ Premium Rs 45/-", "Buy Back",
+    "Dividend - Rs 5 Per Share", "Buy Back",
     "Distribution - Rs 1.55 Per Unit", "Interest Payment"])
 def test_parse_ignores_events_that_do_not_move_the_share_count(subject):
     assert corp_actions.parse(subject) == (None, None)
+
+
+def test_parse_types_a_rights_issue_without_a_ratio():
+    """iter-204 (adr-050): rights are typed here and priced at P/TERP when the list is refreshed
+    (corp_actions.price_rights) — the ratio needs the close before the ex-date, not the subject."""
+    assert corp_actions.parse("Rights 3:5 @ Premium Rs 45/-") == ("rights", None)
 
 
 # ── the live-tail adjustment ─────────────────────────────────────────────────

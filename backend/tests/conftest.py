@@ -34,7 +34,8 @@ _CANDIDATE_DIRS = [
 _real_dir = next((d for d in _CANDIDATE_DIRS
                   if d is not None and (d / "trendlyne.duckdb").exists()),
                  Path("/app/data"))
-for _ev, _fn in (("WINDFALL_TRENDLYNE_DB", "trendlyne.duckdb"), ("WINDFALL_BHAVCOPY_DB", "bhavcopy.duckdb")):
+for _ev, _fn in (("WINDFALL_TRENDLYNE_DB", "trendlyne.duckdb"), ("WINDFALL_BHAVCOPY_DB", "bhavcopy.duckdb"),
+                 ("WINDFALL_NSE_LAYER_DB", "nse_layer.duckdb")):   # adr-050: NSE market cap + company map
     if _ev not in os.environ and (_real_dir / _fn).exists():
         os.environ[_ev] = str(_real_dir / _fn)
 
