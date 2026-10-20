@@ -72,9 +72,11 @@ was published for them. That is why its returns are higher than the old live rec
   - Trendlyne factor tables (`dvm_history`, `valuation_ratios`) end 2026-09-04, so October's
     rebalances — live and replayed — ranked on factors carried forward ~45 days, until the next
     monthly harvest.
-  - The live Bhavcopy tail is not split-adjusted: BHAGYANGR went from ₹454.55 to ₹41.40 overnight
-    on 8 October (a corporate action, not a crash), which reads as −84.7% in the two 12-month
-    Momentum books and the Blend. Fixing the adjustment, and
-    re-basing stored entries when a split lands, is follow-up work.
+  - The live Bhavcopy tail was not split-adjusted. This ADR first cited BHAGYANGR (₹454.55 →
+    ₹41.40 on 8 October, −84.7% in the two 12-month Momentum books and the Blend) as the example.
+    **Corrected 2026-10-20:** NSE lists BHAGYANGR's 8 October event as a **demerger**, not a split.
+    Trendlyne and every backtest leave demergers unadjusted, so that drop stays as P&L and the
+    holding is now flagged. The tail problem was real for splits and bonuses (TCC, BUILDPRO,
+    MOLDTKPAC and six others since 28 August) and is fixed by adr-049.
 - Re-running the replay is possible (`apply:true`), but every apply archives first and should be an
   owner decision: it rewrites the record.
