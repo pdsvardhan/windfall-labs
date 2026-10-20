@@ -486,3 +486,13 @@ decisions:
       - curated
       - cat:reliability
     body_path: docs/decisions/adr-050-windfall-free-price-and-mcap-layer.md
+  - id: adr-051-windfall-stale-factor-hold
+    project_slug: windfall-labs
+    title: Paper books hold rather than trade when their Trendlyne scores are over 7
+      days old
+    status: accepted
+    date: 2026-10-20T00:00:00.000Z
+    tags:
+      - curated
+      - cat:reliability
+    body_path: docs/decisions/adr-051-windfall-stale-factor-hold.md
