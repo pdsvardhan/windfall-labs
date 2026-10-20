@@ -13,6 +13,8 @@ import datetime as dt
 import logging
 import math
 
+import pandas as pd
+
 from ..data import trendlyne_store as ts
 from ..data.store import connect
 from ..engine.backtest import DP_FLAT, NSE_BUY_RATE, NSE_SELL_RATE
@@ -176,8 +178,94 @@ def commit_signal(strategy_id: str | None, signal: dict, capital_per_position: f
         con.close()
 
 
+REBASE_TOL = 0.03   # stored entry vs the adjusted panel must agree with the CA ratio within 3%
+
+
+def _panel_price(ticker: str, day: dt.date):
+    """(open, close) of the ADJUSTED series on exactly `day` — the basis a re-base is checked against."""
+    out = []
+    for field in ("open", "close"):
+        try:
+            p = ts.adjusted_close_panel([ticker], start=(day - dt.timedelta(days=7)).isoformat(),
+                                        end=None, field=field, extend_live=True)
+            col = ticker.upper()
+            v = p[col].get(pd.Timestamp(day)) if col in p.columns else None
+            out.append(float(v) if v is not None and v == v else None)
+        except Exception as exc:  # noqa: BLE001
+            _log.warning("paper re-base: price lookup failed for %s: %r", ticker, exc)
+            out.append(None)
+    return out
+
+
+def rebase_corporate_actions(today: dt.date | None = None) -> dict:
+    """Put every paper position that spans a split/bonus/consolidation back on one price basis.
+
+    A position's entry, stop, target and share count are stored in the price basis of its fill
+    day. Once a split lands after that day the adjusted series divides every earlier bar by the
+    ratio (trendlyne_store.apply_tail_corporate_actions, or Trendlyne itself after a harvest), so
+    marks and the equity curve compare a post-split price to a pre-split entry — a phantom crash —
+    and a pre-split stop fires on the ex-date (iter-199, #952). The fix is the share-holder's own
+    arithmetic: entry, stop and target divide by the ratio, shares multiply by it, cost unchanged.
+
+    It only acts on price EVIDENCE: the stored entry divided by the adjusted series' price on the
+    fill day must equal the events' combined ratio (re-base) or 1 (already on this basis — skip).
+    Anything else is counted as unresolved and left untouched. That makes it idempotent and safe
+    for rows written under either basis — including the iter-197 replay, whose fills were already
+    taken from an adjusted panel.
+    """
+    from ..data.corp_actions import ratio_events
+
+    today = today or dt.date.today()
+    con = _init()
+    try:
+        rows = con.execute(
+            "SELECT id,ticker,status,entry_date,entry,stop,target,shares,exit,exit_date,last_price "
+            "FROM paper_positions WHERE status IN ('open','closed') AND entry IS NOT NULL "
+            "AND entry_date IS NOT NULL AND shares IS NOT NULL").fetchall()
+        events = ratio_events({r[1] for r in rows})
+        rebased, unresolved = [], []
+        for pid, ticker, status, entry_date, entry, stop, target, shares, exit_, exit_date, last in rows:
+            end = exit_date or today
+            span = [(ex, r) for ex, r in events.get(ticker.upper(), []) if entry_date < ex <= end]
+            if not span:
+                continue
+            factor = math.prod(r for _, r in span)
+            prices = [p for p in _panel_price(ticker, entry_date) if p]
+            seen = [entry / p for p in prices]
+            if any(abs(f - 1.0) <= REBASE_TOL for f in seen):
+                continue                                   # already on the adjusted basis
+            if not any(abs(f / factor - 1.0) <= REBASE_TOL for f in seen):
+                unresolved.append(ticker)
+                _log.warning("paper re-base: %s %s entry %.2f vs adjusted %s does not match the "
+                             "CA factor %.4f — left unchanged", pid, ticker, entry, prices, factor)
+                continue
+            new_entry = entry / factor
+            mark = exit_ if exit_ is not None else last
+            con.execute(
+                "UPDATE paper_positions SET entry=?, shares=?, stop=?, target=?, return_pct=?, "
+                "r_multiple=? WHERE id=?",
+                [new_entry, shares * factor,
+                 stop / factor if stop is not None else None,
+                 target / factor if target is not None else None,
+                 (mark / new_entry - 1.0) if mark else None,
+                 ((mark - new_entry) / (new_entry - stop / factor))
+                 if (mark and stop and new_entry - stop / factor > 0) else None,
+                 pid])
+            con.execute("INSERT INTO paper_ca_rebases VALUES (?,?,?,?,?,?,?)",
+                        [pid, ticker, ",".join(str(ex) for ex, _ in span), factor, entry, shares,
+                         dt.datetime.now()])
+            rebased.append(ticker)
+        return {"ca_rebased": len(rebased), "ca_rebased_tickers": sorted(set(rebased)),
+                "ca_unresolved": len(unresolved), "ca_unresolved_tickers": sorted(set(unresolved))}
+    finally:
+        con.close()
+
+
 def mark_to_market() -> dict:
     fills = fill_pending()  # next-open entries first, so a fresh fill gets marked the same run
+    # ...then put any position a split/bonus has landed on back on one basis, BEFORE its stop is
+    # checked against a post-split close (iter-199, #952).
+    fills.update(rebase_corporate_actions())
     con = _init()
     try:
         rows = con.execute(
@@ -288,7 +376,29 @@ def list_positions(strategy_id: str | None = None, status: str | None = None) ->
     ref = max(open_dates) if open_dates else None
     for d in out:
         d["stale_mark"] = bool(ref and d["status"] == "open" and d["last_date"] and d["last_date"] < ref)
+    _annotate_demergers(out)
     return out
+
+
+def _annotate_demergers(out: list[dict]) -> None:
+    """Flag a position held through a demerger or scheme (iter-199, #952 — owner's choice).
+
+    The parent's price drop on the ex-date is kept as the book's P&L — the convention Trendlyne's
+    adjusted series and every backtest use — but the shareholder also received the new company's
+    shares, which no book counts. Without this note the drop reads as a crash.
+    """
+    from ..data.corp_actions import demergers
+
+    held = [d for d in out if d["status"] in ("open", "closed") and d["entry_date"]]
+    events = demergers({d["ticker"] for d in held})
+    today = dt.date.today().isoformat()
+    for d in held:
+        for exd, subject in events.get(d["ticker"].upper(), []):
+            if d["entry_date"] < str(exd) <= (d["exit_date"] or today):
+                d["corporate_action"] = {
+                    "kind": "demerger" if "demerger" in subject.lower() else "scheme",
+                    "ex_date": str(exd), "subject": subject,
+                    "note": "new company's shares not counted"}
 
 
 def scoreboard() -> list[dict]:

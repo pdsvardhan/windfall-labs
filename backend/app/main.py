@@ -14,6 +14,7 @@ from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, ValidationError
 
 from windfall import store_meta
+from windfall.data import corp_actions
 from windfall.data import fundamentals as fund
 from windfall.data import store
 from windfall.data import surveillance
@@ -187,6 +188,33 @@ def surveillance_refresh():
 @app.get("/api/surveillance")
 def surveillance_list():
     return surveillance.latest_flags()
+
+
+@app.post("/api/corporate-actions/refresh")
+def corporate_actions_refresh(days_back: int = 150, days_forward: int = 60):
+    """Fetch NSE's split / bonus / consolidation / demerger list and upsert it (in-process — ONE DOOR).
+
+    The price layer back-adjusts split/bonus ex-dates that land in the raw Bhavcopy tail, and the
+    paper mark re-bases positions spanning one (iter-199, #952). Daily via the 9:00 surveillance cron.
+    """
+    try:
+        return corp_actions.refresh(days_back=days_back, days_forward=days_forward)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(502, f"NSE corporate-actions fetch failed: {exc}")
+
+
+@app.get("/api/corporate-actions")
+def corporate_actions_list(symbol: str | None = None):
+    syms = [symbol] if symbol else None
+    con = store.connect()
+    con.execute(corp_actions.SCHEMA)
+    q = ("SELECT symbol, ex_date, kind, ratio, subject, record_date, fetched_at "
+         "FROM nse_corporate_actions")
+    rows = (con.execute(q + " WHERE symbol = ? ORDER BY ex_date", [symbol.upper()]).fetchall()
+            if syms else con.execute(q + " ORDER BY ex_date DESC LIMIT 500").fetchall())
+    cols = ["symbol", "ex_date", "kind", "ratio", "subject", "record_date", "fetched_at"]
+    return clean([{c: (str(v) if c in ("ex_date", "record_date", "fetched_at") and v is not None
+                       else v) for c, v in zip(cols, r)} for r in rows])
 
 
 def _feasibility(cov: dict, fcov: dict | None = None, tl: dict | None = None) -> list[dict]:
