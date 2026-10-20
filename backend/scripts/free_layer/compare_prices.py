@@ -53,9 +53,10 @@ def rights_events(con) -> pd.DataFrame:
                    AND b.date < n.ex_date AND b.close > 0 AND b.series IN ('EQ', 'BE')
                  ORDER BY b.date DESC LIMIT 1) AS cum_close
         FROM nse_ca n WHERE n.kind = 'rights'""").fetchdf()
-    rows = []
+    rows, parsed = [], 0
     for x in r.itertuples():
         m = _RIGHTS.search(x.subject or "")
+        parsed += bool(m)
         if not m or not x.face_value or not x.cum_close:
             continue
         a, b, prem = int(m.group(1)), int(m.group(2)), float(m.group(3))
@@ -65,7 +66,8 @@ def rights_events(con) -> pd.DataFrame:
         terp = (b * p + a * s) / (a + b)
         rows.append({"symbol": x.symbol, "ex_date": x.ex_date, "ratio": p / terp})
     out = pd.DataFrame(rows, columns=["symbol", "ex_date", "ratio"]).drop_duplicates(["symbol", "ex_date"])
-    print(f"rights issues priced below market (adjusting): {len(out)} of {len(r)}")
+    print(f"rights subjects read by the regex: {parsed} of {len(r)} (formats like 'Prem', '@ Par' "
+          f"are skipped); priced below market (adjusting): {len(out)}")
     return out
 
 
