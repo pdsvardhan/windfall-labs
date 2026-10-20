@@ -638,3 +638,72 @@ position to fills now priced on Trendlyne's refreshed history (e.g. FREDUN's 2-S
 - Deployed from the iter-202 worktree (`docker build` there, `compose up --no-build` from the main
   checkout) while the main checkout was on iter-200's branch; coordinated with that session, which
   ships iteration 204 (adr-050) on top of this merge.
+
+## Session 2026-10-20 — iter-204 (Ottomate iteration 204): free prices and a point-in-time universe (adr-050 switch)
+
+**Stage:** Stage 4 · 7 items locked (owner: "Lock all 7") · branch `iter-204-adr050-switch` · merged
+`7b47b40` on top of iteration 202
+
+### What changed
+
+- **Prices (1484, 1485).** Trendlyne's price history is frozen at its 2026-10-12 harvest. Every later
+  bar — and every name Trendlyne never priced — is NSE Bhavcopy back-adjusted with NSE's corporate
+  actions, now held from 2010: 527 splits, 573 bonuses, 27 combined subjects (#958), 349 rights
+  issues, 313 of them priced at P/TERP. The OHLCV harvester is retired (`ingest_refresh.py` ignores
+  `tl_ohlcv_*` unless `--include-ohlcv`); `rebuild_pit_mcap_ca.py` / `build_membership.py` refuse
+  without `--force-after-adr-050`, because with the close frozen they would rewrite pre-2024
+  membership every month. The megacap harvester stays (DVM + valuation for the ~100 index names).
+- **Gap detector (1486).** `/api/data/gap-check` + the 20:40 mark cron: a split-shaped overnight move
+  (≥1.5 / ≤0.5) with no NSE event within three sessions is logged; nothing is ever adjusted.
+- **Market cap (1487).** `scripts/nse_mcap_ingest.py` → `backend/data/nse_layer.duckdb`, nightly in the
+  EOD window: NSE's official MCAP file from 2024-02-01 (669 days backfilled) and an ISIN company map
+  (ordinary shares only — no ETFs, rights-entitlement or DVR lines). From 2024-02-01 membership, the
+  `mcap` feature and the universe read NSE's own number.
+- **NSE gate (1488, #957).** By company and by date: listed by the day and an NSE mainboard trade within
+  90 days. Before Bhavcopy (2010-01-04) a company counts if it was listed when coverage began.
+- **Survivorship (1489, #959).** 189 companies Trendlyne's stock list had dropped (143 listed by the
+  cutover) are priced and gated; before 2024 by adjusted close × their first NSE share count. A blend
+  that uses a Trendlyne factor leaves them out (delisted names keep their adr-030 treatment).
+
+### Re-baseline shown before deploy (1490), 2016 → today
+
+DVM books within ±1 point (DVM_user identical); Value + Momentum 25.67% → 25.65%; Momentum 20
+31.57% → 30.17%, Momentum 10 38.87% → 36.99%; Blend 23.75% → 22.82%. Universe 13–27 smaller per
+month-end before 2024, 40–100 smaller through 2024–mid 2026, the same from Aug 2026.
+
+Owner: **"Ship it"**, and **re-apply the replay from 29 Jun** under the new rules. Applied 18:04 IST
+(archive `20261020_123418`, 0 problems): five books identical; Momentum 20 +4.55% → +3.43%, DVM
+weekly-10 +9.53% → +10.33%, Blend +2.41% → +2.05%.
+
+### Verification
+
+Code verifier, two rounds. Round 1 found five blocking defects, each now pinned by a test: a same-day
+bonus + split sharing a ratio collapsed into one event (seven such pairs since 2021 would have read as
+50% crashes); a backtest with an explicit end after the freeze lost every Trendlyne-priced name;
+`aggfunc='last'` changed pre-2024 membership on master's live+dead twin rows; survivors were scored on
+momentum alone inside a P/E blend (that alone made Value + Momentum read 18%); a rename after the
+freeze would have counted one company twice. Round 2: 6/6 APPROVE (reports 1186–1191); suite 402/402
+on real data, and on a trial merge with iteration 202 before it landed. Item 1490 (re-baseline +
+deploy, verified live): APPROVE (report 1196). Its notes: backtests vary ~0.25pp CAGR between
+processes from tie order in universe_membership's live+dead twins and dead-name aliases — pre-existing,
+to-do #967; the comparison's "new" arm mixes runs (six strategies 15:22 on 5b1a2d6, Value + Momentum
+17:23 after the blend fix, DVM weekly-10 re-run on the final code — all reproduce on 7b47b40) and used
+294 priced rights against production's 313. Comparison kept in
+`docs/validation/iter204_rebaseline_compare.txt`.
+
+### Ops
+
+- EOD cron runs `nse_mcap_ingest.py --recent 7` in the api-stopped window; the mark cron calls the gap
+  check (backups `.bak-20261020` — the mark script's iter-199 backup of the same name was overwritten).
+- Alerts go to the log only: `.windfall-alert.env` does not exist on the server (owner question).
+- Only the api image was rebuilt; web stayed on iteration 202's 17:45 image.
+
+### Friction
+
+- pandas 3 builds date indexes in microseconds while `Timedelta.value` is nanoseconds — the 90-day
+  gate briefly meant 90,000 days; a synthetic test caught it.
+- `pgrep -f`/`pkill -f` on a pattern that also appears in the watching command matches itself (and
+  dropped the SSH session). Match the PID, not the pattern.
+- `windfall.strategy` re-exports a `resolve()` function that shadows the module — use
+  `importlib.import_module("windfall.strategy.resolve")` in tests.
+- `trendlyne_store.py` and `resolve.py` are CRLF in master; re-apply CRLF after editing on Windows.

@@ -480,7 +480,7 @@ decisions:
     project_slug: windfall-labs
     title: "Prices and market cap from free NSE data: freeze Trendlyne's price
       history, take membership from NSE's official market cap"
-    status: proposed
+    status: accepted
     date: 2026-10-20T00:00:00.000Z
     tags:
       - curated

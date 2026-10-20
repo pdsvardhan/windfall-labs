@@ -1,7 +1,7 @@
 # adr-050 — Prices and market cap from free NSE data: freeze Trendlyne's price history, take membership from NSE's official market cap
 
-- **Status:** proposed — measurement done in iter-200. On 2026-10-20 the owner chose all of steps 1–5
-  for the next, separately locked iteration; this becomes accepted when that iteration ships.
+- **Status:** accepted — shipped in iter-204 (Ottomate iteration 204, master 7b47b40, 2026-10-20) after
+  the owner approved the side-by-side re-baseline; measured in iter-200.
 - **Date:** 2026-10-20
 - **Tags:** curated, cat:reliability
 - **Iteration:** iter-200 (Ottomate iteration 200, items 1460–1463)
