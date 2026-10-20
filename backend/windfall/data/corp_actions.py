@@ -103,14 +103,29 @@ def fetch(from_date: dt.date, to_date: dt.date) -> list[dict]:
     return out
 
 
-def ingest(rows: list[dict]) -> dict:
+def ingest(rows: list[dict], window: tuple[dt.date, dt.date] | None = None) -> dict:
+    """Upsert rows. With `window`, the fetch is authoritative for that ex-date range: everything
+    stored inside it is replaced, so an event NSE revised (subject or ex-date) leaves no stale twin
+    to be applied twice. The swap is one transaction under the store lock."""
+    from .store import _LOCK
+
     con = connect()
     con.execute(SCHEMA)
     now = dt.datetime.now()
-    for r in rows:
-        con.execute("INSERT OR REPLACE INTO nse_corporate_actions VALUES (?,?,?,?,?,?,?)",
-                    [r["symbol"], r["ex_date"], r["subject"], r["kind"], r.get("ratio"),
-                     r.get("record_date"), now])
+    with _LOCK:
+        con.execute("BEGIN TRANSACTION")
+        try:
+            if window:
+                con.execute("DELETE FROM nse_corporate_actions WHERE ex_date BETWEEN ? AND ?",
+                            list(window))
+            for r in rows:
+                con.execute("INSERT OR REPLACE INTO nse_corporate_actions VALUES (?,?,?,?,?,?,?)",
+                            [r["symbol"], r["ex_date"], r["subject"], r["kind"], r.get("ratio"),
+                             r.get("record_date"), now])
+            con.execute("COMMIT")
+        except Exception:
+            con.execute("ROLLBACK")
+            raise
     by_kind: dict[str, int] = {}
     for r in rows:
         by_kind[r["kind"]] = by_kind.get(r["kind"], 0) + 1
@@ -120,9 +135,9 @@ def ingest(rows: list[dict]) -> dict:
 def refresh(days_back: int = 150, days_forward: int = 60) -> dict:
     """Fetch a rolling window (announced events have future ex-dates) and upsert it."""
     today = dt.date.today()
-    rows = fetch(today - dt.timedelta(days=days_back), today + dt.timedelta(days=days_forward))
-    return {"window": [str(today - dt.timedelta(days=days_back)),
-                       str(today + dt.timedelta(days=days_forward))], **ingest(rows)}
+    window = (today - dt.timedelta(days=days_back), today + dt.timedelta(days=days_forward))
+    rows = fetch(*window)
+    return {"window": [str(window[0]), str(window[1])], **ingest(rows, window)}
 
 
 def _rows(symbols, where: str) -> list[tuple]:

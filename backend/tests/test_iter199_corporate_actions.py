@@ -166,12 +166,85 @@ def test_evidence_that_does_not_match_the_ratio_changes_nothing(split_world):
     assert _row("t199c")[:2] == pytest.approx((100.0, 100.0))
 
 
-def test_a_position_closed_before_the_ex_date_is_untouched(split_world):
-    split_world.setattr(book, "_panel_price", lambda t, d: [20.0, 20.0])
+def _prices(by_day):
+    return lambda t, d: by_day[d]
+
+
+def _full(pid):
+    return _init().execute(
+        "SELECT entry, shares, exit, last_price, return_pct FROM paper_positions WHERE id=?",
+        [pid]).fetchone()
+
+
+def test_a_position_sold_before_the_split_is_rebased_whole(split_world):
+    """Verifier finding 1: the adjusted series rescales its whole holding period too, so entry AND
+    exit move by the ratio — the return is unchanged and the equity curve no longer dips."""
+    split_world.setattr(book, "_panel_price", _prices({D(2026, 9, 1): [20.0, 20.0],
+                                                       D(2026, 10, 5): [22.0, 22.0]}))
     _seed("t199d", D(2026, 9, 1), 100.0, 100.0, status="closed", exit_=110.0,
           exit_date=D(2026, 10, 5))
-    assert book.rebase_corporate_actions(today=D(2026, 10, 19))["ca_rebased"] == 0
-    assert _row("t199d")[:2] == pytest.approx((100.0, 100.0))
+    assert book.rebase_corporate_actions(today=D(2026, 10, 19))["ca_rebased"] == 1
+    entry, shares, exit_, _last, ret = _full("t199d")
+    assert (entry, shares, exit_) == pytest.approx((20.0, 500.0, 22.0))
+    assert ret == pytest.approx(0.10)
+
+
+def test_a_stop_fired_on_a_phantom_crash_is_reported_not_turned_into_a_gain(split_world):
+    """Verifier finding 2: a pre-split stop level booked as the exit after the ex-date. Re-basing
+    only the entry would read +70%; the row is left alone and reported instead."""
+    split_world.setattr(corp_actions, "ratio_events",
+                        lambda syms: {"SPLITCO": [(D(2026, 10, 9), 2.0)]})
+    split_world.setattr(book, "_panel_price", _prices({D(2026, 10, 1): [330.3, 331.0],
+                                                       D(2026, 10, 9): [329.0, 330.0]}))
+    _seed("t199e", D(2026, 10, 1), 660.6, 40.0, stop=561.51, status="closed", exit_=561.51,
+          exit_date=D(2026, 10, 9))
+    out = book.rebase_corporate_actions(today=D(2026, 10, 19))
+    assert out["ca_rebased"] == 0 and out["ca_unresolved"] == 1
+    assert _full("t199e")[:3] == pytest.approx((660.6, 40.0, 561.51))
+
+
+def test_a_second_split_after_a_rebase_is_applied_alone(split_world):
+    """Verifier finding 3: the row already carries the first event; only the second is missing."""
+    split_world.setattr(corp_actions, "ratio_events", lambda syms: {
+        "SPLITCO": [(D(2026, 10, 8), 5.0), (D(2026, 10, 14), 2.0)]})
+    split_world.setattr(book, "_panel_price", _prices({D(2026, 10, 1): [10.0, 10.2]}))
+    _seed("t199f", D(2026, 10, 1), 20.0, 500.0)
+    assert book.rebase_corporate_actions(today=D(2026, 10, 19))["ca_rebased"] == 1
+    assert _full("t199f")[:2] == pytest.approx((10.0, 1000.0))
+
+
+def test_a_last_mark_taken_before_the_split_is_rescaled_with_the_entry(split_world):
+    """Verifier finding 6: an unpriced holding must not read +400% after a 1:5 re-base."""
+    split_world.setattr(book, "_panel_price", _prices({D(2026, 10, 1): [20.0, 20.4]}))
+    _seed("t199g", D(2026, 10, 1), 100.0, 100.0)
+    _init().execute("UPDATE paper_positions SET last_price=104.0, last_date=? WHERE id='t199g'",
+                    [D(2026, 10, 7)])
+    book.rebase_corporate_actions(today=D(2026, 10, 19))
+    entry, shares, _exit, last, ret = _full("t199g")
+    assert (entry, shares, last) == pytest.approx((20.0, 500.0, 20.8))
+    assert ret == pytest.approx(0.04)
+
+
+def test_a_name_with_no_bar_after_its_ex_date_keeps_its_latest_price_raw():
+    """Verifier finding 5: the batch extends past the ex-date, this name does not."""
+    w = _wide()
+    w.loc[w.index >= pd.Timestamp("2026-10-08"), "AAA"] = float("nan")
+    out = ts.apply_tail_corporate_actions(w, {"AAA": pd.Timestamp("2026-09-30")},
+                                          {"AAA": [(D(2026, 10, 8), 5.0)]})
+    assert out["AAA"].dropna().iloc[-1] == 103
+
+
+def test_a_refresh_replaces_its_window_so_a_revised_event_is_not_applied_twice():
+    """Verifier finding 4: NSE revising a subject must not leave a stale twin."""
+    win = (D(2031, 1, 1), D(2031, 1, 31))
+    row = {"symbol": "T199REV", "ex_date": D(2031, 1, 15), "kind": "split", "ratio": 5.0,
+           "record_date": None}
+    try:
+        corp_actions.ingest([{**row, "subject": "Split From Rs 10 To Rs 2"}], win)
+        corp_actions.ingest([{**row, "subject": "Face Value Split From Rs 10 To Rs 2"}], win)
+        assert corp_actions.ratio_events(["T199REV"]) == {"T199REV": [(D(2031, 1, 15), 5.0)]}
+    finally:
+        _init().execute("DELETE FROM nse_corporate_actions WHERE symbol='T199REV'")
 
 
 # ── the demerger flag ────────────────────────────────────────────────────────
@@ -187,4 +260,15 @@ def test_a_holding_through_a_demerger_is_flagged_and_one_sold_before_is_not(monk
     book._annotate_demergers(out)
     assert out[0]["corporate_action"]["kind"] == "demerger"
     assert out[0]["corporate_action"]["ex_date"] == "2026-10-08"
+    assert out[0]["corporate_action"]["note"] == "new company's shares not counted"
     assert "corporate_action" not in out[1] and "corporate_action" not in out[2]
+
+
+def test_a_scheme_is_not_described_as_a_new_company(monkeypatch):
+    """Verifier finding 7: 'Bonus Ncrps' schemes issue preference shares, not a new company."""
+    monkeypatch.setattr(corp_actions, "demergers", lambda syms: {
+        "SCHEMECO": [(D(2026, 9, 8), "Scheme Of Arrangement - Bonus Ncrps 46:1")]})
+    out = [{"ticker": "SCHEMECO", "status": "open", "entry_date": "2026-09-01", "exit_date": None}]
+    book._annotate_demergers(out)
+    assert out[0]["corporate_action"]["kind"] == "scheme"
+    assert "new company" not in out[0]["corporate_action"]["note"]

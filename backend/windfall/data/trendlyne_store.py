@@ -319,10 +319,14 @@ def apply_tail_corporate_actions(wide: pd.DataFrame, last_tl: dict, events: dict
     """
     if wide.empty or not events:
         return wide
-    last_bar = wide.index.max()
     for sym, evs in events.items():
         lt = last_tl.get(sym)
         if sym not in wide.columns or lt is None:
+            continue
+        # This name's own last bar, not the batch's: a name with no bar on/after the ex-date has
+        # not traded post-event yet, and its latest price must stay raw (verifier finding 5).
+        last_bar = wide[sym].last_valid_index()
+        if last_bar is None:
             continue
         for exd, ratio in evs:
             ex = pd.Timestamp(exd)

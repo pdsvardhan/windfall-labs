@@ -179,6 +179,7 @@ def commit_signal(strategy_id: str | None, signal: dict, capital_per_position: f
 
 
 REBASE_TOL = 0.03   # stored entry vs the adjusted panel must agree with the CA ratio within 3%
+EXIT_SANITY = 0.35  # a re-based exit further than this from the adjusted close that day is not trusted
 
 
 def _panel_price(ticker: str, day: dt.date):
@@ -207,11 +208,22 @@ def rebase_corporate_actions(today: dt.date | None = None) -> dict:
     and a pre-split stop fires on the ex-date (iter-199, #952). The fix is the share-holder's own
     arithmetic: entry, stop and target divide by the ratio, shares multiply by it, cost unchanged.
 
-    It only acts on price EVIDENCE: the stored entry divided by the adjusted series' price on the
-    fill day must equal the events' combined ratio (re-base) or 1 (already on this basis — skip).
-    Anything else is counted as unresolved and left untouched. That makes it idempotent and safe
-    for rows written under either basis — including the iter-197 replay, whose fills were already
-    taken from an adjusted panel.
+    It only acts on price EVIDENCE. Every event after the fill day is a candidate, whether or not the
+    position has since closed: the adjusted series rescales the WHOLE past, so a position bought
+    and sold before a split is just as far off-basis as one still held (verifier finding 1 — its
+    equity curve dipped by the ratio while held, then jumped back at the exit). The stored entry
+    divided by the adjusted fill-day price says how much of that rescaling the row still lacks;
+    events already applied are the earliest ones, so the row is missing some trailing run of them
+    (finding 3 — a second split must not strand a row re-based for the first). That run's product
+    is the factor; 1 means already on basis; nothing matching means unresolved and untouched. Prices
+    recorded before an event (the exit of a position that closed before it, a last mark taken
+    before it) are rescaled with the entry; prices recorded after it are left alone. Idempotent,
+    and safe for rows written under either basis — including the iter-197 replay, whose fills were
+    already taken from an adjusted panel.
+
+    A re-based exit that still lands far from the adjusted close of its own day is not trusted
+    (finding 2): that is a stop fired on a phantom post-split crash before the event was known. It
+    is reported as unresolved rather than turned into a phantom gain.
     """
     from ..data.corp_actions import ratio_events
 
@@ -219,40 +231,63 @@ def rebase_corporate_actions(today: dt.date | None = None) -> dict:
     con = _init()
     try:
         rows = con.execute(
-            "SELECT id,ticker,status,entry_date,entry,stop,target,shares,exit,exit_date,last_price "
-            "FROM paper_positions WHERE status IN ('open','closed') AND entry IS NOT NULL "
+            "SELECT id,ticker,status,entry_date,entry,stop,target,shares,exit,exit_date,last_price,"
+            "last_date FROM paper_positions WHERE status IN ('open','closed') AND entry IS NOT NULL "
             "AND entry_date IS NOT NULL AND shares IS NOT NULL").fetchall()
         events = ratio_events({r[1] for r in rows})
         rebased, unresolved = [], []
-        for pid, ticker, status, entry_date, entry, stop, target, shares, exit_, exit_date, last in rows:
-            end = exit_date or today
-            span = [(ex, r) for ex, r in events.get(ticker.upper(), []) if entry_date < ex <= end]
-            if not span:
+        for (pid, ticker, status, entry_date, entry, stop, target, shares, exit_, exit_date, last,
+             last_date) in rows:
+            evs = sorted((ex, r) for ex, r in events.get(ticker.upper(), [])
+                         if entry_date < ex <= today)
+            if not evs:
                 continue
-            factor = math.prod(r for _, r in span)
             prices = [p for p in _panel_price(ticker, entry_date) if p]
             seen = [entry / p for p in prices]
             if any(abs(f - 1.0) <= REBASE_TOL for f in seen):
                 continue                                   # already on the adjusted basis
-            if not any(abs(f / factor - 1.0) <= REBASE_TOL for f in seen):
+            missing = None
+            for k in range(len(evs)):                      # the trailing run the row still lacks
+                g = math.prod(r for _, r in evs[k:])
+                if any(abs(f / g - 1.0) <= REBASE_TOL for f in seen):
+                    missing = evs[k:]
+                    break
+            if missing is None:
                 unresolved.append(ticker)
-                _log.warning("paper re-base: %s %s entry %.2f vs adjusted %s does not match the "
-                             "CA factor %.4f — left unchanged", pid, ticker, entry, prices, factor)
+                _log.warning("paper re-base: %s %s entry %.2f vs adjusted %s matches no run of the "
+                             "CA ratios %s — left unchanged", pid, ticker, entry, prices, evs)
                 continue
+            factor = math.prod(r for _, r in missing)
+
+            def after(day):
+                """Product of the missing events later than `day` — what a price taken that day lacks."""
+                return math.prod(r for ex, r in missing if day is None or ex > day)
+
             new_entry = entry / factor
-            mark = exit_ if exit_ is not None else last
+            new_exit = exit_ / after(exit_date) if exit_ is not None else None
+            new_last = last / after(last_date) if last is not None else None
+            if new_exit is not None and exit_date is not None:
+                close_then = _panel_price(ticker, exit_date)[1]
+                if close_then and abs(new_exit / close_then - 1.0) > EXIT_SANITY:
+                    unresolved.append(ticker)
+                    _log.warning("paper re-base: %s %s exit %.2f on %s is %.2fx the adjusted close "
+                                 "%.2f — a stop/target fired off-basis? left unchanged",
+                                 pid, ticker, new_exit, exit_date, new_exit / close_then, close_then)
+                    continue
+            new_stop = stop / factor if stop is not None else None
+            mark = new_exit if new_exit is not None else new_last
             con.execute(
-                "UPDATE paper_positions SET entry=?, shares=?, stop=?, target=?, return_pct=?, "
-                "r_multiple=? WHERE id=?",
-                [new_entry, shares * factor,
-                 stop / factor if stop is not None else None,
+                "UPDATE paper_positions SET entry=?, shares=?, stop=?, target=?, exit=?, "
+                "last_price=?, return_pct=?, r_multiple=? WHERE id=?",
+                [new_entry, shares * factor, new_stop,
                  target / factor if target is not None else None,
+                 new_exit, new_last,
                  (mark / new_entry - 1.0) if mark else None,
-                 ((mark - new_entry) / (new_entry - stop / factor))
-                 if (mark and stop and new_entry - stop / factor > 0) else None,
+                 ((mark - new_entry) / (new_entry - new_stop))
+                 if (mark and new_stop and new_entry - new_stop > 0) else None,
                  pid])
             con.execute("INSERT INTO paper_ca_rebases VALUES (?,?,?,?,?,?,?)",
-                        [pid, ticker, ",".join(str(ex) for ex, _ in span), factor, entry, shares,
+                        [pid, ticker, ",".join(str(ex) for ex, _ in missing), factor, entry, shares,
                          dt.datetime.now()])
             rebased.append(ticker)
         return {"ca_rebased": len(rebased), "ca_rebased_tickers": sorted(set(rebased)),
@@ -395,10 +430,14 @@ def _annotate_demergers(out: list[dict]) -> None:
     for d in held:
         for exd, subject in events.get(d["ticker"].upper(), []):
             if d["entry_date"] < str(exd) <= (d["exit_date"] or today):
+                demerger = "demerger" in subject.lower()
                 d["corporate_action"] = {
-                    "kind": "demerger" if "demerger" in subject.lower() else "scheme",
+                    "kind": "demerger" if demerger else "scheme",
                     "ex_date": str(exd), "subject": subject,
-                    "note": "new company's shares not counted"}
+                    # A scheme may issue preference shares or other securities, not a new company
+                    # (TVSHLTD/SIYSIL 'Bonus Ncrps') — say only what is true of both (finding 7).
+                    "note": ("new company's shares not counted" if demerger
+                             else "securities issued under the scheme not counted")}
 
 
 def scoreboard() -> list[dict]:
