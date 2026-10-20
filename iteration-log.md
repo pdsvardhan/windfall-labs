@@ -459,6 +459,7 @@ the ADR now names BLEND as an honest exception rather than implying the case is 
 
 - **#952 P1** live Bhavcopy tail not split-adjusted — BHAGYANGR 454.55→41.40 on 8 Oct reads as
   −84.7% in both Momentum books and the Blend; stored entries also never re-base on a split.
+  *Corrected 2026-10-20 (iter-199): BHAGYANGR was a demerger, not a split — see below.*
 - **#953 P1** Trendlyne factor harvest overdue — factors end 2026-09-04, so October rebalanced on
   45-day-old scores. **#954** the cron's staleness check ignores that warning. **#955** meta-store
   proxy has the same fetch-outside-lock shape as 1420 (latent). **#956** paper labels hardcoded.
@@ -469,3 +470,50 @@ the ADR now names BLEND as an honest exception rather than implying the case is 
 
 Test strategies `ZZ TEST momentum 126` (+ its backtest) and the older `Untitled strategy` deleted
 through the now-cascading DELETE.
+
+## Session 2026-10-20 — iter-199 (Ottomate iteration 199): corporate actions in the live tail (#952)
+
+**Stage:** Stage 4 · 6 items locked · branch `iter-199-ca-tail`
+
+### Correction first
+
+Iteration 197 (and adr-048) called BHAGYANGR's 454.55 → 41.40 on 8 Oct a split. It was a
+**demerger** — NSE says so, and the tape agreed (volume and trades *fell*; `prev_close` was not
+adjusted; the name moved to the BE series). Trendlyne and every backtest leave demergers
+unadjusted, so the −84.7% stays as P&L; owner chose to keep it and flag the holding.
+
+### What was actually wrong, and the fix (adr-049)
+
+- Nine real splits/bonuses landed in the raw Bhavcopy tail after 28 Aug (TCC, BUILDPRO, MOLDTKPAC,
+  BLSE, BANSALWIRE, PGIL, AASTHA, TAALTECH, MOLDTECH) and read as 50–90% crashes. None held in a
+  paper book; TCC's had pushed it out of Value + Momentum's 1-Oct pick.
+- `data/corp_actions.py` — NSE's corporate-actions API, daily via the 9:00 cron; split / bonus /
+  consolidation parsed to a ratio, demerger / scheme typed without one. 45 events in the window.
+- `adjusted_close_panel` back-adjusts ratio events after each name's last Trendlyne bar —
+  Trendlyne's own convention (verified on TEMBO, GOODLUCK, TRENT; demergers on GUJENERGY,
+  TRIVENI, INOXGREEN) — so nothing moves when Trendlyne catches up. The mcap fallback scales shares.
+- Paper: `rebase_corporate_actions()` at every mark, on price evidence only, idempotent, audited.
+- Replay re-applied with owner approval (archive `20261020_065005`): Value + Momentum takes TCC
+  instead of KAMDHENU on 1 Oct, +21.5% → +20.5%; the other seven books identical trade for trade.
+
+### Ops
+
+- `/opt/homeserver/scripts/windfall-surveillance-refresh.sh` also refreshes corporate actions
+  (backup `.bak-20261020`).
+- A heredoc commit message with an apostrophe died inside a single-quoted ssh command and left a
+  truncated commit message; amended from a file. Rule 6 again — write the message to a file.
+- A Python rewrite on Windows turned `frontend/src/app/paper/page.tsx` to CRLF (the diff showed
+  870 lines); normalised before review. `trendlyne_store.py` is CRLF in master and stays so.
+
+### Verification
+
+- Code verifier: 5 of 6 APPROVE in round 1; 1456 (paper re-base) took three rounds. Round 1 found
+  positions sold before a split left unrescaled (equity dipped −40% while held), a second split
+  stranding a re-based row, phantom stop-outs turned into phantom gains, revised NSE subjects
+  applied twice, a batch-wide last bar, +400% on unpriced holdings, and schemes described as a new
+  company. Round 2 found the 35% exit check missed small-ratio bonuses (1:2, 1:3) and an empty NSE
+  fetch could wipe the list. Final rules: date-based (a stop/target after an un-applied event is
+  reported, never re-based) and a refresh refuses to shrink its window below 80%.
+- Feature verifier: 4/4 on the live paper page (report 542).
+- Ops: the 20:40 mark cron now logs re-bases and alerts on unresolved ones; the 9:00 cron alerts on
+  a failed or refused corporate-actions refresh (both host scripts, backups `.bak-20261020`).

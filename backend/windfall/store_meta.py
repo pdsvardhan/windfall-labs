@@ -38,6 +38,13 @@ CREATE TABLE IF NOT EXISTS paper_rebalance_runs (
     notional DOUBLE, target_n INTEGER, closed INTEGER, opened INTEGER,
     created_at TIMESTAMP
 );
+-- Audit of every split/bonus re-base applied to a paper position (iter-199, #952): what the row
+-- held before, the factor, and the ex-dates it covered. The re-base itself is idempotent by price
+-- evidence; this table is the record of what changed and when.
+CREATE TABLE IF NOT EXISTS paper_ca_rebases (
+    position_id VARCHAR, ticker VARCHAR, ex_dates VARCHAR, factor DOUBLE,
+    entry_before DOUBLE, shares_before DOUBLE, applied_at TIMESTAMP
+);
 """
 
 

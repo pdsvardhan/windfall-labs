@@ -292,7 +292,58 @@ def adjusted_close_panel(symbols, start=None, end=None, field: str = "close",
         return pd.DataFrame()
     long = pd.concat(parts, ignore_index=True)
     long["date"] = pd.to_datetime(long["date"])
-    return long.pivot_table(index="date", columns="symbol", values="v").sort_index()
+    wide = long.pivot_table(index="date", columns="symbol", values="v").sort_index()
+    if extend_live and live:
+        wide = _adjust_live_tail(wide, live)
+    return wide
+
+
+def _last_tl_dates(live: dict[str, int]) -> dict[str, pd.Timestamp]:
+    """{symbol: its last Trendlyne ohlcv bar} — where its raw Bhavcopy tail begins."""
+    pk2sym = {pk: s for s, pk in live.items()}
+    rows = _con().execute(
+        f"SELECT pk, max(date) FROM ohlcv WHERE pk IN ({','.join(['?'] * len(pk2sym))}) GROUP BY pk",
+        list(pk2sym)).fetchall()
+    return {pk2sym[pk]: pd.Timestamp(d) for pk, d in rows if d is not None}
+
+
+def apply_tail_corporate_actions(wide: pd.DataFrame, last_tl: dict, events: dict) -> pd.DataFrame:
+    """Back-adjust split/bonus/consolidation ex-dates that fall inside a name's raw Bhavcopy tail.
+
+    Trendlyne's `ohlcv` is back-adjusted for every event up to its harvest, so an ex-date on or
+    before the name's last Trendlyne bar is already in the series and is left alone (adjusting it
+    again would double it). An ex-date AFTER that bar sits in the raw tail: every bar before it is
+    divided by the event's ratio, so the latest bar stays the raw traded price — the same series
+    Trendlyne publishes once it catches up (iter-199, #952). Events not yet in the panel (an
+    announced future ex-date) do nothing.
+    """
+    if wide.empty or not events:
+        return wide
+    for sym, evs in events.items():
+        lt = last_tl.get(sym)
+        if sym not in wide.columns or lt is None:
+            continue
+        # This name's own last bar, not the batch's: a name with no bar on/after the ex-date has
+        # not traded post-event yet, and its latest price must stay raw (verifier finding 5).
+        last_bar = wide[sym].last_valid_index()
+        if last_bar is None:
+            continue
+        for exd, ratio in evs:
+            ex = pd.Timestamp(exd)
+            if ex <= lt or ex > last_bar or not ratio:
+                continue
+            before = wide.index < ex
+            wide.loc[before, sym] = wide.loc[before, sym] / ratio
+    return wide
+
+
+def _adjust_live_tail(wide: pd.DataFrame, live: dict[str, int]) -> pd.DataFrame:
+    from .corp_actions import ratio_events     # meta-store read; imported lazily (no cycle at import)
+    events = ratio_events(live.keys())
+    if not events:
+        return wide
+    return apply_tail_corporate_actions(wide, _last_tl_dates({s: live[s] for s in events if s in live}),
+                                        events)
 
 
 def pit_universe(asof_date, floor_cr: float = MCAP_FLOOR_CR) -> list[str]:
@@ -313,6 +364,11 @@ def _bhavcopy_mcap_panel(symbols, idx) -> pd.DataFrame:
     The shares figure is read back out of `pit_mcap` rather than re-derived, so this is the same
     `shares_now` that built `universe_membership` — a fallback that disagreed with the primary
     path about share count would be worse than no fallback at all.
+
+    That count is as of pit_mcap's last row. A split or bonus after it multiplies the shares while
+    the raw close falls by the same ratio, so from its ex-date the count is scaled up (iter-199,
+    #952) — otherwise a 1:5 split read as an 80% market-cap collapse and could drop the name
+    under the Rs500cr floor.
     """
     syms = [s.upper() for s in symbols]
     if not syms:
@@ -320,12 +376,12 @@ def _bhavcopy_mcap_panel(symbols, idx) -> pd.DataFrame:
     ph = ",".join(["?"] * len(syms))
     df = _con().execute(f"""
         WITH shares AS (
-            SELECT pk, arg_max(shares_cr, date) AS shares_cr
+            SELECT pk, arg_max(shares_cr, date) AS shares_cr, max(date) AS shares_date
             FROM pit_mcap WHERE shares_cr IS NOT NULL GROUP BY pk),
         sym AS (
             SELECT upper(nsecode) s, pk FROM stocks WHERE nsecode <> ''
             UNION SELECT upper(nse_symbol), pk FROM recovered_symbols WHERE nse_symbol <> '')
-        SELECT m.s AS symbol, b.date, b.close * sh.shares_cr AS mcap_cr
+        SELECT m.s AS symbol, b.date, b.close * sh.shares_cr AS mcap_cr, sh.shares_date
         FROM bc.bhavcopy_prices b
         JOIN sym m ON upper(regexp_replace(b.ticker, '\\.NS$', '')) = m.s
         JOIN shares sh ON sh.pk = m.pk
@@ -334,8 +390,28 @@ def _bhavcopy_mcap_panel(symbols, idx) -> pd.DataFrame:
     if df.empty:
         return pd.DataFrame(index=idx)
     df["date"] = pd.to_datetime(df["date"])
-    return (df.pivot_table(index="date", columns="symbol", values="mcap_cr")
-              .sort_index().reindex(index=idx))
+    shares_date = {s: pd.Timestamp(d) for s, d in
+                   df.groupby("symbol")["shares_date"].first().items() if pd.notna(d)}
+    wide = df.pivot_table(index="date", columns="symbol", values="mcap_cr").sort_index()
+    from .corp_actions import ratio_events
+    return scale_shares_after_corporate_actions(wide, shares_date,
+                                                ratio_events(wide.columns)).reindex(index=idx)
+
+
+def scale_shares_after_corporate_actions(wide: pd.DataFrame, shares_date: dict,
+                                         events: dict) -> pd.DataFrame:
+    """Raw close x a pre-event share count: from each later ex-date on, multiply by the ratio."""
+    for sym, evs in events.items():
+        sd = shares_date.get(sym)
+        if sym not in wide.columns or sd is None:
+            continue
+        for exd, ratio in evs:
+            ex = pd.Timestamp(exd)
+            if ex <= sd or not ratio:
+                continue
+            after = wide.index >= ex
+            wide.loc[after, sym] = wide.loc[after, sym] * ratio
+    return wide
 
 
 def _pit_mcap_wide(syms, idx, warnings: list | None = None):

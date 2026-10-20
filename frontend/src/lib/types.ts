@@ -116,6 +116,9 @@ export interface PaperPosition {
   reason: string | null;
   /** "live" | "replay" — never displayed (owner chose no visible marker). */
   origin?: string;
+  /** Set when the holding spans a demerger/scheme ex-date (iter-199): the parent's drop counts as
+   *  P&L, the new company's shares are not counted — flagged so the drop is not read as a crash. */
+  corporate_action?: { kind: string; ex_date: string; subject: string; note: string };
 }
 
 export interface ScoreRow {

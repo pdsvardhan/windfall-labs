@@ -93,6 +93,22 @@ function aggregate(sid: string, ps: PaperPosition[], today: string): Agg {
     committed: openCost + pendingCapital, value, pnl, wins, marked, start, days: daysBetween(start, today) };
 }
 
+// A holding that went through a demerger keeps the parent's drop as P&L (as every backtest does);
+// say so under the ticker, or the drop reads as a crash (iter-199, owner's choice).
+function TickerCell({ p }: { p: PaperPosition }) {
+  const ca = p.corporate_action;
+  return (
+    <span className="font-bold">
+      {p.ticker}
+      {ca && (
+        <span className="block text-[10.5px] font-semibold leading-tight mt-0.5" style={{ color: "#9a6c12" }} title={ca.subject}>
+          {ca.kind} {dateShort(ca.ex_date)} — {ca.note}
+        </span>
+      )}
+    </span>
+  );
+}
+
 // Current value of a holding: planned capital while queued, else marked at the last price.
 function holdingValue(p: PaperPosition): number | null {
   if (p.status === "pending") return p.planned_capital ?? 0;
@@ -260,7 +276,7 @@ function BookCard({ a, i, score, equity, isOpen, onToggle }: {
                 {holdings.rows.length === 0 && <div className="px-5 py-6 text-[13px] text-faint border-t" style={{ borderColor: "#f6f4fb" }}>No holdings.</div>}
                 {holdings.rows.map(({ p, v }) => (
                   <div key={p.id} className="grid px-5 py-2 text-[12.5px] items-center tn border-t" style={{ gridTemplateColumns: HOLD_COLS, borderColor: "#f6f4fb" }}>
-                    <span className="font-bold">{p.ticker}</span>
+                    <TickerCell p={p} />
                     <span className="text-right text-faint">
                       {p.status === "pending"
                         // Queued by a rebalance, fills at the next session's open. Showing this as a
@@ -299,7 +315,7 @@ function BookCard({ a, i, score, equity, isOpen, onToggle }: {
                       const pnl = p.exit != null && p.entry != null && p.shares != null ? (p.exit - p.entry) * p.shares : null;
                       return (
                         <div key={p.id} className="grid px-5 py-2 text-[12.5px] items-center tn border-t" style={{ gridTemplateColumns: HIST_COLS, borderColor: "#f6f4fb" }}>
-                          <span className="font-bold">{p.ticker}</span>
+                          <TickerCell p={p} />
                           <span className="text-right text-faint">{dateShort(p.entry_date)}</span>
                           <span className="text-right text-faint">{dateShort(p.exit_date)}</span>
                           <span className="text-right">{p.entry != null ? num(p.entry, 1) : "—"}</span>
