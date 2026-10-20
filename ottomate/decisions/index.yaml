@@ -476,3 +476,13 @@ decisions:
       - curated
       - cat:reliability
     body_path: docs/decisions/adr-049-windfall-corporate-actions-tail.md
+  - id: adr-050-windfall-free-price-and-mcap-layer
+    project_slug: windfall-labs
+    title: "Prices and market cap from free NSE data: freeze Trendlyne's price
+      history, take membership from NSE's official market cap"
+    status: proposed
+    date: 2026-10-20T00:00:00.000Z
+    tags:
+      - curated
+      - cat:reliability
+    body_path: docs/decisions/adr-050-windfall-free-price-and-mcap-layer.md

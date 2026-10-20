@@ -517,3 +517,57 @@ unadjusted, so the −84.7% stays as P&L; owner chose to keep it and flag the ho
 - Feature verifier: 4/4 on the live paper page (report 542).
 - Ops: the 20:40 mark cron now logs re-bases and alerts on unresolved ones; the 9:00 cron alerts on
   a failed or refused corporate-actions refresh (both host scripts, backups `.bak-20261020`).
+
+## Session 2026-10-20 — iter-200 (Ottomate iteration 200): can free NSE data replace Trendlyne's prices and market cap?
+
+**Stage:** Stage 4 · 4 items locked · measurement only, no production code · branch `iter-200-free-layer`
+
+### Why
+
+The monthly Trendlyne refresh (~1.5 h in the owner's browser) mostly feeds two things NSE publishes
+for free: split-adjusted prices and the market cap behind the ₹500cr universe. Only the DVM scores
+have no free substitute. Scripts in `backend/scripts/free_layer/` (store `backend/data/free_layer.duckdb`)
+measured both.
+
+### What was found (adr-050, proposed)
+
+- **Corporate actions (1460):** NSE's API back to 2010; pre-2018 combined subjects ("Bonus 1:1 / Face
+  Value Split…") multiplied — 494 splits, 524 bonuses, 350 rights. Trendlyne took the same price step on
+  724 of 736 (98.2%).
+- **Prices (1461):** Bhavcopy adjusted with NSE's ratios plus rights (TERP) matches Trendlyne's adjusted
+  price on 95.9% of names (97.9% of name-days) since 2016. Trendlyne's history only changes by
+  rescaling for a corporate action (15 of 1,731 names since 12 Jun, 14 explained), so freezing it loses
+  nothing.
+- **Market cap (1462):** NSE's daily bundle carries an official market cap from 2024-02-01. Scored at 30
+  month-ends, share-count/price errors are 1.0% of the official set — not the problem. The real gaps:
+  - the NSE-only gate ("ever traded EQ") is not point-in-time: ~95 companies per month-end admitted
+    before their first NSE bar, ~15 with an idle NSE line (#957);
+  - survivorship: 157 companies were above ₹500cr in 2024–26 yet sit in no universe row; 142 of the 149
+    still listed are now under ₹500cr — backtests likely biased upward (#959, now P1).
+- Paper: 4 of 389 buys were in names NSE put under ₹500cr at the prior month-end; no REIT/InvIT ever
+  reached a strategy.
+
+### Owner decision
+
+All of adr-050 steps 1–5 go into the next, separately locked iteration (to-do **#960**): freeze
+Trendlyne's prices (adding rights, plus an alert-only gap detector), NSE official market cap from Feb 2024,
+point-in-time NSE gate, survivorship fix — re-baselined side by side before anything moves. The DVM-score
+harvest stays.
+
+### Verification
+
+Code verifier, three rounds. Round 1 (ITERATE): tickers matched instead of companies (renames counted
+as misses), the gate look-ahead unattributed, a circular free-vs-free score. Round 2 (ITERATE): the
+survivorship gap hidden in a "harvest coverage" bucket, a 14-day-window artifact (CIPLA, BSE), SME
+look-ahead, figures no script printed. Round 3: 4/4 APPROVE (reports 1152–1155); the non-blocking
+wording fixed in 23f7ab4, including NSE's MCAP start (2024-02-01, not 02-29 — checked against NSE).
+
+### Friction
+
+- The first membership score ("18.4% wrong") was unfair — ticker-matched and blind to the gate. Attribute
+  every disagreement to a cause before reporting a rate.
+- `ca_events_nse.ex_date` came out of pandas as TIMESTAMP and broke date arithmetic (`BinderException`);
+  cast to DATE.
+- Parallel sessions: production runs iter-202's images, so iter-200 (scripts + docs) needed no rebuild;
+  DB reads finished before the Trendlyne ingest window. Merged into master without switching the shared
+  checkout's branch.
