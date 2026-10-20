@@ -24,15 +24,23 @@ IDX = pd.bdate_range("2026-06-01", "2026-09-04")
 
 
 def _live_symbols(n=40):
-    """Symbols whose Trendlyne membership is stale but which Bhavcopy still prices."""
+    """Symbols whose Trendlyne membership is stale but which Bhavcopy still prices — required to
+    have traded since September, and ordered, so a membership rebuild that adds delisted names
+    cannot turn the sample into companies that no longer trade (it did on 2026-10-20)."""
     rows = ts._con().execute("""
         SELECT symbol FROM universe_membership
         GROUP BY 1 HAVING MAX(date) < DATE '2026-08-01' AND MAX(mcap_cr) > 1000
-        LIMIT ?""", [n]).fetchall()
+           AND symbol IN (SELECT DISTINCT upper(regexp_replace(ticker, '\\.NS$', ''))
+                          FROM bc.bhavcopy_prices WHERE date >= DATE '2026-09-01')
+        ORDER BY symbol LIMIT ?""", [n]).fetchall()
     return [r[0] for r in rows]
 
 
-def test_stale_names_are_eligible_again_with_the_fallback():
+def test_stale_names_are_eligible_again_with_the_fallback(monkeypatch):
+    # The fallback itself, on Trendlyne's membership alone: since adr-050 NSE's official market cap
+    # carries these names from 2024-02-01 (next test), so the NSE layer is switched off here to
+    # keep pinning the fallback's own two properties.
+    monkeypatch.setattr(ts, "_has_nl", lambda: False)
     syms = _live_symbols()
     if not syms:
         pytest.skip("no stale-membership names in this snapshot")
@@ -44,6 +52,20 @@ def test_stale_names_are_eligible_again_with_the_fallback():
         "the fallback did not engage")
     assert warns and "universe eligibility" in warns[0], (
         "the fallback must disclose itself, not silently rescue the universe")
+
+
+def test_nse_market_cap_carries_stale_trendlyne_names_without_the_fallback():
+    """adr-050: from 2024-02-01 membership is NSE's own number, refreshed nightly — names whose
+    Trendlyne readings stopped are eligible from it, and the fallback has nothing to fill."""
+    if not ts._has_nl():
+        pytest.skip("NSE layer (nse_layer.duckdb) not present in this environment")
+    syms = _live_symbols()
+    if not syms:
+        pytest.skip("no stale-membership names in this snapshot")
+    warns: list[str] = []
+    out = ts.membership_panel(syms, IDX, warnings=warns)
+    assert int(out.iloc[-1].sum()) > 0
+    assert not [w for w in warns if "universe eligibility" in w], warns
 
 
 def test_fallback_never_overrides_an_existing_reading():

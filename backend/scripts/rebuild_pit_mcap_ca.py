@@ -26,6 +26,16 @@ from __future__ import annotations
 import sys
 import duckdb
 
+# Retired with the frozen price history (adr-050, iter-204). This rebuild derives point-in-time market
+# cap from Trendlyne's adjusted close x a CURRENT share count; with the close frozen and the share
+# count refreshed every month, a re-run would rewrite pre-2024 membership each time (and loss-makers'
+# fallback count = today's mcap / a months-old close). From 2024-02-01 membership is NSE's official
+# market cap (scripts/nse_mcap_ingest.py). Pass --force-after-adr-050 only to rebuild deliberately.
+if "--force-after-adr-050" not in sys.argv:
+    sys.exit("retired by adr-050 (frozen price history) — see the comment above; "
+             "--force-after-adr-050 to run anyway")
+sys.argv = [a for a in sys.argv if a != "--force-after-adr-050"]
+
 TL = sys.argv[1] if len(sys.argv) > 1 else "/mnt/storage/websites/windfall-labs/backend/data/trendlyne.duckdb"
 BC = sys.argv[2] if len(sys.argv) > 2 else "/mnt/storage/websites/windfall-labs/backend/data/bhavcopy.duckdb"
 SC = sys.argv[3] if len(sys.argv) > 3 else "/mnt/storage/websites/windfall-labs/backend/data/screener_fundamentals.duckdb"

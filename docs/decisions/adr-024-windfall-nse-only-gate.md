@@ -1,6 +1,13 @@
 # ADR-024 — Hard NSE-only universe gate
 
-**Status:** accepted · **Date:** 2026-06-22 · iter-33
+**Status:** accepted · **Date:** 2026-06-22 · iter-33 · **amended by adr-050 (iter-204, 2026-10-20)**
+
+> **Amendment (adr-050).** "Ever traded EQ" turned out to be a look-ahead: measured against NSE's
+> official market cap it admitted ~95 companies per month-end before their first NSE bar and ~15 whose
+> NSE line had gone idle. The gate is now **point-in-time and by company** (every ticker sharing an
+> ISIN): a company counts on day d only if its first EQ bar is on or before d and it traded on the NSE
+> mainboard (EQ/BE/BZ) within 90 days before d (`trendlyne_store.nse_gate_panel` / `nse_gate_at`).
+> `_nse_symbols()` remains as the ever-EQ ticker set for diagnostics.
 
 ## Context
 We target NSE-only strategies. But the investable universe (`universe_membership`) is gated purely on

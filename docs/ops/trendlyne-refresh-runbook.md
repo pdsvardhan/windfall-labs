@@ -1,4 +1,4 @@
-# Trendlyne refresh runbook (monthly, owner-in-browser)
+# Trendlyne refresh runbook (monthly, owner-in-browser — factors only since adr-050)
 
 Written iter-147 (2026-08-10), reconstructing the 2026-07-16 iter-22 procedure whose ingest
 script lived only in a session scratchpad. The ingest is now a repo script:
@@ -8,10 +8,13 @@ script lived only in a session scratchpad. The ingest is now a repo script:
 cookies. The harvesters are console scripts that run inside a logged-in browser tab. Nothing
 server-side can replace this step.
 
-**Why it matters:** `pit_universe` gates membership on a **14-day lookback**, and Trendlyne's
-own OHLC endpoint **lags its DVM by ~8 days**. If a pull doesn't land within 14 days of a
-monthly rebalance, the universe empties and signals silently resolve on the last healthy bar
-(weeks-old factors). The 1 Aug 2026 rebalance ran on 8 Jul factors for exactly this reason.
+**What it still feeds (adr-050, iter-204):** the DVM scores and valuation multiples four paper
+books rank on — nothing else. **Prices and the Rs500cr universe no longer need a harvest:**
+Trendlyne's price history is frozen at its last harvest and every later bar is NSE Bhavcopy
+adjusted with NSE's corporate actions; from 2024-02-01 membership is NSE's official market cap,
+pulled nightly by the EOD cron (`scripts/nse_mcap_ingest.py`). A late refresh now means stale
+*factors* (the iter-202 stale-factor guard holds a factor book rather than rebalancing on them),
+not an empty universe.
 
 **When to run:** ideally the last 2–3 days of each month (for the 1st-of-month 21:30 rebalance
 cron). A mid-month run is never wasted — live signals degrade daily past ~8 days of staleness.
@@ -21,15 +24,15 @@ cron). A mid-month run is never wasted — live signals degrade daily past ~8 da
 ## Phase 1 — browser (logged-in trendlyne.com tab, F12 → Console, paste, Enter)
 
 Scripts live in `Desktop/Projects/Windfall Labs/harvesters/` on the Windows machine (one-offs already applied are in `harvesters/_done/`; see that folder README for cadence). Click **Allow** when
-the browser asks about multiple downloads. Run all three — **a refresh takes three scripts, not
-one** (iter-22: DVM-only ingest would have deleted 806k rows / 138 megacaps — the base screener
-silently excludes the top ~100 index names).
+the browser asks about multiple downloads. Run the DVM **and** megacap scripts — the base screener
+silently excludes the top ~100 index names, whose DVM and valuation rows come only from the megacap
+leg (iter-22: a DVM-only ingest would have deleted 806k rows / 138 megacaps).
 
 | # | Script | Time | Output (Downloads) |
 |---|--------|------|--------------------|
 | 1 | `trendlyne_dvm_harvester.js` | ~15–20 min | `tl_dvm_history_partNN.csv`, `tl_stocks.csv` |
 | 2 | `trendlyne_harvester_megacap.js` | ~10 min | `tl_*_megacap.csv` (covers the index-megacap crack) |
-| 3 | `trendlyne_harvester_ohlcv.js` | ~35–45 min | `tl_ohlcv_partNN.csv`, `tl_index_ohlcv.csv`, `tl_index_map.csv` |
+| ~~3~~ | ~~`trendlyne_harvester_ohlcv.js`~~ — **retired (adr-050)**: prices come from NSE | — | — |
 | 4 | `trendlyne_harvester_leg1.js` | ~25 min | `tl_valuation_ratios_partNN.csv`, `tl_pnl_quarterly_*`, `tl_growth_quality_*`, `tl_ownership_*` |
 | 5 | `trendlyne_harvester_gapfill.js` — only if specific names froze | ~2 min | `tl_*_gapfill.csv` |
 
@@ -60,7 +63,8 @@ cd /mnt/storage/websites/windfall-labs/backend
 .venv/bin/python scripts/ingest_refresh.py data/refresh_staging
 
 #    Read it like this:
-#    - the report must list FOUR tables: dvm_history, ohlcv, stocks, valuation_ratios. A missing
+#    - the report must list THREE tables: dvm_history, stocks, valuation_ratios (OHLCV files are
+#      ignored on purpose since adr-050 — the megacap leg still emits one). A missing
 #      valuation_ratios line means neither leg1 nor the megacap harvester's CSV landed — do NOT proceed to
 #      step 5 (which deletes the staging dir), because that is exactly how the table went 54 days
 #      stale unnoticed (#849).
@@ -73,14 +77,14 @@ cd /mnt/storage/websites/windfall-labs/backend
 docker compose -f ../docker-compose.yml stop api
 .venv/bin/python scripts/ingest_refresh.py data/refresh_staging --apply
 
-# 3. rebuild the point-in-time layers that hang off the refreshed tables
-.venv/bin/python scripts/rebuild_pit_mcap_ca.py
-.venv/bin/python scripts/build_membership.py
+# 3. (retired, adr-050) rebuild_pit_mcap_ca.py / build_membership.py — they derive pre-2024
+#    membership from the frozen close x this month's share count and would rewrite history on every
+#    run; both now refuse without --force-after-adr-050.
 
 # 4. restart + verify
 docker compose -f ../docker-compose.yml start api
 sleep 5 && curl -s http://127.0.0.1:8505/api/data/status | python3 -c \
-  "import json,sys; d=json.load(sys.stdin)['trendlyne']; print('date_max', d['date_max'], '- expect within ~8-10 days of today')"
+  "import json,sys; d=json.load(sys.stdin)['trendlyne']; print('date_max', d['date_max'], '- the frozen price harvest; factors are what this refresh moves')"
 
 # 5. clean the staging dir so next month starts empty
 rm data/refresh_staging/*.csv
@@ -103,9 +107,10 @@ ssh pdsv@192.168.1.10 'cd /mnt/storage/websites/windfall-labs/backend && \
 
 ## What this feeds
 
-`dvm_history` + `ohlcv` + `stocks` + `valuation_ratios` (merged per key, never replaced) →
-`rebuild_pit_mcap_ca.py` → `pit_mcap` → `build_membership.py` → `universe_membership` →
-live signals + backtests.
+`dvm_history` + `stocks` + `valuation_ratios` (merged per key, never replaced) → the factor ranks.
+Prices: frozen Trendlyne `ohlcv` + NSE Bhavcopy adjusted with NSE corporate actions (adr-049/050).
+Universe: `universe_membership` (frozen pit_mcap) before 2024-02-01, NSE's official market cap from
+it, behind the point-in-time NSE gate (adr-050).
 Index prices come from the automated EOD cron (adr-038), never from a harvest.
 
 ### `valuation_ratios` — added to the ingest 2026-09-07 (iter-172, to-do #849)

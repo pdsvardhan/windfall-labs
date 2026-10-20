@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
-"""Merge a Trendlyne harvest (DVM + OHLCV + stocks + valuation ratios) into trendlyne.duckdb.
+"""Merge a Trendlyne harvest (DVM + stocks + valuation ratios) into trendlyne.duckdb.
+
+OHLCV IS FROZEN (adr-050, iter-204): Trendlyne's price history stays as last harvested; every bar
+after it comes from NSE Bhavcopy adjusted with NSE's corporate actions, and from 2024-02-01 the
+Rs500cr universe reads NSE's official market cap. tl_ohlcv_*.csv files are ignored unless
+--include-ohlcv is passed (the megacap harvester still emits one alongside the DVM rows it is
+still needed for).
 
 MERGE, NEVER REPLACE (iter-22 rule, adr-030): a harvest only covers names in the screener
 universe TODAY. Replacing tables deletes the history of names that legitimately fell below
@@ -39,9 +45,8 @@ Usage (on the server, host venv — the api opens this DB read-only, so --apply 
     .venv/bin/python scripts/ingest_refresh.py /path/to/staged_csvs             # DRY RUN
     docker compose stop api
     .venv/bin/python scripts/ingest_refresh.py /path/to/staged_csvs --apply
-    .venv/bin/python scripts/rebuild_pit_mcap_ca.py
-    .venv/bin/python scripts/build_membership.py
     docker compose start api
+(rebuild_pit_mcap_ca.py / build_membership.py are retired with the frozen price history — adr-050)
 
 Input files (from the browser harvesters, see docs/ops/trendlyne-refresh-runbook.md):
     tl_dvm_history_part*.csv / tl_dvm_history_megacap.csv / tl_dvm_history_gapfill.csv
@@ -101,10 +106,16 @@ def main():
                     help="skip the >=1000-stock floor (gapfill-only ingest)")
     ap.add_argument("--allow-shrink", action="store_true",
                     help="permit a pk's history to shrink >50%% (deliberate upstream correction)")
+    ap.add_argument("--include-ohlcv", action="store_true",
+                    help="also merge tl_ohlcv_*.csv (the price history is frozen since adr-050)")
     args = ap.parse_args()
     src = Path(args.src).expanduser()
 
     dvm_f, ohlcv_f, stocks_f = _files(src, "dvm_history"), _files(src, "ohlcv"), _files(src, "stocks")
+    if ohlcv_f and not args.include_ohlcv:
+        print(f"ignoring on purpose (adr-050: Trendlyne's price history is frozen; prices come from "
+              f"Bhavcopy + NSE corporate actions): {[p.name for p in ohlcv_f]}")
+        ohlcv_f = []
     # Every (pk, metric, date, value) table the leg1 harvester produces, keyed identically. They
     # were all in the same position valuation_ratios was: emitted by a harvester, ignored by this
     # script, then deleted by Phase 3 step 5. Wiring one and leaving three is just a slower version

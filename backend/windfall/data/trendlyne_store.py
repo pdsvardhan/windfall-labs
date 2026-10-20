@@ -18,6 +18,7 @@ from __future__ import annotations
 import functools
 import os
 import threading
+from collections import Counter
 from pathlib import Path
 
 import duckdb
@@ -27,8 +28,18 @@ from ..config import DATA_DIR
 
 TRENDLYNE_DB = Path(os.environ.get("WINDFALL_TRENDLYNE_DB", DATA_DIR / "trendlyne.duckdb"))
 BHAVCOPY_DB = Path(os.environ.get("WINDFALL_BHAVCOPY_DB", DATA_DIR / "bhavcopy.duckdb"))
+# NSE's official market cap + the ISIN company map, built nightly on the host by
+# scripts/nse_mcap_ingest.py in the EOD window (adr-050). Attached read-only like Bhavcopy.
+NSE_LAYER_DB = Path(os.environ.get("WINDFALL_NSE_LAYER_DB", DATA_DIR / "nse_layer.duckdb"))
 
 MCAP_FLOOR_CR = 500.0   # investable-universe floor: NSE-listed + market cap > Rs500 Cr (adr-015)
+# NSE publishes its daily MCAP file (issue size x close, every listed security) from 2024-02-01;
+# from that day membership and the mcap feature are NSE's own number, before it the
+# Trendlyne-derived pit_mcap (adr-050 step 3).
+MCAP_CUTOVER = pd.Timestamp("2024-02-01")
+# The NSE gate is point-in-time (adr-050 step 4, #957): a company counts from its first NSE EQ bar
+# and only while it has traded on the NSE mainboard within this many calendar days.
+GATE_RECENT_DAYS = 90
 
 # NSE mainboard equity series for PRICING a name we already hold or track (iter-171, item 1228).
 # EQ is rolling settlement; BE and BZ are trade-for-trade / surveillance segments — same shares, same
@@ -58,20 +69,32 @@ def coverage(floor_cr: float = MCAP_FLOOR_CR) -> dict:
     if not available():
         return {"available": False}
     con = _con()
-    ever = con.execute(
-        "SELECT COUNT(DISTINCT symbol) FROM universe_membership WHERE mcap_cr > ?", [floor_cr]).fetchone()[0]
-    last = con.execute("SELECT MAX(date) FROM universe_membership").fetchone()[0]
-    now = con.execute(
-        "SELECT COUNT(DISTINCT symbol) FROM universe_membership "
-        "WHERE mcap_cr > ? AND date >= CAST(? AS DATE) - 14", [floor_cr, str(last)]).fetchone()[0]
     px_n, px_min, px_max = con.execute(
         "SELECT COUNT(DISTINCT pk), MIN(date), MAX(date) FROM ohlcv").fetchone()
     dead = con.execute("SELECT COUNT(*) FROM delistings").fetchone()[0]
+    if _has_nl():
+        # adr-050: NSE's official market cap from MCAP_CUTOVER, so "now" is NSE's latest day and
+        # "ever" spans both sources; prices run to the latest Bhavcopy, not the frozen harvest.
+        last = con.execute("SELECT MAX(date) FROM nl.mcap_daily").fetchone()[0]
+        ever = len(universe_over_window("2000-01-01", str(last), floor_cr))
+        now = len(pit_universe(last, floor_cr))
+    else:
+        ever = con.execute(
+            "SELECT COUNT(DISTINCT symbol) FROM universe_membership WHERE mcap_cr > ?",
+            [floor_cr]).fetchone()[0]
+        last = con.execute("SELECT MAX(date) FROM universe_membership").fetchone()[0]
+        now = con.execute(
+            "SELECT COUNT(DISTINCT symbol) FROM universe_membership "
+            "WHERE mcap_cr > ? AND date >= CAST(? AS DATE) - 14", [floor_cr, str(last)]).fetchone()[0]
     return {"available": True,
             "universe_ever": int(ever or 0), "universe_now": int(now or 0),
             "price_tickers": int(px_n or 0), "delisted": int(dead or 0),
+            "survivors_added": len(survivors()),
             "date_min": str(px_min) if px_min else None,
+            # date_max stays Trendlyne's own last bar (the frozen harvest, and the end of the DVM
+            # history row); prices_to is where prices actually run — the latest Bhavcopy (adr-050).
             "date_max": str(px_max) if px_max else None,
+            "prices_to": _prices_to(),
             "floor_cr": floor_cr}
 
 
@@ -85,25 +108,31 @@ def coverage(floor_cr: float = MCAP_FLOOR_CR) -> dict:
 _CON_LOCK = threading.Lock()
 
 
+def _attach_ro(con, path: Path, alias: str) -> None:
+    # DuckDB shares one instance per file path within a process, so another read-only
+    # connection may have already attached it — attach only if absent. The probe stays
+    # (it is the cheap path), but the ATTACH is idempotent as well: the lock cannot stop a
+    # DIFFERENT module holding its own connection to this file from attaching between our
+    # check and our act.
+    if not path.exists():
+        return
+    already = con.execute(
+        "SELECT count(*) FROM duckdb_databases() WHERE database_name=?", [alias]).fetchone()[0]
+    if not already:
+        try:
+            con.execute(f"ATTACH '{path}' AS {alias} (READ_ONLY)")
+        except duckdb.Error as exc:
+            if "already exists" not in str(exc):
+                raise
+
+
 @functools.lru_cache(maxsize=1)
 def _base_con() -> duckdb.DuckDBPyConnection:
-    """Process-wide read-only connection; bhavcopy attached read-only for dead-name raw prices."""
+    """Process-wide read-only connection; bhavcopy (`bc`) and the NSE layer (`nl`) attached read-only."""
     with _CON_LOCK:
         con = duckdb.connect(str(TRENDLYNE_DB), read_only=True)
-        if BHAVCOPY_DB.exists():
-            # DuckDB shares one instance per file path within a process, so another read-only
-            # connection may have already attached `bc` — attach only if absent. The probe stays
-            # (it is the cheap path), but the ATTACH is now idempotent as well: the lock cannot
-            # stop a DIFFERENT module holding its own connection to this file from attaching
-            # between our check and our act.
-            already = con.execute(
-                "SELECT count(*) FROM duckdb_databases() WHERE database_name='bc'").fetchone()[0]
-            if not already:
-                try:
-                    con.execute(f"ATTACH '{BHAVCOPY_DB}' AS bc (READ_ONLY)")
-                except duckdb.Error as exc:
-                    if "already exists" not in str(exc):
-                        raise
+        _attach_ro(con, BHAVCOPY_DB, "bc")
+        _attach_ro(con, NSE_LAYER_DB, "nl")
         return con
 
 
@@ -189,6 +218,228 @@ def _alias_to_canonical(symbols) -> dict:
     return m
 
 
+# ── the point-in-time NSE gate (adr-050 step 4, #957) ────────────────────────────────────────
+#
+# adr-024 gated the universe on "the name EVER traded in series EQ". Measured against NSE's
+# official market cap (iter-200, explain_membership.py) that admits ~95 companies per month-end
+# before their first NSE bar (BSE-only names that joined NSE later: ACGL, AKCAPIT, ASHIKA) and ~15
+# whose NSE line had gone idle (GOODYEAR, KENNAMET, KOVAI) — a look-ahead in every backtest and
+# signal. The gate is now by company (every ticker sharing its ISIN, adr-025) and by date: a
+# company counts on day d only if its first EQ bar is on or before d AND it traded on the NSE
+# mainboard (EQ/BE/BZ) within GATE_RECENT_DAYS before d.
+
+@functools.lru_cache(maxsize=1)
+def _first_eq_by_ticker() -> dict[str, pd.Timestamp]:
+    return {s: pd.Timestamp(d) for s, d in _con().execute(
+        "SELECT upper(regexp_replace(ticker,'\\.NS$','')), min(date) FROM bc.bhavcopy_prices "
+        "WHERE series='EQ' GROUP BY 1").fetchall()}
+
+
+def first_nse_bar(symbols) -> dict[str, pd.Timestamp]:
+    """{symbol: the company's first EQ bar on NSE} across every ticker it has used; absent = never."""
+    fe, al = _first_eq_by_ticker(), _ticker_aliases()
+    out = {}
+    for s in symbols:
+        s = s.upper()
+        ds = [fe[a] for a in al.get(s, frozenset({s})) | {s} if a in fe]
+        if ds:
+            out[s] = min(ds)
+    return out
+
+
+@functools.lru_cache(maxsize=1)
+def _bhav_start() -> pd.Timestamp:
+    """First day NSE Bhavcopy covers (2010-01-04). Before it neither a listing date nor recent
+    trading can be observed."""
+    d = _con().execute("SELECT min(date) FROM bc.bhavcopy_prices").fetchone()[0]
+    return pd.Timestamp(d) if d else pd.Timestamp("2010-01-04")
+
+
+# A company whose first Bhavcopy bar falls within this many days of Bhavcopy's start was already
+# listed when coverage began; that is all the gate can know about dates before 2010 (Trendlyne's
+# history starts 2006, and adr-040's untouched 2007–2016 validation decade runs there).
+_PRE_COVERAGE_SLACK_DAYS = 30
+
+
+def _listed_by(first: pd.Timestamp | None, d: pd.Timestamp) -> bool:
+    if first is None:
+        return False
+    start = _bhav_start()
+    if d < start:
+        return first <= start + pd.Timedelta(days=_PRE_COVERAGE_SLACK_DAYS)
+    return first <= d
+
+
+def nse_gate_at(symbols, asof) -> set[str]:
+    """The symbols that pass the point-in-time NSE gate on `asof`."""
+    asof = pd.Timestamp(asof)
+    first = first_nse_bar(symbols)
+    if asof < _bhav_start():          # no tape before coverage: listed-at-coverage-start is the test
+        return {s.upper() for s in symbols if _listed_by(first.get(s.upper()), asof)}
+    # Same window as nse_gate_panel: a trade on or after asof - GATE_RECENT_DAYS counts.
+    recent = {r[0] for r in _con().execute(
+        f"SELECT DISTINCT upper(regexp_replace(ticker,'\\.NS$','')) FROM bc.bhavcopy_prices "
+        f"WHERE series IN {_MAINBOARD_SQL_IN} AND date >= CAST(? AS DATE) - {GATE_RECENT_DAYS} "
+        f"AND date <= CAST(? AS DATE)", [str(asof.date()), str(asof.date())]).fetchall()}
+    al = _ticker_aliases()
+    return {s.upper() for s in symbols
+            if _listed_by(first.get(s.upper()), asof)
+            and (al.get(s.upper(), frozenset()) | {s.upper()}) & recent}
+
+
+def nse_gate_panel(symbols, idx) -> pd.DataFrame:
+    """Bool date x symbol: True where the symbol passes the point-in-time NSE gate that day."""
+    syms = [s.upper() for s in symbols]
+    idx = pd.DatetimeIndex(idx)
+    out = pd.DataFrame(False, index=idx, columns=syms)
+    if not syms or len(idx) == 0:
+        return out
+    first = first_nse_bar(syms)
+    al = _ticker_aliases()
+    # Per symbol, every ticker its company used — kept as sets, not inverted into one dict, so a
+    # ticker two requested symbols share (a renamed company listed under both) counts for both.
+    own = {s: (al.get(s, frozenset()) | {s}) for s in syms}
+    tick = sorted(set().union(*own.values()))
+    lo = (idx.min() - pd.Timedelta(days=GATE_RECENT_DAYS)).date()
+    df = _con().execute(
+        f"SELECT DISTINCT upper(regexp_replace(ticker,'\\.NS$','')) AS t, date FROM bc.bhavcopy_prices "
+        f"WHERE series IN {_MAINBOARD_SQL_IN} AND date >= ? AND date <= ? "
+        f"AND upper(regexp_replace(ticker,'\\.NS$','')) IN ({','.join(['?'] * len(tick))})",
+        [str(lo), str(idx.max().date())] + tick).fetchdf()
+    if df.empty:
+        return _pre_coverage(out, first)
+    df["date"] = pd.to_datetime(df["date"])
+    # Integer nanoseconds on BOTH sides: pandas 3 builds date indexes in microseconds while
+    # Timedelta.value is always ns — mixing them made "90 days" mean 90,000 days.
+    df["v"] = df["date"].astype("datetime64[ns]").astype("int64")
+    by_t = df.pivot_table(index="date", columns="t", values="v", aggfunc="max").sort_index()
+    by_t = by_t.reindex(by_t.index.union(idx)).ffill().reindex(idx)   # last trade on/before each day
+    cols = {s: by_t[[t for t in ts_ if t in by_t.columns]].max(axis=1)
+            for s, ts_ in own.items() if any(t in by_t.columns for t in ts_)}
+    if not cols:
+        return _pre_coverage(out, first)
+    last = pd.DataFrame(cols, index=idx)
+    age = last.rsub(pd.Series(idx.astype("datetime64[ns]").asi8, index=idx), axis=0)   # ns since
+    recent = age.le(pd.Timedelta(days=GATE_RECENT_DAYS).value) & last.notna()
+    listed = pd.DataFrame({s: idx >= first[s] if s in first else [False] * len(idx)
+                           for s in last.columns}, index=idx)
+    gate = (recent & listed).reindex(columns=syms).fillna(False).astype(bool)
+    return _pre_coverage(gate, first)
+
+
+def _pre_coverage(gate: pd.DataFrame, first: dict) -> pd.DataFrame:
+    """Before Bhavcopy's first day there is no tape: a company passes if it was already listed
+    when coverage began (else every pre-2010 date would have an empty universe)."""
+    start = _bhav_start()
+    early = gate.index < start
+    if early.any():
+        for s in gate.columns:
+            gate.loc[early, s] = _listed_by(first.get(s), gate.index[0])
+    return gate
+
+
+# ── NSE's official market cap and the companies Trendlyne never listed (adr-050 steps 3, 5) ───
+
+def _has_nl() -> bool:
+    try:
+        return bool(_con().execute(
+            "SELECT count(*) FROM duckdb_databases() WHERE database_name='nl'").fetchone()[0])
+    except duckdb.Error:
+        return False
+
+
+@functools.lru_cache(maxsize=1)
+def survivors() -> dict[str, tuple[pd.Timestamp, float]]:
+    """{engine symbol: (first NSE MCAP date, official mcap that day)} for every company NSE put
+    above the floor on some day from MCAP_CUTOVER that has no Trendlyne row at all (#959: 157 such
+    companies in 2024-26, 142 of the 149 still listed now under Rs500cr — the stock list had
+    dropped them, which biased every backtest upward). Empty without the NSE layer."""
+    if not _has_nl():
+        return {}
+    return {s: (pd.Timestamp(d), float(m)) for s, d, m in _con().execute(
+        "SELECT engine_symbol, first_mcap_date, first_mcap_cr FROM nl.companies "
+        "WHERE survivor").fetchall()}
+
+
+@functools.lru_cache(maxsize=1)
+def _frozen_alias() -> dict[str, str]:
+    """{frozen universe_membership symbol: engine symbol} for companies renamed after the last
+    membership build. universe_membership is frozen with the price history (adr-050) while
+    stocks.nsecode follows renames, so the company's pre-2024 rows sit under its old symbol; they
+    are read under the new one rather than as a second company (iter-204 verifier B5)."""
+    if not _has_nl():
+        return {}
+    try:
+        return {o: e for e, o in _con().execute(
+            "SELECT engine_symbol, membership_symbol FROM nl.companies "
+            "WHERE membership_symbol IS NOT NULL AND membership_symbol <> engine_symbol").fetchall()}
+    except duckdb.Error:          # a layer built before iter-204's membership_symbol column
+        return {}
+
+
+@functools.lru_cache(maxsize=1)
+def _survivor_pre_mcap() -> pd.DataFrame:
+    """Long (symbol, date, mcap_cr) for survivors BEFORE MCAP_CUTOVER: their split/bonus/rights-
+    adjusted Bhavcopy close x the share count implied by their first NSE MCAP reading — pit_mcap's
+    own method (adjusted close x one share count held constant), so a survivor and a Trendlyne name
+    are measured the same way before 2024. Computed once per process (the api restarts nightly)."""
+    sv = survivors()
+    if not sv:
+        return pd.DataFrame(columns=["symbol", "date", "mcap_cr"])
+    adj = _bhavcopy_adjusted(list(sv), None, None, "close")
+    parts = []
+    for s, (d0, m0) in sv.items():
+        if s not in adj.columns:
+            continue
+        col = adj[s].dropna()
+        at = col[col.index <= d0]
+        if at.empty or not at.iloc[-1] > 0:
+            continue
+        shares = m0 / float(at.iloc[-1])
+        pre = col[col.index < MCAP_CUTOVER] * shares
+        if not pre.empty:
+            parts.append(pd.DataFrame({"symbol": s, "date": pre.index, "mcap_cr": pre.values}))
+    return (pd.concat(parts, ignore_index=True) if parts
+            else pd.DataFrame(columns=["symbol", "date", "mcap_cr"]))
+
+
+def _membership_long(syms) -> pd.DataFrame:
+    """Long (symbol, date, mcap_cr): the point-in-time market cap membership is read from.
+
+    Before MCAP_CUTOVER, Trendlyne's `universe_membership` (pit_mcap) plus survivors' Bhavcopy-
+    derived figure; from it, NSE's official market cap mapped to engine symbols by ISIN. Without
+    the NSE layer (tests, a bare checkout), `universe_membership` alone, as before adr-050.
+    """
+    ph = ",".join(["?"] * len(syms))
+    nl = _has_nl()
+    cond = " AND date < CAST(? AS DATE)" if nl else ""
+    src = {o: e for o, e in _frozen_alias().items() if e in syms}     # renamed after the freeze
+    want = syms + [o for o in src if o not in syms]
+    tl_part = _con().execute(
+        f"SELECT symbol, date, mcap_cr FROM universe_membership "
+        f"WHERE symbol IN ({','.join(['?'] * len(want))}){cond}",
+        want + ([str(MCAP_CUTOVER.date())] if nl else [])).fetchdf()
+    if src and not tl_part.empty:
+        tl_part["symbol"] = tl_part["symbol"].map(lambda x: src.get(x, x))
+    parts = [tl_part]
+    if nl:
+        parts.append(_con().execute(f"""
+            SELECT t.engine_symbol AS symbol, m.date, max(m.mcap_cr) AS mcap_cr
+            FROM nl.mcap_daily m JOIN nl.ticker_map t ON t.ticker = m.symbol
+            WHERE t.engine_symbol IN ({ph}) AND m.date >= CAST(? AS DATE)
+            GROUP BY 1, 2""", syms + [str(MCAP_CUTOVER.date())]).fetchdf())
+        sv = [s for s in syms if s in survivors()]
+        if sv:
+            pre = _survivor_pre_mcap()
+            parts.append(pre[pre["symbol"].isin(sv)])
+    parts = [p for p in parts if not p.empty]
+    if not parts:
+        return pd.DataFrame(columns=["symbol", "date", "mcap_cr"])
+    out = pd.concat(parts, ignore_index=True)
+    out["date"] = pd.to_datetime(out["date"])
+    return out
+
+
 def adjusted_close_panel(symbols, start=None, end=None, field: str = "close",
                          extend_live: bool = False) -> pd.DataFrame:
     """Wide date x symbol panel of split/bonus-ADJUSTED prices.
@@ -199,10 +450,16 @@ def adjusted_close_panel(symbols, start=None, end=None, field: str = "close",
 
     `extend_live` (iter-31): for live signals (end=None) only, append the most recent Bhavcopy EOD
     beyond the last Trendlyne bar so signals reflect the latest close we hold — read-only, no write.
+
+    Names with NO Trendlyne bars — listed after the price history was frozen (adr-050 step 1) or
+    never in Trendlyne's stock list at all (step 5, #959) — and not in the delisting registry are
+    priced from raw Bhavcopy back-adjusted with NSE's corporate actions (`_bhavcopy_adjusted`):
+    the free layer that matched Trendlyne's own factor on 95.9% of names since 2016 (iter-200).
     """
     syms = [s.upper() for s in symbols]
     pkmap = symbol_pk_map()
-    live = {s: pkmap[s] for s in syms if s in pkmap}
+    has_bars = _ohlcv_pks()
+    live = {s: pkmap[s] for s in syms if s in pkmap and pkmap[s] in has_bars}
     con = _con()
     parts = []
 
@@ -219,7 +476,11 @@ def adjusted_close_panel(symbols, start=None, end=None, field: str = "close",
         if not df.empty:
             df["symbol"] = df["pk"].map(pk2sym)
             parts.append(df[["date", "symbol", "v"]])
-        if extend_live:
+        # Trendlyne's history is frozen (adr-050), so a window with an explicit end past a name's
+        # last bar needs the Bhavcopy tail just as a live one does — otherwise a backtest ending
+        # after the freeze (the builder's End field, every walk-forward OOS window) silently loses
+        # every Trendlyne-priced name from the freeze on (iter-204 verifier B2). Bounded by `end`.
+        if extend_live or end:
             # Extend live names with Bhavcopy EOD beyond the last Trendlyne bar (back-adjusted series'
             # tail = raw price, so no split adjustment needed for the recent window).
             #
@@ -251,12 +512,26 @@ def adjusted_close_panel(symbols, start=None, end=None, field: str = "close",
                     JOIN tails t ON t.pk = m.pk
                     WHERE b.series IN {_MAINBOARD_SQL_IN} AND b.{fcol} > 0
                       AND b.date > t.last_tl
-                      AND m.s IN ({ph_sym})
-                """, pks + syms_live).fetchdf()
+                      AND m.s IN ({ph_sym}) {"AND b.date <= ?" if end else ""}
+                """, pks + syms_live + ([end] if end else [])).fetchdf()
                 if not ext.empty:
                     parts.append(ext[["date", "symbol", "v"]])
 
-    dead = [s for s in syms if s not in pkmap]
+    unpriced = [s for s in syms if s not in live]
+    registry = set()
+    if unpriced:
+        registry = {r[0] for r in con.execute(
+            "SELECT DISTINCT symbol FROM delistings WHERE symbol IN ("
+            + ",".join(["?"] * len(unpriced)) + ")", unpriced).fetchall()}
+    free = [s for s in unpriced if s not in registry]
+    if free:
+        bh = _bhavcopy_adjusted(free, start, end, field)
+        if not bh.empty:
+            long_bh = bh.stack().rename("v").reset_index()
+            long_bh.columns = ["date", "symbol", "v"]
+            parts.append(long_bh)
+
+    dead = [s for s in unpriced if s in registry]
     if dead:
         # Include ALL delisted names (not just CA-confirmed ones): excluding a name because it has a
         # large unexplained gap silently drops blow-ups (RCOM) and mergers (HDFC/RANBAXY) — that is
@@ -293,7 +568,7 @@ def adjusted_close_panel(symbols, start=None, end=None, field: str = "close",
     long = pd.concat(parts, ignore_index=True)
     long["date"] = pd.to_datetime(long["date"])
     wide = long.pivot_table(index="date", columns="symbol", values="v").sort_index()
-    if extend_live and live:
+    if (extend_live or end) and live:
         wide = _adjust_live_tail(wide, live)
     return wide
 
@@ -346,16 +621,128 @@ def _adjust_live_tail(wide: pd.DataFrame, live: dict[str, int]) -> pd.DataFrame:
                                         events)
 
 
+@functools.lru_cache(maxsize=1)
+def _ohlcv_pks() -> frozenset[int]:
+    """Trendlyne pks that have any adjusted bar. A pk without one (a listing after the frozen
+    harvest, adr-050) is priced from Bhavcopy instead of returning nothing."""
+    return frozenset(r[0] for r in _con().execute("SELECT DISTINCT pk FROM ohlcv").fetchall())
+
+
+def last_raw_close_before(symbol: str, day) -> float | None:
+    """The last raw mainboard close strictly before `day` — the cum-rights price P a rights issue's
+    theoretical ex-rights price is computed from (corp_actions.price_rights). NSE's list files an
+    old event under the company's CURRENT symbol, so every ticker it has used is searched."""
+    s = str(symbol).upper()
+    tick = sorted(_ticker_aliases().get(s, frozenset()) | {s})
+    r = _con().execute(
+        f"SELECT close FROM bc.bhavcopy_prices WHERE upper(regexp_replace(ticker,'\\.NS$','')) IN "
+        f"({','.join(['?'] * len(tick))}) "
+        f"AND series IN {_MAINBOARD_SQL_IN} AND close > 0 AND date < CAST(? AS DATE) "
+        f"ORDER BY date DESC LIMIT 1", tick + [str(day)]).fetchone()
+    return float(r[0]) if r else None
+
+
+def _prices_to() -> str | None:
+    try:
+        d = _con().execute("SELECT max(date) FROM bc.bhavcopy_prices").fetchone()[0]
+    except duckdb.Error:
+        return None
+    return str(d) if d else None
+
+
+def apply_corporate_actions(wide: pd.DataFrame, events: dict) -> pd.DataFrame:
+    """Back-adjust a RAW price panel for every event inside each name's own history: bars before an
+    ex-date divide by its ratio, so the latest bar stays the traded price (Trendlyne's convention).
+    An ex-date after a name's last bar (announced, or after a delisting) does nothing."""
+    for sym, evs in events.items():
+        if sym not in wide.columns:
+            continue
+        last_bar = wide[sym].last_valid_index()
+        if last_bar is None:
+            continue
+        for exd, ratio in evs:
+            ex = pd.Timestamp(exd)
+            if ex > last_bar or not ratio:
+                continue
+            before = wide.index < ex
+            wide.loc[before, sym] = wide.loc[before, sym] / ratio
+    return wide
+
+
+def _bhavcopy_adjusted(symbols, start=None, end=None, field: str = "close") -> pd.DataFrame:
+    """Wide date x symbol of raw NSE mainboard Bhavcopy, back-adjusted with NSE's corporate actions
+    (splits, bonuses, consolidations, combined subjects and rights at P/TERP — corp_actions).
+
+    Rows filed under a company's earlier tickers are relabelled to the requested symbol (adr-025),
+    and so are the events NSE filed under them. Used for every name Trendlyne has no bars for
+    (adr-050): the companies it never listed and listings after its frozen harvest.
+    """
+    from .corp_actions import ratio_events     # meta-store read; imported lazily (no cycle at import)
+
+    syms = [s.upper() for s in symbols]
+    if not syms:
+        return pd.DataFrame()
+    a2c = _alias_to_canonical(syms)
+    tick = list(a2c)
+    fcol = {"close": "close", "open": "open", "high": "high", "low": "low"}.get(field, "close")
+    cond = (f"WHERE series IN {_MAINBOARD_SQL_IN} AND {fcol} > 0 "
+            "AND upper(regexp_replace(ticker,'\\.NS$','')) IN (" + ",".join(["?"] * len(tick)) + ")")
+    params = tick[:]
+    if start:
+        cond += " AND date >= ?"; params.append(start)
+    if end:
+        cond += " AND date <= ?"; params.append(end)
+    df = _con().execute(
+        f"SELECT upper(regexp_replace(ticker,'\\.NS$','')) t, date, {fcol} v "
+        f"FROM bc.bhavcopy_prices {cond}", params).fetchdf()
+    if df.empty:
+        return pd.DataFrame()
+    df["symbol"] = df["t"].map(a2c)
+    df["date"] = pd.to_datetime(df["date"])
+    # One bar per company-day: a day it traded under two tickers/series is a re-listing overlap.
+    wide = df.pivot_table(index="date", columns="symbol", values="v", aggfunc="last").sort_index()
+    # ratio_events already collapses a duplicate filing per symbol and keeps a same-day split +
+    # bonus pair (two events, one ratio). Across a company's tickers an event filed under both its
+    # old and new symbol must count once: per (ex_date, ratio), take the largest count any single
+    # ticker carries (Counter union), so a shared event is applied once and a pair still twice.
+    merged: dict[str, Counter] = {}
+    for alias, evs in ratio_events(tick).items():
+        canon = a2c.get(alias, alias)
+        merged[canon] = merged.get(canon, Counter()) | Counter(evs)
+    events = {s: sorted(c.elements()) for s, c in merged.items()}
+    return apply_corporate_actions(wide, events)
+
+
 def pit_universe(asof_date, floor_cr: float = MCAP_FLOOR_CR) -> list[str]:
     """Survivorship-free investable universe at `asof_date`: symbols whose most-recent point-in-time
-    market cap within the prior ~2 weeks exceeds the floor (live + confirmed-tradeable dead)."""
-    rows = _con().execute("""
-        SELECT symbol FROM (
-          SELECT symbol, arg_max(mcap_cr, date) m FROM universe_membership
-          WHERE date BETWEEN CAST(? AS DATE) - 14 AND CAST(? AS DATE)
-          GROUP BY symbol)
-        WHERE m > ?""", [str(asof_date), str(asof_date), floor_cr]).fetchall()
-    return sorted(r[0] for r in rows if r[0] in _nse_symbols())  # NSE-only gate (adr-024)
+    market cap within the prior ~2 weeks exceeds the floor (live + confirmed-tradeable dead +
+    the companies Trendlyne never listed), behind the point-in-time NSE gate (adr-050)."""
+    asof = pd.Timestamp(asof_date)
+    d = str(asof.date())
+    if _has_nl() and asof >= MCAP_CUTOVER:
+        rows = _con().execute("""
+            SELECT symbol FROM (
+              SELECT t.engine_symbol AS symbol, arg_max(m.mcap_cr, m.date) AS mc
+              FROM nl.mcap_daily m JOIN nl.ticker_map t ON t.ticker = m.symbol
+              WHERE m.date BETWEEN CAST(? AS DATE) - 14 AND CAST(? AS DATE)
+              GROUP BY 1)
+            WHERE mc > ?""", [d, d, floor_cr]).fetchall()
+        cands = {r[0] for r in rows}
+    else:
+        rows = _con().execute("""
+            SELECT symbol FROM (
+              SELECT symbol, arg_max(mcap_cr, date) m FROM universe_membership
+              WHERE date BETWEEN CAST(? AS DATE) - 14 AND CAST(? AS DATE)
+              GROUP BY symbol)
+            WHERE m > ?""", [d, d, floor_cr]).fetchall()
+        alias = _frozen_alias()
+        cands = {alias.get(r[0], r[0]) for r in rows}
+        pre = _survivor_pre_mcap()
+        if not pre.empty:
+            win = pre[(pre["date"] > asof - pd.Timedelta(days=14)) & (pre["date"] <= asof)]
+            last = win.sort_values("date").groupby("symbol")["mcap_cr"].last()
+            cands |= set(last[last > floor_cr].index)
+    return sorted(nse_gate_at(cands, asof))   # point-in-time NSE gate (adr-050, #957)
 
 
 def _bhavcopy_mcap_panel(symbols, idx) -> pd.DataFrame:
@@ -393,9 +780,9 @@ def _bhavcopy_mcap_panel(symbols, idx) -> pd.DataFrame:
     shares_date = {s: pd.Timestamp(d) for s, d in
                    df.groupby("symbol")["shares_date"].first().items() if pd.notna(d)}
     wide = df.pivot_table(index="date", columns="symbol", values="mcap_cr").sort_index()
-    from .corp_actions import ratio_events
+    from .corp_actions import share_events    # split/bonus/consolidation — not a rights P/TERP
     return scale_shares_after_corporate_actions(wide, shares_date,
-                                                ratio_events(wide.columns)).reindex(index=idx)
+                                                share_events(wide.columns)).reindex(index=idx)
 
 
 def scale_shares_after_corporate_actions(wide: pd.DataFrame, shares_date: dict,
@@ -425,14 +812,19 @@ def _pit_mcap_wide(syms, idx, warnings: list | None = None):
 
     Returns None when the store has nothing for these symbols, so callers can pick their own empty
     shape (all-False mask vs empty frame).
+
+    The readings come from `_membership_long`: Trendlyne's pit_mcap before MCAP_CUTOVER, NSE's
+    official market cap from it (adr-050). The Bhavcopy fallback below then only engages when the
+    nightly NSE pull is behind (or, without the NSE layer, past the last Trendlyne bar).
     """
-    df = _con().execute(
-        "SELECT symbol, date, mcap_cr FROM universe_membership WHERE symbol IN ("
-        + ",".join(["?"] * len(syms)) + ")", syms).fetchdf()
+    df = _membership_long(syms)
     if df.empty:
         return None
-    df["date"] = pd.to_datetime(df["date"])
-    wide = df.pivot_table(index="date", columns="symbol", values="mcap_cr").sort_index()
+    # mean, as before adr-050: universe_membership holds ~8k duplicate (symbol, date) rows (a live
+    # and a dead row for one symbol — SHALPAINTS, MAZDA, MBECL) and master averages them. The
+    # sources never overlap on a date (Trendlyne before MCAP_CUTOVER, NSE from it), so the mean
+    # only ever meets those Trendlyne twins (iter-204 verifier B3).
+    wide = df.pivot_table(index="date", columns="symbol", values="mcap_cr", aggfunc="mean").sort_index()
     # Each symbol's last genuine reading, BEFORE any reindex/ffill invents shape around it.
     last_obs = wide.apply(lambda c: c.last_valid_index())
     # Bridge small daily gaps (≈2 trading weeks) but DO NOT forward-fill past a name's last
@@ -456,11 +848,13 @@ def _pit_mcap_wide(syms, idx, warnings: list | None = None):
                 filled_obs.append(last_obs[s])
         if filled_obs and warnings is not None:
             gap = (idx.max() - min(filled_obs)).days
+            fix = ("NSE's market-cap pull (scripts/nse_mcap_ingest.py, nightly EOD) is behind — "
+                   "check the eod-refresh log." if _has_nl() else
+                   "Build the NSE layer (scripts/nse_mcap_ingest.py --backfill) to restore it.")
             warnings.append(
                 f"universe eligibility: {len(filled_obs)} of {len(wide.columns)} names had no "
-                f"point-in-time market cap past their last Trendlyne bar (the oldest {gap} days "
-                f"back) and were priced from Bhavcopy instead (adr-046). Run the Trendlyne OHLCV "
-                f"harvest to restore split-adjusted membership.")
+                f"point-in-time market cap past their last reading (the oldest {gap} days "
+                f"back) and were priced from Bhavcopy instead (adr-046). {fix}")
     return wide
 
 
@@ -499,10 +893,13 @@ def membership_panel(symbols, dates, floor_cr: float = MCAP_FLOOR_CR,
     if wide is None:
         return pd.DataFrame(False, index=idx, columns=syms)
     out = (wide > floor_cr).reindex(columns=syms).fillna(False)
-    bad = [s for s in out.columns if s not in _nse_symbols()]  # NSE-only gate (adr-024)
-    if bad:
-        out[bad] = False
-    return out
+    if warnings is not None and len(idx) and idx.min() < _bhav_start():
+        warnings.append(
+            f"NSE gate: NSE Bhavcopy starts {_bhav_start().date()}, so before it a company counts if "
+            f"it was already listed when coverage began — listing dates and idle NSE lines before "
+            f"then cannot be checked (adr-050).")
+    # Point-in-time NSE gate (adr-050 step 4, #957): listed on NSE by that day and trading on it.
+    return out & nse_gate_panel(syms, idx).reindex(index=idx, columns=syms).fillna(False)
 
 
 def delistings() -> pd.DataFrame:
@@ -527,13 +924,35 @@ def universe_over_window(start, end, floor_cr: float = MCAP_FLOOR_CR) -> list[st
     This is the survivorship-free candidate set for a backtest window; membership_panel then gates
     each name to the specific dates it actually qualified. Delisted names are included regardless of
     ca_uncertain (excluding them would bias out blow-ups/mergers); ca_uncertain is a warning only.
+
+    Sources follow `_membership_long` (adr-050): Trendlyne's pit_mcap before MCAP_CUTOVER plus the
+    companies it never listed, NSE's official market cap from it. A candidate must have listed on
+    NSE (first EQ bar) by the window's end; the per-day gate is membership_panel's.
     """
-    rows = _con().execute("""
-        SELECT DISTINCT symbol FROM universe_membership
-        WHERE date >= CAST(? AS DATE) AND date <= CAST(? AS DATE) AND mcap_cr > ?
-        GROUP BY symbol HAVING max(mcap_cr) > ?""",
-        [str(start), str(end), floor_cr, floor_cr]).fetchall()
-    return sorted(r[0] for r in rows if r[0] in _nse_symbols())  # NSE-only gate (adr-024)
+    s, e = pd.Timestamp(start), pd.Timestamp(end)
+    nl = _has_nl()
+    tl_end = min(e, MCAP_CUTOVER - pd.Timedelta(days=1)) if nl else e
+    cands: set[str] = set()
+    if s <= tl_end:
+        alias = _frozen_alias()
+        cands |= {alias.get(r[0], r[0]) for r in _con().execute("""
+            SELECT DISTINCT symbol FROM universe_membership
+            WHERE date >= CAST(? AS DATE) AND date <= CAST(? AS DATE) AND mcap_cr > ?""",
+            [str(s.date()), str(tl_end.date()), floor_cr]).fetchall()}
+    if nl:
+        if e >= MCAP_CUTOVER:
+            cands |= {r[0] for r in _con().execute("""
+                SELECT DISTINCT t.engine_symbol FROM nl.mcap_daily m
+                JOIN nl.ticker_map t ON t.ticker = m.symbol
+                WHERE m.date >= CAST(? AS DATE) AND m.date <= CAST(? AS DATE) AND m.mcap_cr > ?""",
+                [str(max(s, MCAP_CUTOVER).date()), str(e.date()), floor_cr]).fetchall()}
+        if s < MCAP_CUTOVER:
+            pre = _survivor_pre_mcap()
+            if not pre.empty:
+                w = pre[(pre["date"] >= s) & (pre["date"] <= tl_end) & (pre["mcap_cr"] > floor_cr)]
+                cands |= set(w["symbol"])
+    first = first_nse_bar(cands)
+    return sorted(c for c in cands if _listed_by(first.get(c), e))   # listed on NSE (adr-050)
 
 
 def raw_close_panel(symbols, start=None, end=None, field: str = "close") -> pd.DataFrame:

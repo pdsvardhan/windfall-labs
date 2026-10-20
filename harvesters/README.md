@@ -17,10 +17,10 @@ Full procedure (staging, ingest, rebuild, verify) lives on the server at
 | 0 | `trendlyne_preflight.js` | every time | 15 sec |
 | 1 | `trendlyne_dvm_harvester.js` | **weekly** | ~20 min |
 | 2 | `trendlyne_harvester_megacap.js` | monthly | ~10 min |
-| 3 | `trendlyne_harvester_ohlcv.js` | **monthly** | ~35–45 min |
+| ~~3~~ | ~~`trendlyne_harvester_ohlcv.js`~~ | **retired (adr-050)** — prices come from NSE | — |
 | 4 | `trendlyne_harvester_leg1.js` | **monthly** | ~25 min |
 
-**3 and 4 were added 2026-09-07 (adr-046, to-do #851).** This table used to list only the first
+**Since adr-050 (iter-204) row 3 is retired** — see the situational table. **3 and 4 were added 2026-09-07 (adr-046, to-do #851).** This table used to list only the first
 three and describe the OHLCV pull as optional. That is how the eligible universe silently collapsed
 to 293 of 2,190 stocks: `ohlcv` also feeds `pit_mcap` → `universe_membership`, so skipping it
 freezes *which stocks can be picked*, not just their price history. leg1 is here because it is the
@@ -51,7 +51,7 @@ is free and already automated. So script 1 alone keeps the factors current.
 
 | Script | When |
 |---|---|
-| `trendlyne_harvester_ohlcv.js` (~40 min) | **Run it monthly.** It extends Trendlyne's **native price history**, and that table is also what feeds `rebuild_pit_mcap_ca.py` -> `pit_mcap` -> `universe_membership` — i.e. which stocks are **eligible to be picked at all**. This row used to say it was "NOT needed for freshness" because Bhavcopy carries prices and `adjusted_close_panel` splices them on. That was true of PRICES and false of ELIGIBILITY, and on 2026-09-07 it cost the live books their universe: a partial harvest left 293 of 2,190 stocks selectable and every paper book picked from that slice (adr-046). Skipping it is now *survivable* — eligibility falls back to Bhavcopy and says so in `warnings[]` — but the fallback uses unadjusted closes, so run it monthly to keep membership split-adjusted. |
+| `trendlyne_harvester_ohlcv.js` (~40 min) | **Retired (adr-050, iter-204).** Trendlyne's price history is frozen at its last harvest; every later bar is NSE Bhavcopy adjusted with NSE's corporate actions, and from 2024-02-01 the Rs500cr universe is NSE's official market cap (nightly `scripts/nse_mcap_ingest.py`). `ingest_refresh.py` ignores `tl_ohlcv_*.csv` unless `--include-ohlcv`. The 2026-09-07 universe collapse this row used to warn about cannot recur: eligibility no longer hangs off this table. |
 | `trendlyne_harvester_gapfill.js` (~2–5 min) | When the ingest dry-run names specific stocks as missing or shrinking. **Its `SYMBOLS` list is scratch — repointed per incident, never a stable list.** Check it targets the names you actually mean before running. |
 | `trendlyne_harvester_forecaster.js` (~25-35 min) | **Analyst consensus estimates — forward EPS and target price (#857, for #26).** Not yet part of the monthly loop; read the coverage note below before spending 30 minutes on it. Output goes to `tl_forecaster_estimates_partNN.csv` (`pk,metric,period_end,as_of,value`) plus `tl_forecaster_coverage_partNN.csv`. **There is no ingest leg for it yet** — the CSVs land in Downloads and wait. |
 
