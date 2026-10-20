@@ -130,6 +130,39 @@ bonus. No row in the live window is affected (current NSE filings list the two s
    cases; it gains the never-mapped companies only if step 5 is taken. Leaderboards and the 8 paper
    strategies' backtests are re-run and shown side by side before anything else moves.
 
+## Implementation (iter-204, Ottomate iteration 204)
+
+Built as proposed, steps 1–5, with these choices made in the build:
+
+- **Corporate actions** (`corp_actions.py`): NSE's list backfilled from 2010 (`/api/corporate-actions/backfill`);
+  combined subjects multiply (#958); rights issues are typed and priced at P/TERP when the list is
+  refreshed, from the last close before the ex-date — only issues stating a price (premium or par),
+  fully paid and in equity; one event filed twice (same day, same ratio) counts once. A share COUNT
+  is scaled by splits/bonuses only (`share_events`), never by a rights P/TERP.
+- **Prices** (`trendlyne_store.adjusted_close_panel`): Trendlyne `ohlcv` frozen; names with no
+  Trendlyne bars (listings after the freeze, the companies Trendlyne never listed) priced from
+  Bhavcopy back-adjusted with NSE's events (`_bhavcopy_adjusted`). Rights reach the live tail and
+  the paper re-base through `ratio_events`, the same convention as the backtests.
+- **Harvest**: the OHLCV harvester is retired and `ingest_refresh.py` ignores `tl_ohlcv_*.csv`
+  unless `--include-ohlcv`. The megacap harvester stays — it carries the DVM and valuation rows of
+  the ~100 index names the base screener omits. `rebuild_pit_mcap_ca.py` / `build_membership.py`
+  refuse to run without `--force-after-adr-050`: with the close frozen they would rewrite pre-2024
+  membership from each month's share count.
+- **Gap detector** (`gap_check.py`, `/api/data/gap-check`, the 20:40 mark cron): ratios ≥ 1.5 only
+  (a 1:4 bonus is indistinguishable from a 20% circuit move); any NSE event of any kind within three
+  sessions explains a move.
+- **Market cap** (`scripts/nse_mcap_ingest.py` → `nse_layer.duckdb`, nightly in the EOD window):
+  mainboard rows of NSE's MCAP file from 2024-02-01; `ticker_map` groups every mainboard ticker with
+  an equity ISIN (INE…, so no ETFs) transitively and names the company by its Trendlyne symbol when
+  Trendlyne has one, else its latest NSE ticker. From 2024-02-01 membership, the `mcap` feature and
+  the universe candidates read it; the adr-046 Bhavcopy fallback only engages when the pull is behind.
+- **NSE gate** (`nse_gate_panel` / `nse_gate_at`): first EQ bar on or before the date AND a mainboard
+  (EQ/BE/BZ) trade within 90 days, by company. adr-024 amended.
+- **Survivorship** (`survivors()`): a company NSE put above the floor on any day from 2024-02-01 with
+  no `universe_membership` row. Before 2024 its market cap is its adjusted close × the share count
+  implied by its first MCAP reading (pit_mcap's own method). No Trendlyne scores, so only price-based
+  rules can pick it. Out of scope: companies that delisted before 2024-02-01 without a Trendlyne row.
+
 ## Consequences
 
 - The monthly chore shrinks to the DVM-score script (weekly, ~20 min) plus the valuation pull while

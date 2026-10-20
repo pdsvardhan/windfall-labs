@@ -269,7 +269,8 @@ def test_build_map_names_companies_by_their_trendlyne_symbol_and_flags_survivors
     b.execute("CREATE TABLE bhavcopy_prices (date DATE, ticker VARCHAR, isin VARCHAR, series VARCHAR)")
     b.execute("""INSERT INTO bhavcopy_prices VALUES
         ('2023-06-01', 'ZOMATO.NS', 'INE758T01015', 'EQ'), ('2025-06-01', 'ETERNAL.NS', 'INE758T01015', 'EQ'),
-        ('2025-06-01', 'SHRUNK.NS', 'INE222B01011', 'BE'), ('2025-06-01', 'NIFTYBEES.NS', 'INF204K01EY0', 'EQ')""")
+        ('2025-06-01', 'SHRUNK.NS', 'INE222B01011', 'BE'), ('2025-06-01', 'NIFTYBEES.NS', 'INF204K01EY0', 'EQ'),
+        ('2025-06-01', 'ADANI-RE.NS', 'INE423A20013', 'EQ')""")
     b.close()
     t = duckdb.connect(str(tl))
     t.execute("CREATE TABLE stocks (pk INTEGER, nsecode VARCHAR)")
@@ -285,10 +286,10 @@ def test_build_map_names_companies_by_their_trendlyne_symbol_and_flags_survivors
     con.execute(ing.SCHEMA)
     con.execute("""INSERT INTO mcap_daily VALUES
         ('2024-02-01', 'ZOMATO', 'EQ', 1, 1, 1, 150000), ('2024-02-01', 'SHRUNK', 'EQ', 1, 1, 1, 900),
-        ('2025-06-01', 'SHRUNK', 'BE', 1, 1, 1, 300)""")
+        ('2025-06-01', 'SHRUNK', 'BE', 1, 1, 1, 300), ('2025-06-01', 'ADANI-RE', 'EQ', 1, 1, 1, 7000)""")
     out = ing.build_map(con)
     tm = dict(con.execute("SELECT ticker, engine_symbol FROM ticker_map").fetchall())
-    assert tm == {"ZOMATO": "ETERNAL", "ETERNAL": "ETERNAL", "SHRUNK": "SHRUNK"}   # no ETF
+    assert tm == {"ZOMATO": "ETERNAL", "ETERNAL": "ETERNAL", "SHRUNK": "SHRUNK"}   # no ETF, no -RE line
     surv = {r[0]: r[1] for r in con.execute("SELECT engine_symbol, survivor FROM companies").fetchall()}
     assert surv == {"ETERNAL": False, "SHRUNK": True}
     assert out["trendlyne_unplaced"] == []

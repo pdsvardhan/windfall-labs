@@ -5,7 +5,9 @@ listed security — from 2024-02-01 (the 31 Jan 2024 bundle has none). From that
 universe and the `mcap` feature read NSE's own number instead of Trendlyne's pit_mcap (step 3).
 
 The same run rebuilds the company map the engine reads it through:
-  ticker_map  every NSE mainboard ticker with an equity ISIN (INE…, so no ETFs or fund units) ->
+  ticker_map  every NSE mainboard ticker whose ISIN is an ordinary equity share — INE + security
+              code 01, so no ETFs or fund units (INF), partly-paid or DVR lines (IN9) or rights
+              entitlements (code 20, e.g. ADANI-RE, which NSE's MCAP file lists in series EQ) ->
               its engine symbol. Tickers sharing an ISIN are one company (renames: ZOMATO ->
               ETERNAL), grouped transitively. A company's engine symbol is the symbol Trendlyne
               knows it by when Trendlyne lists it (stocks / recovered_symbols / universe_membership
@@ -116,7 +118,8 @@ def fetch_day(s: requests.Session, day: dt.date) -> tuple[str, pd.DataFrame | No
     return ("ok", df) if df is not None and not df.empty else ("missing", None)
 
 
-def download(con, days: list[dt.date], refetch: bool) -> dict:
+def download(con, days: list[dt.date], skip: tuple[str, ...]) -> dict:
+    """Fetch each weekday in `days` unless its stored status is in `skip`."""
     held = {r[0]: r[1] for r in con.execute("SELECT date, status FROM mcap_days").fetchall()}
     s = requests.Session()
     s.headers.update(_HEADERS)
@@ -124,7 +127,7 @@ def download(con, days: list[dt.date], refetch: bool) -> dict:
     for day in days:
         if day.weekday() >= 5:
             continue
-        if not refetch and held.get(day) in ("ok", "missing"):
+        if held.get(day) in skip:
             continue
         status, df = fetch_day(s, day)
         time.sleep(0.6)                                 # polite to NSE's archive
@@ -172,8 +175,16 @@ def build_map(con) -> dict:
         rows = con.execute("""
             SELECT upper(regexp_replace(ticker, '\\.NS$', '')) AS t, isin, max(date) AS last_date
             FROM bc.bhavcopy_prices
-            WHERE series IN ('EQ', 'BE', 'BZ') AND isin LIKE 'INE%'
+            WHERE series IN ('EQ', 'BE', 'BZ') AND isin LIKE 'INE%' AND substr(isin, 8, 2) = '01'
             GROUP BY 1, 2""").fetchall()
+        # Trendlyne universe names trading on the NSE mainboard since the cutover — each must map,
+        # or it would lose its membership from 2024-02-01 (read while bc/tl are attached).
+        active_tl = {r[0] for r in con.execute(r"""
+            SELECT u.symbol
+            FROM (SELECT DISTINCT symbol FROM tl.universe_membership WHERE date >= ?) u
+            JOIN (SELECT DISTINCT upper(regexp_replace(ticker, '\.NS$', '')) AS t FROM bc.bhavcopy_prices
+                  WHERE date >= ? AND series IN ('EQ', 'BE', 'BZ')) b ON b.t = u.symbol""",
+            [FIRST_DAY, FIRST_DAY]).fetchall()}
         last_traded: dict[str, dt.date] = {}
         for t, _isin, d in rows:
             last_traded[t] = max(last_traded.get(t, d), d)
@@ -228,20 +239,22 @@ def build_map(con) -> dict:
     unmapped = con.execute("""
         SELECT count(DISTINCT m.symbol) FROM mcap_daily m LEFT JOIN ticker_map t ON t.ticker = m.symbol
         WHERE t.ticker IS NULL AND m.mcap_cr > ?""", [FLOOR]).fetchone()[0]
-    # A Trendlyne universe name still trading on NSE that no ticker maps to would lose its
-    # membership from the cutover (a stale Trendlyne symbol) — and its company would be added a
-    # second time as a "survivor". Report every one.
-    placed = {e for _t, e, _g, _i in tmap}
-    recent = {s for s, d in um_last.items() if d and pd.Timestamp(d) >= pd.Timestamp(FIRST_DAY)}
-    unplaced = sorted(s for s in recent if s not in placed and s not in dead)
-    n_surv = sum(1 for c in comps if c[-1])
-    return {"tickers": len(tmap), "companies": len(comps), "survivors": n_surv,
-            "unmapped_over_floor": int(unmapped), "trendlyne_unplaced": unplaced}
+    # A Trendlyne universe name still trading on the NSE mainboard that no ticker maps to would lose
+    # its membership from the cutover. Names that never traded there (BSE-only, SME, REIT/InvIT
+    # units) are expected to be absent — the NSE gate excludes them anyway.
+    placed = {t for t, _e, _g, _i in tmap}
+    unplaced = sorted(s for s in active_tl if s not in placed)
+    first_day = con.execute("SELECT min(date) FROM mcap_daily").fetchone()[0]
+    surv = [c for c in comps if c[-1]]
+    n_listed = sum(1 for c in surv if c[4] == first_day)
+    return {"tickers": len(tmap), "companies": len(comps), "survivors": len(surv),
+            "survivors_listed_at_cutover": n_listed, "unmapped_over_floor": int(unmapped),
+            "trendlyne_unplaced": unplaced}
 
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--recent", type=int, help="fetch the last N calendar days (refetching them)")
+    ap.add_argument("--recent", type=int, help="fetch the last N calendar days not yet held")
     ap.add_argument("--backfill", action="store_true", help=f"fetch {FIRST_DAY} -> today, skipping held days")
     ap.add_argument("--download-only", action="store_true")
     ap.add_argument("--map-only", action="store_true")
@@ -253,17 +266,19 @@ def main() -> int:
     if not a.map_only:
         if a.backfill:
             days = [FIRST_DAY + dt.timedelta(days=i) for i in range((today - FIRST_DAY).days + 1)]
-            n = download(con, days, refetch=False)
+            n = download(con, days, skip=("ok", "missing"))
         else:
             k = a.recent or 5
             days = [today - dt.timedelta(days=i) for i in range(k - 1, -1, -1)]
-            n = download(con, [d for d in days if d >= FIRST_DAY], refetch=True)
+            # nightly: a day already held is final; a holiday or a failure is retried
+            n = download(con, [d for d in days if d >= FIRST_DAY], skip=("ok",))
         print(f"MCAP days: {n}")
-    m = {"tickers": None, "companies": None, "survivors": None, "unmapped_over_floor": None,
-         "trendlyne_unplaced": []}
+    m = {"tickers": None, "companies": None, "survivors": None, "survivors_listed_at_cutover": None,
+         "unmapped_over_floor": None, "trendlyne_unplaced": []}
     if not a.download_only:
         m = build_map(con)
-        print(f"map: {m['tickers']} tickers, {m['companies']} companies, {m['survivors']} survivors, "
+        print(f"map: {m['tickers']} tickers, {m['companies']} companies, {m['survivors']} survivors "
+              f"({m['survivors_listed_at_cutover']} already listed on {FIRST_DAY}, the rest listed later), "
               f"{m['unmapped_over_floor']} MCAP symbols over Rs{FLOOR:.0f}cr unmapped, "
               f"Trendlyne universe names unplaced: {m['trendlyne_unplaced']}")
     rows = con.execute("SELECT count(*) FROM mcap_daily").fetchone()[0]
