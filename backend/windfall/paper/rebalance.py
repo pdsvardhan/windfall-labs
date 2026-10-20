@@ -168,12 +168,14 @@ DATA_AGE_ALERT_DAYS = 35   # same threshold the fundamentals snapshot calls stal
 # factor data is more than STALE_HOLD_DAYS older than the rebalance day — it keeps its holdings,
 # the run is NOT recorded (so the book stays due and rebalances the first night fresh data lands),
 # and data_health says so for the cron to alert on. Why: the 1-Aug and 1-Sep 2026 rebalances ran on
-# a frozen 22-July book, and the 1-Oct one on 4-Sep factors (45 days) while the cron printed
-# "signals current". Books that rank on prices alone are never held.
+# a frozen 22-July book, and the 1-Oct one on 4-Sep factors (27 days old that night, 46 by 20 Oct)
+# while the cron printed "signals current". Books that rank on prices alone are never held.
 STALE_HOLD_DAYS = 7
 _FACTOR_FAMILY = {"tl_durability": "dvm", "tl_valuation": "dvm", "tl_momentum": "dvm",
-                  "tl_pe": "valuation", "tl_peg": "valuation", "tl_pbv": "valuation"}
-_TL_TOKEN = re.compile(r"\btl_[a-z_]+\b")
+                  "tl_pe": "valuation", "tl_peg": "valuation", "tl_pbv": "valuation",
+                  # peer P/E features are built from tl_pe (resolve._PEER_PE)
+                  "sector_pe": "valuation", "industry_pe": "valuation"}
+_TL_TOKEN = re.compile(r"\b(?:tl_[a-z_]+|sector_pe|industry_pe)\b")
 
 
 def config_factor_families(cfg: dict) -> set[str]:
@@ -195,32 +197,54 @@ def book_factor_families(entry: dict) -> set[str]:
     return fams
 
 
-def factor_staleness(entry: dict, today: dt.date) -> dict | None:
+def _as_date(v) -> dt.date | None:
+    if v is None:
+        return None
+    if isinstance(v, dt.datetime):
+        return v.date()
+    if isinstance(v, dt.date):
+        return v
+    try:
+        return dt.date.fromisoformat(str(v)[:10])
+    except ValueError:
+        return None
+
+
+def factor_dates() -> dict:
+    """{family: newest published date | None}, normalised to `date` whatever DuckDB hands back."""
+    from ..data import trendlyne_store as ts
+    return {f: _as_date(d) for f, d in ts.factor_last_dates().items()}
+
+
+def factor_staleness(entry: dict, today: dt.date, last: dict | None = None) -> dict | None:
     """None for a price-only book; else the age of the factor data it ranks on, as of `today`.
 
     A family whose table is missing or empty counts as stale — the guard holds rather than trade
-    on data it cannot date."""
+    on data it cannot date — and the book's date and age then read as unknown, never as the other
+    family's. `last` is factor_dates(), passed in so one run reads the tables once."""
     fams = book_factor_families(entry)
     if not fams:
         return None
-    from ..data import trendlyne_store as ts
-    last = ts.factor_last_dates()
+    last = factor_dates() if last is None else last
     dates = [last.get(f) for f in fams]
-    known = [d for d in dates if d is not None]
-    as_of = min(known) if known else None
+    as_of = min(dates) if all(d is not None for d in dates) else None
     age = (today - as_of).days if as_of is not None else None
     return {"factor_families": sorted(fams), "factor_as_of": str(as_of) if as_of else None,
             "factor_age_days": age,
-            "factor_stale": as_of is None or len(known) < len(dates) or age > STALE_HOLD_DAYS}
+            "factor_stale": as_of is None or age > STALE_HOLD_DAYS}
 
 
 def held_message(held: dict) -> str:
     if not held:
         return ""
-    worst = max((h["factor_age_days"] or 0) for h in held.values())
-    as_of = min(h["factor_as_of"] or "unknown" for h in held.values())
-    return (f"HELD {len(held)} book(s) on stale Trendlyne factors (published {as_of}, {worst} days "
-            f"old; limit {STALE_HOLD_DAYS}): {', '.join(sorted(held))} - no trades until the "
+    ages = [h["factor_age_days"] for h in held.values()]
+    dates = [h["factor_as_of"] for h in held.values()]
+    if None in ages:
+        when = "publish date unknown - a factor table could not be read"
+    else:
+        when = f"published {min(dates)}, {max(ages)} days old"
+    return (f"HELD {len(held)} book(s) on stale Trendlyne factors ({when}; limit "
+            f"{STALE_HOLD_DAYS}): {', '.join(sorted(held))} - no trades until the "
             f"Trendlyne refresh lands")
 
 
@@ -297,6 +321,7 @@ def rebalance_paper(today: dt.date | None = None, force: bool = False,
     results = {}
     health_by_book = {}
     held_books: dict[str, dict] = {}
+    last = None                       # factor dates, read once and only if a due book needs them
     for entry in ROSTER:
         sid = entry["sid"]
         due, cadence = is_due(entry, today)
@@ -304,7 +329,9 @@ def rebalance_paper(today: dt.date | None = None, force: bool = False,
             results[sid] = {"skipped": "not-due", "cadence": cadence}
             continue
 
-        stale = factor_staleness(entry, today)
+        if last is None and book_factor_families(entry):
+            last = factor_dates()
+        stale = factor_staleness(entry, today, last or {})
         if stale and stale["factor_stale"] and not allow_stale:
             held_books[sid] = stale
             results[sid] = {"skipped": "stale-factors", "held": True, "cadence": cadence, **stale}

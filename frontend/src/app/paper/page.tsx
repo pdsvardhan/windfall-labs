@@ -175,7 +175,7 @@ function BookCard({ a, i, score, equity, stale, isOpen, onToggle }: {
             {/* Held by the stale-factor guard (iter-202): it will not rebalance on old scores. */}
             {stale?.factor_stale && (
               <span className="font-bold" style={{ color: "#9a6c12" }}>
-                {" "}· holding — scores {stale.factor_age_days ?? "?"}d old
+                {" "}· holding — {stale.factor_age_days == null ? "score date unknown" : `scores ${stale.factor_age_days}d old`}
               </span>
             )}
           </div>
@@ -407,7 +407,8 @@ export default function PaperPage() {
 
   const heldBooks = Object.entries(health?.books ?? {}).filter(([, b]) => b?.factor_stale);
   const heldAsOf = heldBooks.map(([, b]) => b?.factor_as_of).filter(Boolean).sort()[0] ?? null;
-  const heldAge = Math.max(0, ...heldBooks.map(([, b]) => b?.factor_age_days ?? 0));
+  const heldAges = heldBooks.map(([, b]) => b?.factor_age_days ?? null);
+  const heldAge = heldAges.some((x) => x == null) ? null : Math.max(0, ...(heldAges as number[]));
 
   return (
     <div>
@@ -432,7 +433,9 @@ export default function PaperPage() {
       {heldBooks.length > 0 && (
         <Card className="px-4 py-3 mb-4" style={{ background: "#fff3da" }}>
           <span className="text-[13px]" style={{ color: "#9a6c12" }}>
-            Trendlyne scores last published {heldAsOf ? dateShort(heldAsOf) : "—"} ({heldAge} days ago) — {heldBooks.length} score-based
+            {heldAge == null
+              ? "Trendlyne score data could not be dated"
+              : <>Trendlyne scores last published {heldAsOf ? dateShort(heldAsOf) : "—"} ({heldAge} days ago)</>} — {heldBooks.length} score-based
             book{heldBooks.length === 1 ? " is" : "s are"} holding until fresh data arrives (limit {health?.threshold_days ?? 7} days).
           </span>
         </Card>

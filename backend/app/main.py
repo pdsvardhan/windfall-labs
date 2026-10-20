@@ -688,8 +688,8 @@ def paper_data_health():
     import datetime as _dt
     from windfall.paper import rebalance as _rb
     today = _dt.date.today()
-    books = {e["sid"]: _rb.factor_staleness(e, today) for e in _rb.ROSTER}
-    last = ts.factor_last_dates()
+    last = _rb.factor_dates()
+    books = {e["sid"]: _rb.factor_staleness(e, today, last) for e in _rb.ROSTER}
     return clean({"threshold_days": _rb.STALE_HOLD_DAYS,
                   "factors": {f: {"as_of": str(d) if d else None,
                                   "age_days": (today - d).days if d else None}

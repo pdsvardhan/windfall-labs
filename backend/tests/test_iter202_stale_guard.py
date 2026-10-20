@@ -105,3 +105,40 @@ def test_the_operator_override_is_explicit(world):
 
 def test_a_signal_run_warning_about_a_stale_factor_now_counts_as_stale():
     assert any(m in "stale factor: 'tl_pe' was last published 2026-09-04" for m in rb.STALE_WARNING_MARKERS)
+
+
+# --- verifier round 1 (2026-10-20): the gaps it named, pinned -------------------------------------
+
+def test_entry_filters_and_peer_pe_count_as_factor_use():
+    assert rb.config_factor_families({"rank_by": "roc126",
+                                      "entry_filters": ["tl_momentum >= 60"]}) == {"dvm"}
+    assert rb.config_factor_families({"rank_by": "sector_pe"}) == {"valuation"}
+    assert rb.config_factor_families({"rank_by": "roc126",
+                                      "universe": {"filters": ["industry_pe < 30"]}}) == {"valuation"}
+
+
+def test_force_overrides_the_cadence_never_the_data_check(world):
+    world.setattr(rb, "ROSTER", [{"sid": "F", "kind": "saved", "capital": 500000.0}])
+    world.setattr(ts, "factor_last_dates", lambda: {"dvm": D(2026, 9, 4), "valuation": D(2026, 9, 4)})
+    world.setattr(rb, "is_due", lambda e, today: (False, "monthly"))
+    world.setattr(rb, "_target_book", lambda e: pytest.fail("a held book must not compute signals"))
+    world.setattr(rb, "_record_run", lambda *a: pytest.fail("a held book must not record a run"))
+    world.setattr(rb, "mark_to_market", lambda: {})
+    out = rb.rebalance_paper(today=D(2026, 10, 19), force=True)
+    assert out["strategies"]["F"]["skipped"] == "stale-factors"
+    # every due book held -> no signal ran -> the early-return path still reports the hold
+    h = out["data_health"]
+    assert h["stale"] is True and h["held_books"] == ["F"] and "HELD 1 book" in h["message"]
+
+
+def test_an_undatable_family_reads_as_unknown_not_as_the_other_familys_age(world):
+    world.setattr(ts, "factor_last_dates", lambda: {"dvm": D(2026, 10, 18), "valuation": None})
+    blend = rb.factor_staleness({"sid": "B", "kind": "blend", "sleeves": ["F", "V"]}, D(2026, 10, 19))
+    assert blend["factor_stale"] and blend["factor_as_of"] is None and blend["factor_age_days"] is None
+    assert "publish date unknown" in rb.held_message({"B": blend})
+
+
+def test_factor_dates_are_normalised_whatever_duckdb_returns(monkeypatch):
+    monkeypatch.setattr(ts, "factor_last_dates", lambda: {
+        "dvm": dt.datetime(2026, 10, 16, 0, 0), "valuation": "2026-10-15"})
+    assert rb.factor_dates() == {"dvm": D(2026, 10, 16), "valuation": D(2026, 10, 15)}
