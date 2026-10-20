@@ -1,6 +1,6 @@
 import type {
   BacktestResult, BacktestResultFull, BacktestRow, CostSensitivity, Coverage, DataStatus,
-  FundamentalsStatus, LeaderboardsData, PaperEquity, PaperPosition, PaperSim, Readiness, ScoreRow,
+  FundamentalsStatus, LeaderboardsData, PaperDataHealth, PaperEquity, PaperPosition, PaperSim, Readiness, ScoreRow,
   SignalRun, Strategy, SweepResult, WalkForwardReport,
 } from "./types";
 
@@ -75,6 +75,7 @@ export const api = {
   markPaper: () => post<unknown>("/api/paper/mark", {}),
   scoreboard: () => get<ScoreRow[]>("/api/paper/scoreboard"),
   paperEquity: () => get<PaperEquity>("/api/paper/equity"),
+  paperDataHealth: () => get<PaperDataHealth>("/api/paper/data-health"),
   paperSim: () => get<PaperSim>("/api/paper/sim"),
 
   validate: () => get<{ overall: string; checks: unknown[] }>("/api/validate"),

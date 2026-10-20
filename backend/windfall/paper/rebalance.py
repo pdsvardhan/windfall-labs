@@ -20,6 +20,7 @@ faithful signals, refresh the Trendlyne pull before running it.
 from __future__ import annotations
 
 import datetime as dt
+import re
 
 from .. import store_meta
 from ..signals_live.generate import generate_blend_signals, generate_signals
@@ -158,8 +159,69 @@ STALE_WARNING_MARKERS = (
     "no eligible universe",
     "stale point-in-time",
     "refresh data before trading",
+    "stale factor:",            # resolve._ffill_daily_tl — a Trendlyne factor carried forward (#954)
 )
 DATA_AGE_ALERT_DAYS = 35   # same threshold the fundamentals snapshot calls stale
+
+# Stale-factor guard (iter-202, #954). Owner's decision 2026-10-20: HOLD + ALERT at 7 days. A book
+# that ranks or filters on Trendlyne's own factors does not rebalance when the newest published
+# factor data is more than STALE_HOLD_DAYS older than the rebalance day — it keeps its holdings,
+# the run is NOT recorded (so the book stays due and rebalances the first night fresh data lands),
+# and data_health says so for the cron to alert on. Why: the 1-Aug and 1-Sep 2026 rebalances ran on
+# a frozen 22-July book, and the 1-Oct one on 4-Sep factors (45 days) while the cron printed
+# "signals current". Books that rank on prices alone are never held.
+STALE_HOLD_DAYS = 7
+_FACTOR_FAMILY = {"tl_durability": "dvm", "tl_valuation": "dvm", "tl_momentum": "dvm",
+                  "tl_pe": "valuation", "tl_peg": "valuation", "tl_pbv": "valuation"}
+_TL_TOKEN = re.compile(r"\btl_[a-z_]+\b")
+
+
+def config_factor_families(cfg: dict) -> set[str]:
+    """Which Trendlyne factor tables a strategy config reads, from its ranking and its filters."""
+    texts = [cfg.get("rank_by") or ""]
+    texts += [r.get("factor") or "" for r in (cfg.get("rank_blend") or [])]
+    texts += list((cfg.get("universe") or {}).get("filters") or [])
+    texts += list(cfg.get("entry_filters") or [])
+    return {_FACTOR_FAMILY[t] for x in texts for t in _TL_TOKEN.findall(str(x)) if t in _FACTOR_FAMILY}
+
+
+def book_factor_families(entry: dict) -> set[str]:
+    sids = [entry["sid"]] if entry["kind"] == "saved" else list(entry.get("sleeves", []))
+    fams: set[str] = set()
+    for sid in sids:
+        st = store_meta.get_strategy(sid)
+        if st:
+            fams |= config_factor_families(st["config"])
+    return fams
+
+
+def factor_staleness(entry: dict, today: dt.date) -> dict | None:
+    """None for a price-only book; else the age of the factor data it ranks on, as of `today`.
+
+    A family whose table is missing or empty counts as stale — the guard holds rather than trade
+    on data it cannot date."""
+    fams = book_factor_families(entry)
+    if not fams:
+        return None
+    from ..data import trendlyne_store as ts
+    last = ts.factor_last_dates()
+    dates = [last.get(f) for f in fams]
+    known = [d for d in dates if d is not None]
+    as_of = min(known) if known else None
+    age = (today - as_of).days if as_of is not None else None
+    return {"factor_families": sorted(fams), "factor_as_of": str(as_of) if as_of else None,
+            "factor_age_days": age,
+            "factor_stale": as_of is None or len(known) < len(dates) or age > STALE_HOLD_DAYS}
+
+
+def held_message(held: dict) -> str:
+    if not held:
+        return ""
+    worst = max((h["factor_age_days"] or 0) for h in held.values())
+    as_of = min(h["factor_as_of"] or "unknown" for h in held.values())
+    return (f"HELD {len(held)} book(s) on stale Trendlyne factors (published {as_of}, {worst} days "
+            f"old; limit {STALE_HOLD_DAYS}): {', '.join(sorted(held))} - no trades until the "
+            f"Trendlyne refresh lands")
 
 
 def _target_book(entry: dict) -> tuple[dict, dict]:
@@ -224,16 +286,28 @@ def available_cash(sid: str, notional: float) -> float:
     return cash
 
 
-def rebalance_paper(today: dt.date | None = None, force: bool = False) -> dict:
-    """Sync every DUE tracked strategy's open positions to its current target book."""
+def rebalance_paper(today: dt.date | None = None, force: bool = False,
+                    allow_stale: bool = False) -> dict:
+    """Sync every DUE tracked strategy's open positions to its current target book.
+
+    A due book that ranks on Trendlyne factors older than STALE_HOLD_DAYS is HELD (no trades, no
+    run recorded) unless `allow_stale` — `force` overrides the cadence, never the data check.
+    """
     today = today or dt.date.today()
     results = {}
     health_by_book = {}
+    held_books: dict[str, dict] = {}
     for entry in ROSTER:
         sid = entry["sid"]
         due, cadence = is_due(entry, today)
         if not (due or force):
             results[sid] = {"skipped": "not-due", "cadence": cadence}
+            continue
+
+        stale = factor_staleness(entry, today)
+        if stale and stale["factor_stale"] and not allow_stale:
+            held_books[sid] = stale
+            results[sid] = {"skipped": "stale-factors", "held": True, "cadence": cadence, **stale}
             continue
 
         target, health = _target_book(entry)
@@ -287,28 +361,33 @@ def rebalance_paper(today: dt.date | None = None, force: bool = False) -> dict:
     # When nothing was due, no signal run happened — say so rather than reporting an all-clear
     # nobody checked. A reassuring "signals current" asserted on zero evidence is the same failure
     # mode item 1233 exists to remove.
+    held_msg = held_message(held_books)
     if not health_by_book:
         return {"rebalanced_at": str(today), "entry_mode": "next-open", "strategies": results,
-                "data_health": {"stale": None, "stale_books": [], "worst_data_age_days": None,
-                                "signal_as_of": [],
-                                "message": "not evaluated - no book was due, so no signals ran"},
+                "data_health": {"stale": True if held_books else None,
+                                "stale_books": sorted(held_books), "held_books": sorted(held_books),
+                                "worst_data_age_days": None, "signal_as_of": [],
+                                "message": held_msg or
+                                "not evaluated - no book was due, so no signals ran"},
                 "mark": mark_to_market()}
 
     stale_books = sorted(sid for sid, h in health_by_book.items() if h.get("is_stale"))
     ages = [h["data_age_days"] for h in health_by_book.values()
             if h.get("data_age_days") is not None]
     as_ofs = sorted({str(h["as_of"]) for h in health_by_book.values() if h.get("as_of")})
+    signal_msg = (
+        f"signals are STALE for {len(stale_books)} of {len(health_by_book)} book(s) "
+        f"(as_of {', '.join(as_ofs) or 'unknown'}, data age "
+        f"{max(ages) if ages else '?'}d) — this rebalance re-derived an old book rather "
+        f"than a current one; refresh the Trendlyne pull"
+        if stale_books else "signals current")
     data_health = {
-        "stale": bool(stale_books),
-        "stale_books": stale_books,
+        "stale": bool(stale_books) or bool(held_books),
+        "stale_books": sorted(set(stale_books) | set(held_books)),
+        "held_books": sorted(held_books),
         "worst_data_age_days": max(ages) if ages else None,
         "signal_as_of": as_ofs,
-        "message": (
-            f"signals are STALE for {len(stale_books)} of {len(health_by_book)} book(s) "
-            f"(as_of {', '.join(as_ofs) or 'unknown'}, data age "
-            f"{max(ages) if ages else '?'}d) — this rebalance re-derived an old book rather "
-            f"than a current one; refresh the Trendlyne pull"
-            if stale_books else "signals current"),
+        "message": " | ".join(m for m in (held_msg, signal_msg) if m),
     }
     return {"rebalanced_at": str(today), "entry_mode": "next-open",
             "strategies": results, "data_health": data_health,
