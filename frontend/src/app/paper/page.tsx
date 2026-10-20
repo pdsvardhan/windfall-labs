@@ -175,7 +175,7 @@ function BookCard({ a, i, score, equity, stale, isOpen, onToggle }: {
             {/* Held by the stale-factor guard (iter-202): it will not rebalance on old scores. */}
             {stale?.factor_stale && (
               <span className="font-bold" style={{ color: "#9a6c12" }}>
-                {" "}· holding — {stale.factor_age_days == null ? "score date unknown" : `scores ${stale.factor_age_days}d old`}
+                {" "}· holding — {stale.factor_age_days == null ? "data date unknown" : `Trendlyne data ${stale.factor_age_days}d old`}
               </span>
             )}
           </div>
@@ -434,9 +434,9 @@ export default function PaperPage() {
         <Card className="px-4 py-3 mb-4" style={{ background: "#fff3da" }}>
           <span className="text-[13px]" style={{ color: "#9a6c12" }}>
             {heldAge == null
-              ? "Trendlyne score data could not be dated"
-              : <>Trendlyne scores last published {heldAsOf ? dateShort(heldAsOf) : "—"} ({heldAge} days ago)</>} — {heldBooks.length} score-based
-            book{heldBooks.length === 1 ? " is" : "s are"} holding until fresh data arrives (limit {health?.threshold_days ?? 7} days).
+              ? "Trendlyne factor data could not be dated"
+              : <>Trendlyne factor data (scores, P/E) last published {heldAsOf ? dateShort(heldAsOf) : "—"} ({heldAge} days ago)</>} — {heldBooks.length}
+            book{heldBooks.length === 1 ? " that ranks on it is" : "s that rank on it are"} holding until fresh data arrives (limit {health?.threshold_days ?? 7} days).
           </span>
         </Card>
       )}
