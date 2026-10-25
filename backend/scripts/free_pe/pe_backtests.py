@@ -15,6 +15,9 @@ with no P/E is ranked on momentum alone. Unfiltered, 93% of the free-pe run's en
 Each run is repeated (identical calls differ by ~0.6pp CAGR, to-do #967); the table reports the mean
 and the range. Holdings overlap (Jaccard, same rebalance day) is measured against momentum-only.
 Calls POST /api/backtests with save=false (nothing is stored).
+
+iter-206 (#969) knobs: EXCLUDE_FIN=1 drops banks/NBFCs from every arm (the screener.in store cannot
+see them), TABLE=<name> picks the result table, REPEATS=<n> the repeats per cell.
 """
 from __future__ import annotations
 
@@ -33,6 +36,9 @@ WINDOWS = {"overall 10y": ("2016-06-10", "2026-06-16"),
            "post-COVID 5y": ("2021-07-01", "2026-06-16"),
            "pre-COVID": ("2016-07-01", "2021-07-01")}
 REPEATS = int(os.environ.get("REPEATS", "2"))
+EXCLUDE_FIN = os.environ.get("EXCLUDE_FIN", "0") == "1"      # iter-206 (#969): banks/NBFCs out of every arm
+FIN_SECTORS = ["bank", "financ"]                              # substring match, lower-cased, on the sector label
+TABLE = os.environ.get("TABLE", "pe_backtests")               # result table; the iter-201 one is kept as is
 
 
 def call(path, body=None):
@@ -78,7 +84,14 @@ def variants(base: dict) -> dict:
     mom = copy.deepcopy(base)
     mom["rank_blend"] = [f for f in mom["rank_blend"] if f["factor"] != "tl_pe"]
     mom["rank_by"] = "roc126"
-    return {"live config": live, "tl_pe req.": tl_req, "free pe req.": pe_req, "momentum": mom}
+    out = {"live config": live, "tl_pe req.": tl_req, "free pe req.": pe_req, "momentum": mom}
+    if EXCLUDE_FIN:
+        # iter-206 (#969): the screener.in store excludes banks/NBFCs by design, so the free P/E can never
+        # see them; take them out of EVERY arm (matched by substring on the sector label) so the two
+        # P/Es are compared on the same companies.
+        for cfg in out.values():
+            cfg["universe"]["exclude_sectors"] = list(cfg["universe"].get("exclude_sectors") or []) + FIN_SECTORS
+    return out
 
 
 def main() -> None:
@@ -116,7 +129,7 @@ def main() -> None:
     df = pd.DataFrame(rows)
     con = duckdb.connect(str(OUT))
     con.register("df", df)
-    con.execute("CREATE OR REPLACE TABLE pe_backtests AS SELECT * FROM df")
+    con.execute(f"CREATE OR REPLACE TABLE {TABLE} AS SELECT * FROM df")
     con.close()
 
 
