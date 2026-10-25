@@ -23,8 +23,8 @@ only: **nothing here is an engine factor yet** (adr-052 point 3 says how it woul
 
 The first run (13:51) was stopped after about 110 companies: the independent verifier found that it dropped every
 legacy standalone filing (NSE labels them "Non-Consolidated"), stored twice the real EPS for the 18 filings where a
-filer tags discontinued-operations EPS with the continuing figure, and let 14 files that name the wrong year
-overwrite the real quarter. All three are fixed (tests in `test_iter206_nse_filings.py`), the table was rebuilt from
+filer tags discontinued-operations EPS with the continuing figure, and let files that name the wrong year (14 in the first 106 companies, 17 in the first 2,200 files)
+overwrite the real quarter. A refused file is not recorded, so each re-run fetches it again (about 1% of filings); the quarter simply stays missing from that company's TTM. All three are fixed (tests in `test_iter206_nse_filings.py`), the table was rebuilt from
 the saved raw files with `reparse`, and the buggy copy is in `backend/data/snapshots/`. The pilot numbers below
 were measured before the fixes and have not been re-run on the corrected data.
 
@@ -35,7 +35,7 @@ PYTHONPATH=. setsid nohup .venv/bin/python -u -m windfall.data.nse_filings fetch
 ```
 
 - One worker, ~1 s between requests, about 27–37 s per company (the log's running average), ~34 requests each:
-  **roughly 16–20 hours** (about 70,000 requests). Five consecutive errors pause it for 10 minutes and, after
+  **roughly 16–20 hours from a clean start** (about 70,000 requests; the restarted run is quicker per company while it skips the quarters already stored). Five consecutive errors pause it for 10 minutes and, after
   three pauses, stop it (re-run to resume). It is resumable: companies marked `done` or `empty` are skipped on a re-run, a
   `partial` one only re-tries the quarters it is missing. A reboot stops it; re-run the same command.
 - **Progress:** `tail data/nse_filings_fetch.log` (a line every 10 companies). The DuckDB file is locked by the

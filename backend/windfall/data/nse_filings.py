@@ -190,6 +190,9 @@ def _d(s, fmt):
         return None
 
 
+_SEEN_LABELS: set = set()
+
+
 def select_filings(legacy: list[dict], integrated: list[dict]) -> list[dict]:
     """Both listings -> one candidate per (period_end, basis): the earliest broadcast, non-cumulative,
     with a raw XBRL link. Then ONE basis per period: consolidated where the company filed it, else
@@ -218,6 +221,9 @@ def select_filings(legacy: list[dict], integrated: list[dict]) -> list[dict]:
     best: dict[tuple, dict] = {}
     for c in cands:
         if c["basis"] not in ("consolidated", "standalone"):
+            if c["basis"] not in _SEEN_LABELS:      # a spelling NSE has not used before: say so once, do not drop silently
+                _SEEN_LABELS.add(c["basis"])
+                _log.warning("filing with an unrecognised consolidated/standalone label %r dropped", c["basis"])
             continue
         k = (c["period_end"], c["basis"])
         if k not in best or c["broadcast_ts"] < best[k]["broadcast_ts"]:

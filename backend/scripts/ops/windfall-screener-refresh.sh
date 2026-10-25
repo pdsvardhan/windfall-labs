@@ -84,7 +84,8 @@ if [ "$RC" -ne 0 ] || [ "$FAILED" -gt "$LIMIT_FAIL" ]; then
 fi
 # 'failed' is not the only way to lose a name: the ingest deletes a ticker's rows and re-inserts them, and a
 # page that now fails the store's self-check comes back 'quarantined', which the engine does not read. Compare
-# how many tickers the engine CAN read (high/low) before and after.
+# how many tickers the engine CAN read (high/low) before and after. Deliberate tolerance: up to 2% (about 44
+# tickers) may be lost without a failure, and the gate counts tickers, not periods per ticker.
 USABLE=$(PYTHONPATH="$APP/backend" "$PY" - "$LIVE" "$SCR/screener_fundamentals.duckdb" <<'EOF'
 import sys, duckdb
 q = "SELECT count(DISTINCT ticker) FROM fundamentals_history WHERE confidence IN ('high','low')"
