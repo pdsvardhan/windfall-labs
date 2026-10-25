@@ -205,3 +205,34 @@ def test_a_renamed_company_is_found_under_its_current_ticker(tmp_path):
     r = nf.fetch_symbol(con, Fake(), "ZOMATO", alts=["ETERNAL"])
     assert r["new"] == 1 and asked[:2] == ["ZOMATO", "ZOMATO"] and "ETERNAL" in asked
     assert con.execute("SELECT symbol FROM filings").fetchone() == ("ZOMATO",), "stored under the engine symbol"
+
+
+def test_a_filing_with_no_dated_context_takes_its_quarter_from_the_listing_row():
+    bare = (HEAD + '<in-bse-fin:ProfitLossForPeriod contextRef="OneD" unitRef="INR">5000000.00</in-bse-fin:ProfitLossForPeriod>'
+            '<in-bse-fin:BasicEarningsLossPerShareFromContinuingOperations contextRef="OneD" unitRef="INRPerShare">0.40</in-bse-fin:BasicEarningsLossPerShareFromContinuingOperations>'
+            '</xbrli:xbrl>')
+    assert nf.parse_xbrl(bare) is None, "without a hint there is no way to date it"
+    p = nf.parse_xbrl(bare, (dt.date(2019, 7, 1), dt.date(2019, 9, 30)))
+    assert p["period_end"] == dt.date(2019, 9, 30) and p["period_months"] == 3 and p["eps_basic"] == 0.40
+    assert p["ytd_months"] is None
+
+
+def test_raw_filings_are_kept_so_a_parser_fix_can_be_replayed_without_a_refetch(tmp_path, monkeypatch):
+    monkeypatch.setattr(nf, "RAW_DIR", tmp_path / "raw")
+    con = nf.connect(tmp_path / "f.duckdb")
+
+    class Fake:
+        n = 0
+
+        def get(self, url, landing, params=None, json_=True):
+            if json_:
+                return [] if "integrated" in url else [_legacy("31-Dec-2024", "20-Jan-2025 10:00:00")]
+            return INDUSTRIAL
+
+    nf.fetch_symbol(con, Fake(), "TCS")
+    assert len(list((tmp_path / "raw" / "TCS").glob("*.xml.gz"))) == 1
+    con.execute("DELETE FROM filings")                      # as if the parser had been wrong
+    assert nf.reparse(con) == {"reparsed": 1, "unparseable": 0}
+    row = con.execute("SELECT symbol, period_end, eps_basic, basis, broadcast_ts FROM filings").fetchone()
+    assert row[:4] == ("TCS", dt.date(2024, 12, 31), 34.21, "consolidated")
+    assert row[4] == dt.datetime(2025, 1, 20, 10, 0)

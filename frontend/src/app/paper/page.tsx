@@ -34,7 +34,8 @@ const RULES: Record<string, string> = {
   DVM_dm_m_20: rule(20, "Durability + Momentum", "monthly", "ADTV ≥ ₹0.5cr"),
   MOM_roc252_m_20: rule(20, "12-month price change", "monthly", "ADTV ≥ ₹0.5cr"),
   MOM_roc252_m_10: rule(10, "12-month price change", "monthly", "ADTV ≥ ₹0.5cr"),
-  CMP_valmom_m_20: rule(20, "low PE + 6-month price change", "monthly", "ADTV ≥ ₹0.5cr"),
+  // A company with no positive P/E is not eligible (iter-206, adr-052) — it used to be ranked on momentum alone.
+  CMP_valmom_m_20: rule(20, "low PE + 6-month price change", "monthly", "ADTV ≥ ₹0.5cr, positive P/E required"),
   DVM_all_w_10: rule(10, DVM3, "weekly", "ADTV ≥ ₹0.5cr"),
   DVM_all_m_10: rule(10, DVM3, "monthly", "ADTV ≥ ₹0.5cr"),
   // A 70/30 sleeve blend: each momentum name is 3.5% of the book, each low-vol name 1.5%.

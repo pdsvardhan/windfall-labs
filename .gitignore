@@ -38,3 +38,5 @@ backend/data/*.log
 # refresh ingest scratch + pre-apply DB snapshots (see docs/ops/trendlyne-refresh-runbook.md)
 backend/data/refresh_staging/
 *.duckdb.pre-*-bak
+backend/data/snapshots/
+backend/data/nse_filings_raw/

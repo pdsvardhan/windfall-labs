@@ -19,12 +19,15 @@ ONE DOOR (adr-018): a standalone DB with a single writer (the fetch process); th
 
 CLI:  python -m windfall.data.nse_filings fetch --symbols-file f.csv [--limit N] [--throttle 1.0]
       python -m windfall.data.nse_filings status
+      python -m windfall.data.nse_filings reparse      # rebuild `filings` from data/nse_filings_raw/ after a parser fix
 """
 from __future__ import annotations
 
 import argparse
 import csv
 import datetime as dt
+import gzip
+import json
 import logging
 import re
 import time
@@ -39,6 +42,7 @@ from .surveillance import _HEADERS
 _log = logging.getLogger(__name__)
 
 DB_PATH = DATA_DIR / "nse_filings.duckdb"
+RAW_DIR = DATA_DIR / "nse_filings_raw"      # every fetched filing, gzipped, so a parser fix never needs a refetch
 LEGACY_LANDING = "https://www.nseindia.com/companies-listing/corporate-filings-financial-results"
 LEGACY_API = "https://www.nseindia.com/api/corporates-financial-results"
 INTEGRATED_LANDING = "https://www.nseindia.com/companies-listing/corporate-integrated-filing"
@@ -96,12 +100,15 @@ def _months(start: dt.date, end: dt.date) -> int:
     return int(round(((end - start).days + 1) / 30.4375))
 
 
-def parse_xbrl(text: str) -> dict | None:
+def parse_xbrl(text: str, hint: tuple | None = None) -> dict | None:
     """One filing -> {period_end, period_months, ytd_months, np, np_owners, eps_basic, eps_diluted,
     revenue, paid_up, face_value, np_ytd, eps_ytd, taxonomy} or None when it is not a results XBRL.
 
     OneD is the reporting quarter and FourD the year to date, in both taxonomies. Values are absolute
-    rupees (not crore) and per-share rupees."""
+    rupees (not crore) and per-share rupees.
+
+    `hint` = (from_date, to_date) from the filing's listing row, used only when the file declares no
+    dated context at all (some 2019-2020 filings; DEEPENR Sep-2019)."""
     ctx: dict[str, tuple[dt.date, dt.date]] = {}
     dims: dict[str, list] = {"OneD": [], "FourD": []}
     for cid, body in _CTX.findall(text):
@@ -120,6 +127,8 @@ def parse_xbrl(text: str) -> dict | None:
     for k, spans in dims.items():
         if k not in ctx and spans:
             ctx[k] = max(set(spans), key=spans.count)
+    if "OneD" not in ctx and hint and hint[1]:
+        ctx["OneD"] = (hint[0] or hint[1] - dt.timedelta(days=90), hint[1])
     if "OneD" not in ctx:
         return None
     facts: dict[tuple[str, str], float] = {}
@@ -175,7 +184,8 @@ def select_filings(legacy: list[dict], integrated: list[dict]) -> list[dict]:
             continue
         if str(r.get("cumulative") or "").lower().startswith("cum"):   # "Cumulative" = a year-to-date filing
             continue
-        cands.append({"source": "legacy", "period_end": pe.date(), "basis": str(r.get("consolidated") or "").lower(),
+        fd = _d(r.get("fromDate"), "%d-%b-%Y")
+        cands.append({"source": "legacy", "period_end": pe.date(), "from_date": fd.date() if fd else None, "basis": str(r.get("consolidated") or "").lower(),
                       "broadcast_ts": bc, "audited": r.get("audited"), "url": url})
     for r in integrated:
         url = str(r.get("xbrl") or "")
@@ -259,6 +269,43 @@ def connect(path=DB_PATH):
     return con
 
 
+def _save_raw(symbol: str, c: dict, text: str) -> None:
+    d = RAW_DIR / symbol
+    d.mkdir(parents=True, exist_ok=True)
+    stem = f"{c['period_end']}_{c['basis']}"
+    (d / f"{stem}.xml.gz").write_bytes(gzip.compress(text.encode("utf-8")))
+    meta = {k: (v.isoformat() if hasattr(v, "isoformat") else v) for k, v in c.items()}
+    (d / f"{stem}.json").write_text(json.dumps(meta))
+
+
+def _store(con, symbol: str, c: dict, p: dict) -> None:
+    con.execute(
+        "INSERT OR REPLACE INTO filings VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        [symbol, p["period_end"], c["basis"], c["source"], p["period_months"], c["broadcast_ts"],
+         c["audited"], p["taxonomy"], p["np"], p["np_owners"], p["eps_basic"], p["eps_diluted"],
+         p["revenue"], p["paid_up"], p["face_value"], p["ytd_months"], p["np_ytd"], p["eps_ytd"],
+         c["url"], dt.datetime.now(dt.timezone.utc).replace(tzinfo=None)])
+
+
+def reparse(con) -> dict:
+    """Rebuild `filings` from the saved raw files with the CURRENT parser (after a parser fix)."""
+    ok = bad = 0
+    for meta_path in sorted(RAW_DIR.glob("*/*.json")):
+        symbol = meta_path.parent.name
+        c = json.loads(meta_path.read_text())
+        c["period_end"] = dt.date.fromisoformat(c["period_end"])
+        c["from_date"] = dt.date.fromisoformat(c["from_date"]) if c.get("from_date") else None
+        c["broadcast_ts"] = dt.datetime.fromisoformat(c["broadcast_ts"])
+        text = gzip.decompress(meta_path.with_suffix(".xml.gz").read_bytes()).decode("utf-8")
+        p = parse_xbrl(text, (c["from_date"], c["period_end"]))
+        if p is None:
+            bad += 1
+            continue
+        _store(con, symbol, c, p)
+        ok += 1
+    return {"reparsed": ok, "unparseable": bad}
+
+
 def fetch_symbol(con, nse: Nse, symbol: str, alts=()) -> dict:
     """List, select and store the quarters of one symbol that are not yet in the store.
 
@@ -284,17 +331,14 @@ def fetch_symbol(con, nse: Nse, symbol: str, alts=()) -> dict:
             failed += 1
             detail.append(f"{c['period_end']}: {str(e)[:60]}")
             continue
-        p = parse_xbrl(text or "")
+        if text:
+            _save_raw(symbol, c, text)
+        p = parse_xbrl(text or "", (c.get("from_date"), c["period_end"]))
         if p is None:
             failed += 1
             detail.append(f"{c['period_end']}: not a results XBRL")
             continue
-        con.execute(
-            "INSERT OR REPLACE INTO filings VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-            [symbol, p["period_end"], c["basis"], c["source"], p["period_months"], c["broadcast_ts"],
-             c["audited"], p["taxonomy"], p["np"], p["np_owners"], p["eps_basic"], p["eps_diluted"],
-             p["revenue"], p["paid_up"], p["face_value"], p["ytd_months"], p["np_ytd"], p["eps_ytd"],
-             c["url"], dt.datetime.now(dt.timezone.utc).replace(tzinfo=None)])
+        _store(con, symbol, c, p)
         new += 1
     status = "done" if failed == 0 else "partial"
     if not chosen:
@@ -391,11 +435,15 @@ def main():
     f.add_argument("--throttle", type=float, default=1.0)
     f.add_argument("--redo", action="store_true", help="also revisit symbols already marked done")
     sub.add_parser("status")
+    sub.add_parser("reparse")
     args = ap.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
     con = connect()
     if args.cmd == "status":
         print(status(con))
+        return
+    if args.cmd == "reparse":
+        print(reparse(con), status(con))
         return
     rows = [r for r in csv.DictReader(open(args.symbols_file, encoding="utf-8")) if r.get("symbol")]
     alts = {r["symbol"].strip().upper(): [a.strip().upper() for a in (r.get("alts") or "").split(";") if a.strip()]
