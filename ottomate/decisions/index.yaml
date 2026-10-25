@@ -496,3 +496,12 @@ decisions:
       - curated
       - cat:reliability
     body_path: docs/decisions/adr-051-windfall-stale-factor-hold.md
+  - id: adr-052-windfall-value-momentum-requires-pe
+    project_slug: windfall-labs
+    title: The Value + Momentum paper book only buys companies with a positive P/E
+    status: accepted
+    date: 2026-10-25T00:00:00.000Z
+    tags:
+      - curated
+      - cat:product
+    body_path: docs/decisions/adr-052-windfall-value-momentum-requires-pe.md
