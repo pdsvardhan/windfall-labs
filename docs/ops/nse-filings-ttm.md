@@ -19,7 +19,14 @@ only: **nothing here is an engine factor yet** (adr-052 point 3 says how it woul
   2018, with their other tickers in `alts` (NSE answers by the current symbol; a renamed company is found
   through its alias). Built by `scripts/free_pe/nse_symbols.py`.
 
-## The full run (started 2026-10-25 13:51 IST)
+## The full run (restarted 2026-10-25 14:51 IST, after the verifier's three fixes)
+
+The first run (13:51) was stopped after about 110 companies: the independent verifier found that it dropped every
+legacy standalone filing (NSE labels them "Non-Consolidated"), stored twice the real EPS for the 18 filings where a
+filer tags discontinued-operations EPS with the continuing figure, and let 14 files that name the wrong year
+overwrite the real quarter. All three are fixed (tests in `test_iter206_nse_filings.py`), the table was rebuilt from
+the saved raw files with `reparse`, and the buggy copy is in `backend/data/snapshots/`. The pilot numbers below
+were measured before the fixes and have not been re-run on the corrected data.
 
 ```bash
 cd /mnt/storage/websites/windfall-labs/backend
@@ -27,8 +34,9 @@ PYTHONPATH=. setsid nohup .venv/bin/python -u -m windfall.data.nse_filings fetch
   --symbols-file data/nse_filings_symbols.csv --throttle 1.0 > data/nse_filings_fetch.log 2>&1 < /dev/null &
 ```
 
-- One worker, ~1 s between requests, about 22 s per company, ~34 requests each: **roughly 13 hours**
-  (about 70,000 requests). It is resumable: companies marked `done` or `empty` are skipped on a re-run, a
+- One worker, ~1 s between requests, about 27–37 s per company (the log's running average), ~34 requests each:
+  **roughly 16–20 hours** (about 70,000 requests). Five consecutive errors pause it for 10 minutes and, after
+  three pauses, stop it (re-run to resume). It is resumable: companies marked `done` or `empty` are skipped on a re-run, a
   `partial` one only re-tries the quarters it is missing. A reboot stops it; re-run the same command.
 - **Progress:** `tail data/nse_filings_fetch.log` (a line every 10 companies). The DuckDB file is locked by the
   running fetch, so `status` and queries wait until it ends. Do not copy the file while it runs.
@@ -51,6 +59,8 @@ was IDFCFIRSTB (a 2018 merger changes its share base); EXICOM has three months o
 
 ## Limits found
 
+- **Standalone-only companies** (most small caps) have their standalone filings fetched since the 14:51 run;
+  before it they had only the 2025+ integrated ones. A company that switches basis has no TTM across the switch.
 - **TTM starts around March 2019, not 2018.** It needs four consecutive quarters on one basis and the first XBRL
   quarter is March 2018; 2018 months are empty and 2019 fills in as quarters accumulate.
 - **Filings before mid-2022 declare no `OneD`/`FourD` context**; the quarter's dates are read from the

@@ -33,7 +33,7 @@ leg (iter-22: a DVM-only ingest would have deleted 806k rows / 138 megacaps).
 | 1 | `trendlyne_dvm_harvester.js` | ~15–20 min | `tl_dvm_history_partNN.csv`, `tl_stocks.csv` |
 | 2 | `trendlyne_harvester_megacap.js` | ~10 min | `tl_*_megacap.csv` (covers the index-megacap crack) |
 | ~~3~~ | ~~`trendlyne_harvester_ohlcv.js`~~ — **retired (adr-050)**: prices come from NSE | — | — |
-| 4 | `trendlyne_harvester_leg1_lite.js` | ~20 min | `tl_valuation_ratios_partNN.csv` (plus `tl_growth_quality_*` if `FETCH_QUARTERLY` is switched on) |
+| 4 | `trendlyne_harvester_leg1_lite.js` | ~20 min | `tl_valuation_ratios_partNN.csv` (plus `tl_growth_quality_*` when `FETCH_QUARTERLY` is switched on — do that in the month after a results season closes, i.e. once `MAX(date)` in `growth_quality` is a quarter behind the last quarter-end; otherwise `tl_piotroski` / `tl_np_growth` / `tl_rev_growth` freeze for non-megacap names) |
 | 4b | `trendlyne_harvester_leg1.js` — the full 25-code version, ~150 min; only if a strategy starts to read `pnl_quarterly` or `ownership` | ~150 min | adds `tl_pnl_quarterly_*`, `tl_ownership_*` |
 | 5 | `trendlyne_harvester_gapfill.js` — only if specific names froze | ~2 min | `tl_*_gapfill.csv` |
 

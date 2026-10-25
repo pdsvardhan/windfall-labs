@@ -9,10 +9,11 @@
 ## Context
 
 `CMP_valmom_m_20` ranks on `tl_pe` (ascending) plus 6-month momentum. The rank blend re-weights a missing factor
-away, so a company with no P/E was ranked on momentum alone and could be bought. Measured in iteration 201 and
-again on equal terms in iteration 206 (`docs/validation/free-pe-equal-terms-2026-10-25.md`): over ten years that
+away, so a company with no P/E was ranked on momentum alone and could be bought. Measured in iteration 201 (`docs/validation/free-pe-2026-10-20.md`): over ten years that
 was 367 entries, about half loss-makers and four in ten companies that later delisted; since COVID about two-thirds
-of the entries were loss-makers (ATHERENERG and BLUSPRING were held in the paper book on 2026-10-25).
+of the entries were loss-makers (ATHERENERG and BLUSPRING were held in the paper book on 2026-10-25). Iteration
+206 re-ran the performance side on equal terms (`docs/validation/free-pe-equal-terms-2026-10-25.md`); the entry
+counts were not re-measured.
 
 Performance, banks/NBFCs out of every arm, repeats identical (CAGR): as configured 23.0% / 16.3% / 30.3%
 (10 years / post-COVID / pre-COVID); Trendlyne P/E required 15.0% / 16.1% / 15.1%; free P/E required 18.2% /
@@ -46,4 +47,9 @@ momentum-only book).
   excluded and runs were made repeatable). It is the honest number for what the book now does.
 - The paper-book card's rule line now says "positive P/E required". The card title/rules are still hardcoded
   per strategy id (#956 stays open: the roster cards do not yet derive from `GET /api/strategies`).
+- **Known limit: a positive P/E is not a quality test.** A one-off gain passes it. On 2026-10-23 IDEA enters at a
+  `tl_pe` of 3.65 on a FY26 profit of about +34,500 cr that follows a FY25 loss of about -27,400 cr, and SPARC on
+  an FY26 EPS of 47.86 after -10.55. The filter removes the companies the book cannot value; it does not remove
+  companies whose latest earnings are unrepresentative. AHCL's `PE_TTM` series also stops at 2026-06-18 while the
+  other 19 targets run to 2026-10-16, so its P/E is four months old.
 - Reversible: restore the saved config from the JSON above.

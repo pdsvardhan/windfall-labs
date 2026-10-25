@@ -13,6 +13,10 @@
 #  - If more than 5% of names fail (rate limiting, a screener.in change), the live store is left
 #    untouched and the run is logged FAILED; the snapshot is kept either way.
 #
+# Known limits: it refreshes the names already in the store, so a company listed since the last
+# extension never enters it (extend with `python -m windfall.data.screener_fundamentals --symbols-file ...`);
+# failures are logged, not alerted; snapshots accumulate (about 15 MB each) with no retention.
+#
 # DRY_RUN=1  -> run on LIMIT names (default 5) into scratch, report, swap nothing.
 set -u
 APP=/mnt/storage/websites/windfall-labs
@@ -25,6 +29,10 @@ MAX_FAIL_PCT=5
 LIMIT="${LIMIT:-5}"
 
 log() { echo "[$(date '+%F %T')] $*" >> "$LOG"; }
+
+# two overlapping runs would each copy the live file and the later swap would win
+exec 9>/tmp/windfall-screener-refresh.lock
+flock -n 9 || { log "SKIPPED: another refresh is running"; exit 0; }
 
 mkdir -p "$SNAPDIR"
 STAMP="$(date +%F)"
@@ -74,6 +82,23 @@ if [ "$RC" -ne 0 ] || [ "$FAILED" -gt "$LIMIT_FAIL" ]; then
   grep -i 'failed' "$SCR/ingest.out" | head -20 >> "$LOG"
   exit 1
 fi
+# 'failed' is not the only way to lose a name: the ingest deletes a ticker's rows and re-inserts them, and a
+# page that now fails the store's self-check comes back 'quarantined', which the engine does not read. Compare
+# how many tickers the engine CAN read (high/low) before and after.
+USABLE=$(PYTHONPATH="$APP/backend" "$PY" - "$LIVE" "$SCR/screener_fundamentals.duckdb" <<'EOF'
+import sys, duckdb
+q = "SELECT count(DISTINCT ticker) FROM fundamentals_history WHERE confidence IN ('high','low')"
+a = duckdb.connect(sys.argv[1], read_only=True).execute(q).fetchone()[0]
+b = duckdb.connect(sys.argv[2], read_only=True).execute(q).fetchone()[0]
+print(a, b)
+EOF
+)
+set -- $USABLE
+if [ "$#" -ne 2 ] || [ "$2" -lt $(( $1 * 98 / 100 )) ]; then
+  log "FAILED: usable (high/low) tickers $USABLE (before after) - dropped more than 2%, live store NOT replaced"
+  exit 1
+fi
+log "usable (high/low) tickers before/after: $1/$2"
 if [ "${DRY_RUN:-0}" = "1" ]; then
   log "dry run ok — $FAILED failed of $TOTAL; nothing swapped"
   exit 0

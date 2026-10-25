@@ -78,9 +78,16 @@ EPS_DILUTED_TAGS = ("DilutedEarningsLossPerShareFromContinuingAndDiscontinuedOpe
                     "DilutedEarningsPerShareAfterExtraordinaryItems",
                     "DilutedEarningsLossPerShareFromContinuingOperations",
                     "DilutedEarningsPerShareBeforeExtraordinaryItems")
+_B_CONT, _B_DISC = ("BasicEarningsLossPerShareFromContinuingOperations",
+                    "BasicEarningsLossPerShareFromDiscontinuedOperations")
+_D_CONT, _D_DISC = ("DilutedEarningsLossPerShareFromContinuingOperations",
+                    "DilutedEarningsLossPerShareFromDiscontinuedOperations")
 REVENUE_TAGS = ("RevenueFromOperations", "InterestEarned", "Income")
 PAID_UP_TAGS = ("PaidUpValueOfEquityShareCapital",)
 FACE_VALUE_TAGS = ("FaceValueOfEquityShareCapital",)
+
+# NSE's legacy listing calls a standalone filing "Non-Consolidated"; the integrated one says "Standalone".
+_BASIS = {"consolidated": "consolidated", "standalone": "standalone", "non-consolidated": "standalone"}
 
 _FACT = re.compile(r"<(?:[A-Za-z0-9\-]+):([A-Za-z0-9_]+)\b([^>]*)>([^<]*)<")
 _CTX = re.compile(r"<xbrli:context\b[^>]*\bid=\"([^\"]+)\"[^>]*>(.*?)</xbrli:context>", re.S)
@@ -146,15 +153,27 @@ def parse_xbrl(text: str, hint: tuple | None = None) -> dict | None:
                 return facts[(t, c)]
         return None
 
+    def eps(tags, cont_tag, disc_tag, c):
+        """Per-share earnings. Some filers tag the discontinued-operations EPS with the continuing figure
+        although they have none, and the 'continuing and discontinued' total then arrives as their sum -
+        twice the real EPS (ADANIENT Sep-2022, 3MINDIA Sep-2025). That pattern is read as the continuing EPS."""
+        v = pick(tags, c)
+        cont, disc = facts.get((cont_tag, c)), facts.get((disc_tag, c))
+        if (v is not None and cont is not None and disc is not None and abs(disc) > 1e-9
+                and abs(v - (cont + disc)) <= 0.011 and abs(cont - disc) <= 0.011):
+            return cont
+        return v
+
     start, end = ctx["OneD"]
     out = {
         "period_end": end, "period_months": _months(start, end),
         "ytd_months": _months(*ctx["FourD"]) if "FourD" in ctx else None,
         "np": pick(NP_TAGS, "OneD"), "np_owners": pick(NP_OWNERS_TAGS, "OneD"),
-        "eps_basic": pick(EPS_BASIC_TAGS, "OneD"), "eps_diluted": pick(EPS_DILUTED_TAGS, "OneD"),
+        "eps_basic": eps(EPS_BASIC_TAGS, _B_CONT, _B_DISC, "OneD"),
+        "eps_diluted": eps(EPS_DILUTED_TAGS, _D_CONT, _D_DISC, "OneD"),
         "revenue": pick(REVENUE_TAGS, "OneD"),
         "paid_up": pick(PAID_UP_TAGS, "OneD"), "face_value": pick(FACE_VALUE_TAGS, "OneD"),
-        "np_ytd": pick(NP_TAGS, "FourD"), "eps_ytd": pick(EPS_BASIC_TAGS, "FourD"),
+        "np_ytd": pick(NP_TAGS, "FourD"), "eps_ytd": eps(EPS_BASIC_TAGS, _B_CONT, _B_DISC, "FourD"),
         "taxonomy": "banking" if ("InterestEarned", "OneD") in facts else "industrial",
     }
     if out["np"] is None and out["eps_basic"] is None:
@@ -185,7 +204,7 @@ def select_filings(legacy: list[dict], integrated: list[dict]) -> list[dict]:
         if str(r.get("cumulative") or "").lower().startswith("cum"):   # "Cumulative" = a year-to-date filing
             continue
         fd = _d(r.get("fromDate"), "%d-%b-%Y")
-        cands.append({"source": "legacy", "period_end": pe.date(), "from_date": fd.date() if fd else None, "basis": str(r.get("consolidated") or "").lower(),
+        cands.append({"source": "legacy", "period_end": pe.date(), "from_date": fd.date() if fd else None, "basis": _BASIS.get(str(r.get("consolidated") or "").strip().lower(), ""),
                       "broadcast_ts": bc, "audited": r.get("audited"), "url": url})
     for r in integrated:
         url = str(r.get("xbrl") or "")
@@ -194,7 +213,7 @@ def select_filings(legacy: list[dict], integrated: list[dict]) -> list[dict]:
         if "financial" not in str(r.get("type") or "").lower() or not url.lower().endswith(".xml") \
                 or pe is None or bc is None:
             continue
-        cands.append({"source": "integrated", "period_end": pe.date(), "basis": str(r.get("consolidated") or "").lower(),
+        cands.append({"source": "integrated", "period_end": pe.date(), "basis": _BASIS.get(str(r.get("consolidated") or "").strip().lower(), ""),
                       "broadcast_ts": bc, "audited": r.get("audited"), "url": url})
     best: dict[tuple, dict] = {}
     for c in cands:
@@ -269,6 +288,14 @@ def connect(path=DB_PATH):
     return con
 
 
+def dates_agree(parsed_end: dt.date, listed_end: dt.date, tolerance_days: int = 30) -> bool:
+    """A file whose own OneD quarter is not the quarter its listing row names (14 of 1,872 in the first
+    106 companies, always by exactly a year: AARTIDRUGS Jun-2025 carries Jun-2024's contexts) cannot be
+    trusted to say which quarter its numbers are. It is kept raw but not stored, so it can neither
+    overwrite the real quarter nor stand in for a missing one."""
+    return abs((parsed_end - listed_end).days) <= tolerance_days
+
+
 def _save_raw(symbol: str, c: dict, text: str) -> None:
     d = RAW_DIR / symbol
     d.mkdir(parents=True, exist_ok=True)
@@ -298,7 +325,7 @@ def reparse(con) -> dict:
         c["broadcast_ts"] = dt.datetime.fromisoformat(c["broadcast_ts"])
         text = gzip.decompress(meta_path.with_suffix(".xml.gz").read_bytes()).decode("utf-8")
         p = parse_xbrl(text, (c["from_date"], c["period_end"]))
-        if p is None:
+        if p is None or not dates_agree(p["period_end"], c["period_end"]):
             bad += 1
             continue
         _store(con, symbol, c, p)
@@ -314,8 +341,13 @@ def fetch_symbol(con, nse: Nse, symbol: str, alts=()) -> dict:
     candidate is asked and the listings are merged; a quarter filed under both is kept once."""
     legacy, integrated = [], []
     for sym in dict.fromkeys([symbol, *alts]):
-        legacy += _rows(nse.get(LEGACY_API, LEGACY_LANDING, {"index": "equities", "symbol": sym, "period": "Quarterly"}))
-        integrated += _rows(nse.get(INTEGRATED_API, INTEGRATED_LANDING, {"index": "equities", "symbol": sym}))
+        for attempt in range(2):
+            legacy += _rows(nse.get(LEGACY_API, LEGACY_LANDING, {"index": "equities", "symbol": sym, "period": "Quarterly"}))
+            integrated += _rows(nse.get(INTEGRATED_API, INTEGRATED_LANDING, {"index": "equities", "symbol": sym}))
+            if legacy or integrated:
+                break
+            if attempt == 0:      # an expired session answers 200 with nothing: re-land once before believing "empty"
+                nse.landed = {}
         if legacy or integrated:
             break      # the first ticker that answers is the company's current one
     chosen = select_filings(legacy, integrated)
@@ -337,6 +369,10 @@ def fetch_symbol(con, nse: Nse, symbol: str, alts=()) -> dict:
         if p is None:
             failed += 1
             detail.append(f"{c['period_end']}: not a results XBRL")
+            continue
+        if not dates_agree(p["period_end"], c["period_end"]):
+            failed += 1
+            detail.append(f"{c['period_end']}: file says {p['period_end']}")
             continue
         _store(con, symbol, c, p)
         new += 1
@@ -455,13 +491,25 @@ def main():
         todo = todo[:args.limit]
     nse = Nse(args.throttle)
     t0 = time.time()
+    streak = pauses = 0
     for i, sym in enumerate(todo, 1):
         try:
             r = fetch_symbol(con, nse, sym, alts[sym])
+            streak = 0
         except Exception as e:  # noqa: BLE001 — one bad symbol must not end a 20-hour run
             con.execute("INSERT OR REPLACE INTO fetch_log VALUES (?,?,?,?,?,?,?)",
                         [sym, "error", 0, 0, 0, str(e)[:300], dt.datetime.now(dt.timezone.utc).replace(tzinfo=None)])
             r = {"symbol": sym, "status": "error"}
+            streak += 1
+            if streak >= 5:        # five in a row is a block or an outage, not five bad symbols
+                pauses += 1
+                if pauses > 3:
+                    _log.error("giving up after %d pauses; re-run to resume", pauses - 1)
+                    break
+                _log.warning("5 consecutive errors (last: %s) - pausing 10 min", str(e)[:80])
+                time.sleep(600)
+                nse = Nse(args.throttle)
+                streak = 0
         if i % 10 == 0 or i == len(todo):
             el = time.time() - t0
             _log.info("%d/%d %s  %.0fs elapsed, %.0fs/name, %d requests", i, len(todo), r["status"],

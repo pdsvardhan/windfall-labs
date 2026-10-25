@@ -23,15 +23,18 @@ Full procedure (staging, ingest, rebuild, verify) lives on the server at
 
 Row 4 is the **lite** version (to-do #858): the engine reads six of leg1's 25 codes — `PE_TTM`/`PEG_TTM`/`PBV_A`
 (`tl_pe`/`tl_peg`/`tl_pbv`) and `PITROSKI_F`/`NP_TTM_GROWTH`/`SR_TTM_GROWTH` (`_RAW_FUND`) — and the quarterly
-half of those already arrives current, so the monthly run fetches the three valuation codes only. The other 19
-codes feed `pnl_quarterly` and `ownership`, which nothing reads; the full script stays for the day something does.
+half (`growth_quality`) is quarterly, so the monthly run fetches the three valuation codes only and leaves
+`FETCH_QUARTERLY` off. **Switch `FETCH_QUARTERLY` on in the month after a results season closes** — once
+`MAX(date)` in `growth_quality` is a quarter behind the last quarter-end — then off again; until then
+`tl_piotroski` / `tl_np_growth` / `tl_rev_growth` freeze for non-megacap names after each quarter-end (the
+~99 megacaps get theirs from the megacap harvester). The other 19 codes feed `pnl_quarterly` and `ownership`, which nothing reads; the full script stays for the day something does.
 
 **Since adr-050 (iter-204) row 3 is retired** — see the situational table. **3 and 4 were added 2026-09-07 (adr-046, to-do #851).** This table used to list only the first
 three and describe the OHLCV pull as optional. That is how the eligible universe silently collapsed
 to 293 of 2,190 stocks: `ohlcv` also feeds `pit_mcap` → `universe_membership`, so skipping it
-freezes *which stocks can be picked*, not just their price history. leg1 is here because it is the
-only script that refreshes `valuation_ratios` (the `tl_pe` / `tl_peg` / `tl_pbv` factors) for the
-whole universe rather than the ~99 megacaps — it had been parked in `_done/` while a live paper
+freezes *which stocks can be picked*, not just their price history. leg1 (now its lite version, row 4)
+is here because it is the only script that refreshes `valuation_ratios` (the `tl_pe` / `tl_peg` / `tl_pbv`
+factors) for the whole universe rather than the ~99 megacaps — it had been parked in `_done/` while a live paper
 book ranked half its holdings on P/Es frozen since July.
 
 As of 2026-09-07 `ingest_refresh.py` reads every table leg1 produces — `valuation_ratios`,

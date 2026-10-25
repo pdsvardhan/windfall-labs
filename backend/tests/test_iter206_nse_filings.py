@@ -236,3 +236,69 @@ def test_raw_filings_are_kept_so_a_parser_fix_can_be_replayed_without_a_refetch(
     row = con.execute("SELECT symbol, period_end, eps_basic, basis, broadcast_ts FROM filings").fetchone()
     assert row[:4] == ("TCS", dt.date(2024, 12, 31), 34.21, "consolidated")
     assert row[4] == dt.datetime(2025, 1, 20, 10, 0)
+
+
+def test_nses_legacy_label_for_a_standalone_filing_is_non_consolidated():
+    """The first version dropped every legacy standalone filing: the real label is 'Non-Consolidated'."""
+    got = nf.select_filings([_legacy("31-Dec-2024", "20-Jan-2025 10:00:00", basis="Non-Consolidated")], [])
+    assert [(c["period_end"], c["basis"]) for c in got] == [(dt.date(2024, 12, 31), "standalone")]
+    both = nf.select_filings([_legacy("31-Dec-2024", "20-Jan-2025 10:00:00", basis="Non-Consolidated"),
+                              _legacy("31-Dec-2024", "21-Jan-2025 10:00:00", basis="Consolidated")], [])
+    assert [c["basis"] for c in both] == ["consolidated"]
+
+
+def _eps_file(total, cont, disc):
+    tag = "in-bse-fin:BasicEarningsLossPerShare"
+    return (HEAD + _ctx("OneD", "2022-07-01", "2022-09-30")
+            + f'<{tag}FromContinuingAndDiscontinuedOperations contextRef="OneD" unitRef="INRPerShare">{total}</{tag}FromContinuingAndDiscontinuedOperations>'
+            + f'<{tag}FromContinuingOperations contextRef="OneD" unitRef="INRPerShare">{cont}</{tag}FromContinuingOperations>'
+            + f'<{tag}FromDiscontinuedOperations contextRef="OneD" unitRef="INRPerShare">{disc}</{tag}FromDiscontinuedOperations>'
+            + '<in-bse-fin:ProfitLossForPeriod contextRef="OneD" unitRef="INR">1</in-bse-fin:ProfitLossForPeriod></xbrli:xbrl>')
+
+
+def test_a_total_eps_that_is_the_sum_of_two_identical_parts_is_read_as_the_continuing_eps():
+    """ADANIENT Sep-2022 tags continuing 4.05, discontinued 4.05 (there is none) and total 8.10."""
+    assert nf.parse_xbrl(_eps_file("8.10", "4.05", "4.05"))["eps_basic"] == 4.05
+    assert nf.parse_xbrl(_eps_file("4.05", "4.05", "0.00"))["eps_basic"] == 4.05, "no discontinued: unchanged"
+    assert nf.parse_xbrl(_eps_file("3.00", "4.05", "-1.05"))["eps_basic"] == 3.00, "a real discontinued loss: the total stands"
+    assert nf.parse_xbrl(_eps_file("-8.10", "-4.05", "-4.05"))["eps_basic"] == -4.05, "ABAN: a loss doubled the same way"
+
+
+def test_a_file_that_names_a_different_quarter_than_its_listing_is_not_stored(tmp_path, monkeypatch):
+    """AARTIDRUGS Jun-2025's file carries Jun-2024's contexts; storing it would overwrite the real Jun-2024 row."""
+    assert nf.dates_agree(dt.date(2024, 12, 31), dt.date(2024, 12, 31))
+    assert nf.dates_agree(dt.date(2024, 12, 30), dt.date(2024, 12, 31))
+    assert not nf.dates_agree(dt.date(2024, 6, 30), dt.date(2025, 6, 30))
+    monkeypatch.setattr(nf, "RAW_DIR", tmp_path / "raw")
+    con = nf.connect(tmp_path / "f.duckdb")
+
+    class Fake:
+        n = 0
+
+        def get(self, url, landing, params=None, json_=True):
+            if json_:
+                return [] if "integrated" in url else [_legacy("31-Dec-2025", "20-Jan-2026 10:00:00")]
+            return INDUSTRIAL          # its own quarter is Dec-2024
+
+    r = nf.fetch_symbol(con, Fake(), "TCS")
+    assert (r["new"], r["failed"], r["status"]) == (0, 1, "partial")
+    assert con.execute("SELECT count(*) FROM filings").fetchone() == (0,)
+
+
+def test_an_empty_answer_is_retried_after_a_fresh_landing_before_it_is_believed(tmp_path, monkeypatch):
+    monkeypatch.setattr(nf, "RAW_DIR", tmp_path / "raw")
+    con = nf.connect(tmp_path / "f.duckdb")
+
+    class Flaky:
+        n, landed, calls = 0, {"x": 1}, 0
+
+        def get(self, url, landing, params=None, json_=True):
+            if json_:
+                if "integrated" in url:
+                    return {}
+                Flaky.calls += 1
+                return {} if Flaky.calls == 1 else [_legacy("31-Dec-2024", "20-Jan-2025 10:00:00")]
+            return INDUSTRIAL
+
+    r = nf.fetch_symbol(con, Flaky(), "TCS")
+    assert r["new"] == 1 and r["status"] == "done", "a stale session's empty first answer must not mark the symbol empty"

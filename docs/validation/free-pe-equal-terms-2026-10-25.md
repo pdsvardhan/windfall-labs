@@ -20,7 +20,11 @@ with `EXCLUDE_FIN=1`); results: `data/free_pe.duckdb` table `pe_backtests_equal`
    | 2026-08 | 1,594 | 1,450 | 1,429 |
 
    The free P/E now sees as many non-bank companies as Trendlyne's does.
-2. **Banks and NBFCs** (which the free P/E can never see) are excluded from every arm, by sector label.
+2. **Banks and NBFCs** (which the free P/E can never see) are excluded from every arm by sector label. The match
+   is the substrings `bank` and `financ` on Trendlyne's sector label, which covers the whole "BANKING AND FINANCE"
+   sector — insurers, brokers and asset managers too, so the exclusion is wider than "banks and NBFCs". Companies
+   with no sector label (287 of 2,249 ever in the universe, among them dead banks such as ALBK and ANDHRABANK) are
+   not excluded in any arm.
 3. **Repeatability** (#967). Two sources of run-to-run difference were fixed, and every cell below was run
    twice: the two runs are identical to the decimal (range 0.0 in all 12 cells).
 
@@ -37,14 +41,23 @@ arm. CAGR / Sharpe / max drawdown:
 
 Overlap of holdings with the momentum-only book, same rebalance days: as configured 14% / 9% / 20% (10y /
 post / pre); Trendlyne P/E required 8% / 7% / 9%; free P/E required 6% / 5% / 7%. The two P/E-required books
-share 34% / 32% / 37% of their holdings with each other.
+share 34% / 32% / 37% of their holdings with each other (printed by `pe_backtests.py` in its run log; not stored
+in the result table).
 
 ## What it shows
 
+- **The iteration-201 headline reversed.** There the free P/E (required) made 23.5% / 22.2% / 22.4% and beat the
+  as-configured book after COVID (22.2% vs 17.1%) and the momentum-only book (18.3%). On equal terms it makes
+  18.2% / 16.6% / 17.4% and trails momentum-only in all three windows; the as-configured book is ahead of it over
+  ten years and pre-COVID. Most of the earlier lead came from the unequal comparison (half the universe, banks
+  on one side) and the repeatability bug (#967), not from the free P/E.
 - **The free P/E is at least as good as Trendlyne's on equal terms.** It leads by 3.2 / 0.5 / 2.3 CAGR points
-  (10y / post-COVID / pre-COVID) with a better Sharpe in all three windows. The iteration-201 gap (5.1 / 2.7 /
+  (10y / post-COVID / pre-COVID) with a better Sharpe in all three windows, and a slightly worse maximum drawdown (−73.1% vs −72.4%, −36.9% vs
+  −34.6%, −73.1% vs −72.4%). The iteration-201 gap (5.1 / 2.7 /
   6.0) was partly the coverage difference; between a fifth and two-thirds of it survives the fix. The
-  post-COVID gap (0.5 points) is small and no significance test was run, so read it as "no worse", not "better".
+  post-COVID gap (0.5 points) is small. Each cell is one path (two identical runs of the same data, not two
+  independent samples) and no significance test was run, so read it as "no worse", not "better"; the free P/E also
+  uses restated EPS (see the caveats).
 - **Requiring a P/E costs return in the early years and nothing since 2021.** Against the as-configured book,
   requiring Trendlyne's P/E gives up 8.0 points over ten years and 15.2 points before COVID, and 0.2 points
   after. The as-configured book's extra return is the 2020–21 stretch, as iteration 201 found.
