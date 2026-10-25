@@ -33,7 +33,8 @@ leg (iter-22: a DVM-only ingest would have deleted 806k rows / 138 megacaps).
 | 1 | `trendlyne_dvm_harvester.js` | ~15–20 min | `tl_dvm_history_partNN.csv`, `tl_stocks.csv` |
 | 2 | `trendlyne_harvester_megacap.js` | ~10 min | `tl_*_megacap.csv` (covers the index-megacap crack) |
 | ~~3~~ | ~~`trendlyne_harvester_ohlcv.js`~~ — **retired (adr-050)**: prices come from NSE | — | — |
-| 4 | `trendlyne_harvester_leg1.js` | ~25 min | `tl_valuation_ratios_partNN.csv`, `tl_pnl_quarterly_*`, `tl_growth_quality_*`, `tl_ownership_*` |
+| 4 | `trendlyne_harvester_leg1_lite.js` | ~20 min | `tl_valuation_ratios_partNN.csv` (plus `tl_growth_quality_*` when `FETCH_QUARTERLY` is switched on — do that in the month after a results season closes, i.e. once `MAX(date)` in `growth_quality` is a quarter behind the last quarter-end; otherwise `tl_piotroski` / `tl_np_growth` / `tl_rev_growth` freeze for non-megacap names) |
+| 4b | `trendlyne_harvester_leg1.js` — the full 25-code version, ~150 min; only if a strategy starts to read `pnl_quarterly` or `ownership` | ~150 min | adds `tl_pnl_quarterly_*`, `tl_ownership_*` |
 | 5 | `trendlyne_harvester_gapfill.js` — only if specific names froze | ~2 min | `tl_*_gapfill.csv` |
 
 Gotchas (all cost a bug once):
@@ -126,9 +127,8 @@ seven-week-old P/Es while reporting a current `as_of`.
 - Replaced per **(pk, metric)**, the same shape as `dvm_history`'s (pk, score): a harvest carrying
   only `PE_TTM` cannot delete a stock's `PEG_TTM` and `PBV_A`.
 - The monthly megacap leg covers ~99 names. **Full coverage needs
-  `_done/trendlyne_harvester_leg1.js` run as well** — it is the only script that pulls valuation
-  ratios for the whole ~1,800-name universe. Until it is promoted back into the monthly set, the
-  non-megacap names keep ageing.
+  `trendlyne_harvester_leg1_lite.js` run as well** (row 4 above) — it is the only script that pulls
+  valuation ratios for the whole ~1,800-name universe; without it the non-megacap names keep ageing.
 - Since iter-172 a stale factor is no longer silent: `resolve()` emits a `stale factor: ...`
   warning on any daily panel carried forward more than 14 days. If you see one after a refresh,
   the corresponding table did not land — check the staging dir before deleting it.

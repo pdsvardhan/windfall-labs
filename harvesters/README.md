@@ -18,14 +18,23 @@ Full procedure (staging, ingest, rebuild, verify) lives on the server at
 | 1 | `trendlyne_dvm_harvester.js` | **weekly** | ~20 min |
 | 2 | `trendlyne_harvester_megacap.js` | monthly | ~10 min |
 | ~~3~~ | ~~`trendlyne_harvester_ohlcv.js`~~ | **retired (adr-050)** — prices come from NSE | — |
-| 4 | `trendlyne_harvester_leg1.js` | **monthly** | ~25 min |
+| 4 | `trendlyne_harvester_leg1_lite.js` | **monthly** | ~20 min (3 codes, ~5,500 requests; `FETCH_QUARTERLY` off) |
+| 4b | `trendlyne_harvester_leg1.js` (full: 25 codes, ~46,000 requests) | only if a strategy needs `pnl_quarterly` or `ownership` | ~150 min |
+
+Row 4 is the **lite** version (to-do #858): the engine reads six of leg1's 25 codes — `PE_TTM`/`PEG_TTM`/`PBV_A`
+(`tl_pe`/`tl_peg`/`tl_pbv`) and `PITROSKI_F`/`NP_TTM_GROWTH`/`SR_TTM_GROWTH` (`_RAW_FUND`) — and the quarterly
+half (`growth_quality`) is quarterly, so the monthly run fetches the three valuation codes only and leaves
+`FETCH_QUARTERLY` off. **Switch `FETCH_QUARTERLY` on in the month after a results season closes** — once
+`MAX(date)` in `growth_quality` is a quarter behind the last quarter-end — then off again; until then
+`tl_piotroski` / `tl_np_growth` / `tl_rev_growth` freeze for non-megacap names after each quarter-end (the
+~99 megacaps get theirs from the megacap harvester). The other 19 codes feed `pnl_quarterly` and `ownership`, which nothing reads; the full script stays for the day something does.
 
 **Since adr-050 (iter-204) row 3 is retired** — see the situational table. **3 and 4 were added 2026-09-07 (adr-046, to-do #851).** This table used to list only the first
 three and describe the OHLCV pull as optional. That is how the eligible universe silently collapsed
 to 293 of 2,190 stocks: `ohlcv` also feeds `pit_mcap` → `universe_membership`, so skipping it
-freezes *which stocks can be picked*, not just their price history. leg1 is here because it is the
-only script that refreshes `valuation_ratios` (the `tl_pe` / `tl_peg` / `tl_pbv` factors) for the
-whole universe rather than the ~99 megacaps — it had been parked in `_done/` while a live paper
+freezes *which stocks can be picked*, not just their price history. leg1 (now its lite version, row 4)
+is here because it is the only script that refreshes `valuation_ratios` (the `tl_pe` / `tl_peg` / `tl_pbv`
+factors) for the whole universe rather than the ~99 megacaps — it had been parked in `_done/` while a live paper
 book ranked half its holdings on P/Es frozen since July.
 
 As of 2026-09-07 `ingest_refresh.py` reads every table leg1 produces — `valuation_ratios`,
@@ -149,9 +158,10 @@ are in `FUNDAMENTALS-EXPORT-COLUMNS.md`. Roughly quarterly; a cron nags past 35 
   failed param wasn't pushed, counted, or reported.
 
 Each stock is three separate fetches (`d`, `v`, `m`). Losing one or two left the stock **looking
-populated while carrying a third of its history**. Because `ingest_refresh.py` replaces a covered
-pk's rows wholesale, those partials would have *deleted* real history — its shrink guard caught
-it. Measured on the 2026-09-07 refresh: 24 stocks with zero rows, **62 more with 1-of-3 params**,
+populated while carrying a third of its history**. At the time `ingest_refresh.py` replaced a covered
+pk's rows wholesale, so those partials would have *deleted* real history — its shrink guard caught
+it. (Since `0b0ecce` it replaces per `(pk, score)` for `dvm_history` and per `(pk, metric)` for
+`valuation_ratios`, so a partial harvest can no longer delete a series it did not carry.) Measured on the 2026-09-07 refresh: 24 stocks with zero rows, **62 more with 1-of-3 params**,
 including GODREJCP, VOLTAS, MOTHERSON, JSWENERGY, ATGL, MAZDOCK, BLUEDART.
 
 **Fix:** both scripts now track every failed `(pk, param)` and run a **recovery sweep** at CONC=1
@@ -186,8 +196,8 @@ generalises to every row still in this table: **an unwired table does not announ
 harvester emits a CSV the ingest does not read, that is a silent staleness bug waiting for a
 consumer, not a harmless extra file.
 
-Megacap coverage only, for now: the monthly leg carries ~99 names. `leg1` is what covers the full
-~1,800, and promoting it back into the monthly set is the remaining half of #849.
+The megacap leg carries ~99 names; `leg1_lite` (row 4) is what covers the full ~1,800 and is part of the
+monthly set.
 
 | Script | What it built |
 |---|---|

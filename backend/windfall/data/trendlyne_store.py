@@ -210,11 +210,15 @@ def _alias_to_canonical(symbols) -> dict:
     """{every historical ticker -> the requested (current) symbol}, so Bhavcopy rows found under an
     old ticker can be relabelled to the symbol the caller asked for."""
     al = _ticker_aliases()
+    req = sorted({s.upper() for s in symbols})
+    asked = set(req)
     m: dict = {}
-    for s in symbols:
-        s = s.upper()
-        for a in al.get(s, frozenset({s})):
-            m[a] = s
+    for s in req:
+        for a in sorted(al.get(s, frozenset({s}))):
+            if a in asked and a != s:
+                continue          # a ticker that is itself requested keeps its own label (#967)
+            m.setdefault(a, s)    # an alias two requested symbols share goes to the alphabetically first
+        m[s] = s
     return m
 
 
@@ -540,7 +544,7 @@ def adjusted_close_panel(symbols, start=None, end=None, field: str = "close",
         # data-quality warning by the caller, never a silent exclusion.
         ok_dead = [r[0] for r in con.execute(
             "SELECT DISTINCT symbol FROM delistings WHERE symbol IN ("
-            + ",".join(["?"] * len(dead)) + ")", dead).fetchall()]
+            + ",".join(["?"] * len(dead)) + ") ORDER BY symbol", dead).fetchall()]
         if ok_dead:
             a2c = _alias_to_canonical(ok_dead)   # incl pre-rename tickers of renamed-then-dead names (adr-025)
             dtick = list(a2c.keys())
@@ -720,19 +724,30 @@ def pit_universe(asof_date, floor_cr: float = MCAP_FLOOR_CR) -> list[str]:
     asof = pd.Timestamp(asof_date)
     d = str(asof.date())
     if _has_nl() and asof >= MCAP_CUTOVER:
+        # The latest reading in the window; where several rows share that date (a company's tickers
+        # map to one engine symbol) the LARGEST wins — arg_max over a tie returns whichever row the
+        # scan met first, which differs between processes (#967).
         rows = _con().execute("""
             SELECT symbol FROM (
-              SELECT t.engine_symbol AS symbol, arg_max(m.mcap_cr, m.date) AS mc
-              FROM nl.mcap_daily m JOIN nl.ticker_map t ON t.ticker = m.symbol
-              WHERE m.date BETWEEN CAST(? AS DATE) - 14 AND CAST(? AS DATE)
-              GROUP BY 1)
+              SELECT symbol, max(mcap_cr) AS mc FROM (
+                SELECT t.engine_symbol AS symbol, m.date, m.mcap_cr,
+                       max(m.date) OVER (PARTITION BY t.engine_symbol) AS last_date
+                FROM nl.mcap_daily m JOIN nl.ticker_map t ON t.ticker = m.symbol
+                WHERE m.date BETWEEN CAST(? AS DATE) - 14 AND CAST(? AS DATE))
+              WHERE date = last_date
+              GROUP BY symbol)
             WHERE mc > ?""", [d, d, floor_cr]).fetchall()
         cands = {r[0] for r in rows}
     else:
+        # universe_membership holds twin rows (live + dead) for a few symbols (MBECL, MAZDA,
+        # SHALPAINTS); same rule as above — the latest date, then the larger value (#967).
         rows = _con().execute("""
             SELECT symbol FROM (
-              SELECT symbol, arg_max(mcap_cr, date) m FROM universe_membership
-              WHERE date BETWEEN CAST(? AS DATE) - 14 AND CAST(? AS DATE)
+              SELECT symbol, max(mcap_cr) AS m FROM (
+                SELECT symbol, date, mcap_cr, max(date) OVER (PARTITION BY symbol) AS last_date
+                FROM universe_membership
+                WHERE date BETWEEN CAST(? AS DATE) - 14 AND CAST(? AS DATE))
+              WHERE date = last_date
               GROUP BY symbol)
             WHERE m > ?""", [d, d, floor_cr]).fetchall()
         alias = _frozen_alias()
